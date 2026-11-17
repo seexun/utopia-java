@@ -13,4 +13,7 @@ for ep in getInfo getRouters system/user/list system/role/list system/menu/list 
   CODE=$(curl -s -H "$AUTH" "$BASE/$ep?pageNum=1&pageSize=10" | sed -n 's/.*"code":\([0-9]*\).*/\1/p')
   [ "$CODE" = "200" ] && echo "PASS: $ep" || { echo "FAIL: $ep code=$CODE"; exit 1; }
 done
+# 日期范围筛选（params.beginTime/endTime 经 mapper 参数侧 ::timestamp 转型，回归 to_char(varchar) 必炸问题）
+CODE=$(curl -s -H "$AUTH" "$BASE/system/user/list?pageNum=1&pageSize=10&params%5BbeginTime%5D=2026-01-01&params%5BendTime%5D=2026-12-31" | sed -n 's/.*"code":\([0-9]*\).*/\1/p')
+[ "$CODE" = "200" ] && echo "PASS: system/user/list date-range" || { echo "FAIL: system/user/list date-range code=$CODE"; exit 1; }
 echo "ALL PASS"

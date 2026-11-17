@@ -51,10 +51,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 				AND config_key like concat('%', #{configKey}, '%')
 			</if>
 			<if test="params.beginTime != null and params.beginTime != ''"><!-- 开始时间检索 -->
-				and to_char(create_time,'YYYYMMDD') &gt;= to_char(#{params.beginTime},'YYYYMMDD')
+				and to_char(create_time,'YYYYMMDD') &gt;= to_char(#{params.beginTime}::timestamp,'YYYYMMDD')
 			</if>
 			<if test="params.endTime != null and params.endTime != ''"><!-- 结束时间检索 -->
-				and to_char(create_time,'YYYYMMDD') &lt;= to_char(#{params.endTime},'YYYYMMDD')
+				and to_char(create_time,'YYYYMMDD') &lt;= to_char(#{params.endTime}::timestamp,'YYYYMMDD')
 			</if>
 		</where>
     </select>

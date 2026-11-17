@@ -69,10 +69,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 				AND lower(table_comment) like lower(concat('%', #{tableComment}, '%'))
 			</if>
 			<if test="params.beginTime != null and params.beginTime != ''"><!-- 开始时间检索 -->
-				AND to_char(create_time,'YYYYMMDD') &gt;= to_char(#{params.beginTime},'YYYYMMDD')
+				AND to_char(create_time,'YYYYMMDD') &gt;= to_char(#{params.beginTime}::timestamp,'YYYYMMDD')
 			</if>
 			<if test="params.endTime != null and params.endTime != ''"><!-- 结束时间检索 -->
-				AND to_char(create_time,'YYYYMMDD') &lt;= to_char(#{params.endTime},'YYYYMMDD')
+				AND to_char(create_time,'YYYYMMDD') &lt;= to_char(#{params.endTime}::timestamp,'YYYYMMDD')
 			</if>
 		</where>
 	</select>
