@@ -9,8 +9,8 @@
     <version>1.0.0-SNAPSHOT</version>
 
     <name>jknow</name>
-    <url>http://www.localhost</url>
-    <description>若依管理系统</description>
+    <url>http://localhost</url>
+    <description>jknow 企业知识图谱平台</description>
     
     <properties>
         <jknow.version>1.0.0-SNAPSHOT</jknow.version>
