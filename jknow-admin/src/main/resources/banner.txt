@@ -1,0 +1,6 @@
+        _ ____  __  __ 
+       | |  _ \|  \/  |
+       | | |_) | |\/| |  Knowledge Graph Platform
+   _   | |  _ <| |  | |  (jknow 1.0.0, Spring Boot 4)
+  | |__| | |_) | |  | |
+   \____/|____/|_|  |_|  tech.seexun.jknow
