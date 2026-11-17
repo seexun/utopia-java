@@ -47,3 +47,6 @@ nbdist/
 !*/build/*.xml
 
 logs/
+
+# 应用运行时数据目录（jknow-admin/data/secret.key 等首启产物，勿入库）
+data/
