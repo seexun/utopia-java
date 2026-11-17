@@ -133,3 +133,12 @@ t.s.j.JknowApplication - Started JknowApplication in 7.878 seconds (process runn
 ## 七、复跑指引
 
 见 `README.md` 本地启动：compose 起依赖 → `mvn install -q -DskipTests` → 带端口变量 `spring-boot:run` → `./scripts/smoke-p0.sh`。默认账号 admin / admin123，接口文档 http://localhost:19080/swagger-ui.html（终验实测 302→200）。
+
+## 八、P1 首任务清单（终审交接，来自整分支最终审查）
+
+1. surefire 3.5.6 上移根 pom `<pluginManagement>`——utopia 测试随迁进各模块前必须，否则 JUnit5 静默不执行
+2. 规格 §3 环境变量名对齐：实现为 JKNOW_PG_HOST/JKNOW_PG_PORT（默认 5432）+ JKNOW_REDIS_*（默认 36379），规格写的是 JKNOW_JDBC_URL/JKNOW_DB_USERNAME/JKNOW_DB_PASSWORD——P1 统一（补别名或勘误规格）
+3. bin/run.bat:11 JVM 参数在 jar 后（上游原样）
+4. 约定：db/migration 新文件禁带事务控制语句（V0000 尾部裸 `commit;` 备案为已知豁免，改它动 checksum 得不偿失）
+5. SwaggerConfig description 上游 XXX 占位文案；V0000 种子 17 行"若依"演示数据随 V0100 菜单种子时替换
+6. gen 模块日期筛选 no-op 与 order by relname 语义损失（触发器方案评估）
