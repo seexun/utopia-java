@@ -1,6 +1,8 @@
 package tech.seexun.jknow.framework.config;
 
+import jakarta.servlet.Filter;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -58,6 +60,16 @@ public class SecurityConfig
     @Autowired
     private PermitAllUrlProperties permitAllUrl;
 
+    /**
+     * 业务身份桥接 filter（jknow-admin 的 web.knowledge.auth.ClientContextBridgeFilter，
+     * bean 名限定注入——framework 不依赖 admin 模块；桥 bean 不存在时安全链保持原样）。
+     * 挂在 JwtAuthenticationTokenFilter 之后：若依 token 建立 LoginUser 后折算业务
+     * UserRow/ClientContext 请求属性（P1 任务 7 方案 B）。
+     */
+    @Autowired(required = false)
+    @Qualifier("clientContextBridgeFilter")
+    private Filter clientContextBridgeFilter;
+
 	/**
 	 * 身份验证实现
 	 */
@@ -85,6 +97,15 @@ public class SecurityConfig
     @Bean
     protected SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception
     {
+        // 业务身份桥接（P1 任务 7）：若依 token → 业务 UserRow/ClientContext 请求属性。
+        // 桥挂在 UsernamePasswordAuthenticationFilter 之后（JwtAuthenticationTokenFilter 经
+        // addFilterBefore 站在它前面——即链序 jwt → bridge，LoginUser 已就位才有得折算；
+        // addFilterAfter 的锚必须是有注册序的标准 filter，自定义 filter 类不行）。bean 缺席
+        // （非 admin 装配形态）时链不变。
+        if (clientContextBridgeFilter != null)
+        {
+            httpSecurity.addFilterAfter(clientContextBridgeFilter, UsernamePasswordAuthenticationFilter.class);
+        }
         return httpSecurity
             // CSRF禁用，因为不使用session
             .csrf(csrf -> csrf.disable())

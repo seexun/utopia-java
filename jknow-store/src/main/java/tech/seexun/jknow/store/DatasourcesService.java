@@ -21,7 +21,7 @@ import tech.seexun.jknow.store.mapper.DatasourcesMapper.DataSourceRow;
  * 开不了（"(sealed with another key)"），不把密文当 URL 去解析。
  *
  * <p>钥匙解析（secrets.rs:47-58 parse_key 的 Java 对等）：环境变量
- * {@code UTOPIA_SECRET_KEY}（64 位十六进制或 44 位 base64，都收）；未设时与 Rust
+ * {@code JKNOW_SECRET_KEY}（64 位十六进制或 44 位 base64，都收）；未设时与 Rust
  * 「一个进程一把钥匙」的未初始化语义一致——开封只认明文（无前缀原样返回，seals.rs:87-89）。
  */
 @Service
@@ -34,7 +34,7 @@ public class DatasourcesService {
     private final SecretKeySpec key;
 
     public DatasourcesService(DatasourcesMapper datasources,
-                              @Value("${UTOPIA_SECRET_KEY:}") String secretKey) {
+                              @Value("${JKNOW_SECRET_KEY:}") String secretKey) {
         this.datasources = datasources;
         this.key = parseKey(secretKey);
     }

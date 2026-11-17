@@ -103,12 +103,13 @@
                  WHERE kb_id = #{kbId} AND merged_into IS NULL) AS entities
   </select>
 
-  <!-- access.rs:101-112（kb_members：停用的人不出现，display_name 序；源内行注释保留） -->
+  <!-- access.rs:101-112（kb_members：停用的人不出现，nick_name 序）——身份主档切
+       sys_user（P1 任务 7）：email→user_name、在职=del_flag='0' AND status='0' -->
   <select id="selectKbMembers" resultMap="kbMemberView">
-    SELECT m.user_id, u.email, u.display_name, m.role
-             FROM kb_members m JOIN users u ON u.id = m.user_id
-             -- 停用的人不出现在成员列表里（见 `users.deactivated_at`）；成员关系那一行留着
-             WHERE m.kb_id = #{kbId} AND u.deactivated_at IS NULL ORDER BY u.display_name
+    SELECT m.user_id, u.user_name AS email, u.nick_name AS display_name, m.role
+             FROM kb_members m JOIN sys_user u ON u.utopia_uuid = m.user_id
+             -- 停用的人不出现在成员列表里（sys_user del_flag='2' 或 status='1'）；成员关系那一行留着
+             WHERE m.kb_id = #{kbId} AND u.del_flag = '0' AND u.status = '0' ORDER BY u.nick_name
   </select>
 
   <!-- access.rs:142-165（my_kb_infos：$2=user；LEFT JOIN 三连，doc/member 计数子查询） -->
@@ -116,13 +117,13 @@
     SELECT k.id AS kb_id,
                     m.role AS member_role,
                     m.created_at AS joined_at,
-                    inviter.display_name AS added_by_name,
+                    inviter.nick_name AS added_by_name,
                     (SELECT count(*) FROM documents d
                       WHERE d.kb_id = k.id AND d.deleted_at IS NULL) AS doc_count,
                     (SELECT count(*) FROM kb_members mm WHERE mm.kb_id = k.id) AS member_count
              FROM knowledge_bases k
              LEFT JOIN kb_members m ON m.kb_id = k.id AND m.user_id = #{userId}
-             LEFT JOIN users inviter ON inviter.id = m.added_by
+             LEFT JOIN sys_user inviter ON inviter.utopia_uuid = m.added_by
              WHERE k.id = ANY(#{kbIds,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler})
   </select>
 

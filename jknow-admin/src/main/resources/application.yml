@@ -30,21 +30,6 @@ jknow:
     url: ${JKNOW_ES_URL:http://localhost:9200}
     reconcile-on-startup: ${JKNOW_ES_RECONCILE:false}
 
-# —— utopia: 别名段：与上方 jknow: 业务子键同值（T7 统一改 jknow. 后删除）——
-# 过渡期双键：jknow-store SecretsConfiguration @Value("${utopia.data-dir:data}")、
-# jknow-search ElasticsearchConfig @Value("${utopia.elasticsearch.url:...}") 等源码引用
-# 尚未改键（server 侧 T7 搬运时统一替换为 jknow.*，届时本段整体删除，勿新增引用）。
-utopia:
-  health:
-    version: 1.0.0
-  data-dir: ${JKNOW_DATA_DIR:data}
-  migration-url: ${JKNOW_MIGRATION_URL:}
-  jobs:
-    worker-enabled: ${JKNOW_JOBS_WORKER:false}
-  elasticsearch:
-    url: ${JKNOW_ES_URL:http://localhost:9200}
-    reconcile-on-startup: ${JKNOW_ES_RECONCILE:false}
-
 # 开发环境配置
 server:
   # 服务器的HTTP端口，默认为8080
@@ -89,13 +74,14 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: false
-  # 文件上传
+  # 文件上传（P1 任务 7：并入业务上传契约——api/mod.rs:51 MAX_UPLOAD_BYTES 100MiB，
+  # 文档上传族按 100MB；对若依自身上传上限为放宽，无收缩面）
   servlet:
     multipart:
       # 单个文件大小
-      max-file-size: 10MB
+      max-file-size: 100MB
       # 设置总上传的文件大小
-      max-request-size: 20MB
+      max-request-size: 100MB
   jackson:
     time-zone: GMT+8
     date-format: yyyy-MM-dd HH:mm:ss
@@ -145,6 +131,9 @@ mybatis:
   mapperLocations: classpath*:mapper/**/*Mapper.xml
   # 加载全局的配置文件
   configLocation: classpath:mybatis/mybatis-config.xml
+  # 业务 mapper（jknow-store）类型处理器包（UUID/jsonb/数组列；源 utopia-server
+  # application.yml mybatis.type-handlers-package 并入，P1 任务 7）
+  typeHandlersPackage: tech.seexun.jknow.store.typehandler
 
 # PageHelper分页插件
 pagehelper:

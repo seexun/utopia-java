@@ -127,6 +127,14 @@ public class MyBatisConfig
         sessionFactory.setTypeAliasesPackage(typeAliasesPackage);
         sessionFactory.setMapperLocations(resolveMapperLocations(StringUtils.split(mapperLocations, ",")));
         sessionFactory.setConfigLocation(new DefaultResourceLoader().getResource(configLocation));
+        // P1 任务 7：业务 mapper（jknow-store）的类型处理器包（UUID/jsonb/数组列），
+        // 源 utopia-server application.yml mybatis.type-handlers-package 同键并入——
+        // 可选键，未配置时行为与原若依一致
+        String typeHandlersPackage = env.getProperty("mybatis.typeHandlersPackage");
+        if (StringUtils.isNotEmpty(typeHandlersPackage))
+        {
+            sessionFactory.setTypeHandlersPackage(typeHandlersPackage);
+        }
         return sessionFactory.getObject();
     }
 }

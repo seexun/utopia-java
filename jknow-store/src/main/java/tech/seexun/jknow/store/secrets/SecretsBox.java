@@ -158,7 +158,7 @@ public final class SecretsBox {
         } catch (java.security.GeneralSecurityException e) {
             // AEADBadTagException（钥匙不对/被改）是其中最常见的形态，统一一句可读原因
             throw AppException.other("a sealed secret does not open with this key "
-                    + "(wrong UTOPIA_SECRET_KEY, or the value was tampered with)", e);
+                    + "(wrong JKNOW_SECRET_KEY, or the value was tampered with)", e);
         }
     }
 

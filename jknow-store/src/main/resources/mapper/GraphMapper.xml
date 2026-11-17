@@ -738,9 +738,9 @@
     LEFT JOIN relation_types r ON r.id = ev.predicate_id
     LEFT JOIN entities o ON o.id = ev.other_id
     LEFT JOIN LATERAL (
-        SELECT u.display_name AS actor_name, a.action
+        SELECT u.nick_name AS actor_name, a.action
         FROM audit_events a
-        LEFT JOIN users u ON u.id = a.actor_id
+        LEFT JOIN sys_user u ON u.utopia_uuid = a.actor_id
         WHERE a.kb_id = #{kbId}
           <!-- 断言由抽取写入，从来不是人的决定：归因只问修正与推翻这两类事件，
                否则后发生的人工裁决会被错安到当初那条断言头上 -->
@@ -777,10 +777,10 @@
            NULL::text, NULL::text,
            NULL::jsonb, NULL::timestamptz, NULL::text,
            NULL::timestamptz, NULL::text,
-           NULL::real, u.display_name, NULL::text,
+           NULL::real, u.nick_name, NULL::text,
            NULL::uuid, NULL::text, NULL::text,
            rt.from_type_label, rt.to_type_label
-    FROM rt LEFT JOIN users u ON u.id = rt.actor_id
+    FROM rt LEFT JOIN sys_user u ON u.utopia_uuid = rt.actor_id
     UNION ALL
     <!-- 合并事件：没有谓词、没有区间、没有证据行，对方是另一个实体。被合并掉的那一头
          仍留在 entities 里（revert_merge 要按原路搬回去），所以这里拿得到名字 -->
@@ -788,12 +788,12 @@
            NULL::text, o.canonical_name,
            NULL::jsonb, NULL::timestamptz, NULL::text,
            NULL::timestamptz, NULL::text,
-           NULL::real, u.display_name, NULL::text,
+           NULL::real, u.nick_name, NULL::text,
            NULL::uuid, NULL::text, NULL::text,
            NULL::text, NULL::text
     FROM mg
     LEFT JOIN entities o ON o.id = mg.other_id
-    LEFT JOIN users u ON u.id = mg.actor_id
+    LEFT JOIN sys_user u ON u.utopia_uuid = mg.actor_id
     ) x
     <!-- 改类型与合并那两支没有 fact_id，同一刻的几行只靠它排不出先后（#646）：再按
          种类，最后按整行——两行连整行都一样，谁先谁后看不出差别 -->

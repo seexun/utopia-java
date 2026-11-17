@@ -119,10 +119,10 @@
 
   <!-- mappings.rs:518-540（revisions：kb 归属走 JOIN 校验（revisions 表自己没有 kb_id）） -->
   <select id="selectRevisions" resultMap="mappingRevision">
-    SELECT r.id, r.before, u.display_name AS changed_by_name, r.changed_at
+    SELECT r.id, r.before, u.nick_name AS changed_by_name, r.changed_at
            FROM concept_mapping_revisions r
            JOIN concept_mappings m ON m.id = r.mapping_id
-           LEFT JOIN users u ON u.id = r.changed_by
+           LEFT JOIN sys_user u ON u.utopia_uuid = r.changed_by
           WHERE r.mapping_id = #{mappingId} AND m.kb_id = #{kbId}
           ORDER BY r.changed_at DESC
           LIMIT 50

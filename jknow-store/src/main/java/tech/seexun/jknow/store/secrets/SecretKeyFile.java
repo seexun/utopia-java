@@ -47,7 +47,7 @@ public final class SecretKeyFile {
         } catch (UnsupportedOperationException e) {
             // Windows 文件系统无 POSIX 属性（Rust 侧 #[cfg(unix)] 同一条件跳过）
         }
-        log.info("生成了凭据封印钥匙: {}（备份数据目录时一起带走；UTOPIA_SECRET_KEY 可覆盖）", path);
+        log.info("生成了凭据封印钥匙: {}（备份数据目录时一起带走；JKNOW_SECRET_KEY 可覆盖）", path);
         return key;
     }
 }

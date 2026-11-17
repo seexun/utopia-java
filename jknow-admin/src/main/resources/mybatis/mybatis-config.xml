@@ -13,8 +13,10 @@ PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
         <setting name="defaultExecutorType"      value="SIMPLE" />
 		<!-- 指定 MyBatis 所用日志的具体实现 -->
         <setting name="logImpl"                  value="SLF4J"  />
-        <!-- 使用驼峰命名法转换字段 -->
-		<!-- <setting name="mapUnderscoreToCamelCase" value="true"/> -->
+        <!-- 使用驼峰命名法转换字段（P1 任务 7 开启：jknow-store 随迁 mapper 的既有语义，
+             源 utopia-server application.yml mybatis.configuration 同键开启；
+             若依系 mapper 全部显式 resultMap/别名映射，开启为纯增益） -->
+        <setting name="mapUnderscoreToCamelCase" value="true"/>
 	</settings>
 	
 </configuration>

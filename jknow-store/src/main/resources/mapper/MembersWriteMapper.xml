@@ -4,9 +4,11 @@
      M5 任务 6 切流演练落位）。 -->
 <mapper namespace="tech.seexun.jknow.store.mapper.MembersWriteMapper">
 
-  <!-- members.rs:61-66（在职用户；停用账号加进工作空间会成为成员列表里看不见的授权） -->
+  <!-- members.rs:61-66（在职用户；停用账号加进工作空间会成为成员列表里看不见的授权）——
+       身份主档切 sys_user（P1 任务 7）：在职 = del_flag='0' AND status='0' -->
   <select id="selectActiveUser" resultType="java.util.UUID">
-    SELECT id FROM users WHERE id = #{id} AND deactivated_at IS NULL
+    SELECT utopia_uuid FROM sys_user WHERE utopia_uuid = #{id}
+         AND del_flag = '0' AND status = '0'
   </select>
 
   <!-- members.rs:68-76（set_role：UPSERT） -->

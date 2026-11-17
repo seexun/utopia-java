@@ -77,7 +77,7 @@
            p.object_id, o.canonical_name AS object_name, p.object_value,
            p.valid_from, p.valid_from_precision, p.valid_to, p.valid_to_precision,
            p.confidence, p.chunk_id, c.text AS quote,
-           p.proposed_by, u.display_name AS proposed_by_name,
+           p.proposed_by, u.nick_name AS proposed_by_name,
            t.name AS proposed_token_name, p.created_at,
            p.phrase, p.qualifiers, p.time_words, p.quote_start, p.quote_end
       FROM pending_facts p
@@ -85,7 +85,7 @@
       LEFT JOIN relation_types r ON r.id = p.predicate_id
       LEFT JOIN entities o ON o.id = p.object_id
       JOIN chunks c ON c.id = p.chunk_id
-      LEFT JOIN users u ON u.id = p.proposed_by
+      LEFT JOIN sys_user u ON u.utopia_uuid = p.proposed_by
       LEFT JOIN personal_tokens t ON t.id = p.proposed_token
      WHERE p.kb_id = #{kbId} AND p.id = #{id}
   </select>

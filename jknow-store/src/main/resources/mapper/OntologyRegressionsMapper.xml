@@ -35,7 +35,7 @@
                 'expected_property_label', expected.label,
                 'expected_property_key', expected.key,
                 'actual_property_label', actual.label, 'actual_property_key', actual.key,
-                'created_by_label', u.display_name) AS view
+                'created_by_label', u.nick_name) AS view
          FROM ontology_regression_cases c
          JOIN facts f ON f.kb_id=c.kb_id AND f.id=c.statement_id
          JOIN entities s ON s.kb_id=f.kb_id AND s.id=f.subject_id
@@ -43,7 +43,7 @@
          JOIN relation_types expected ON expected.kb_id=c.kb_id AND expected.id=c.expected_property_id
          LEFT JOIN relation_types actual ON actual.kb_id=c.kb_id
            AND actual.id=(c.last_result->>'actual_property_id')::uuid
-         LEFT JOIN users u ON u.id=c.created_by
+         LEFT JOIN sys_user u ON u.utopia_uuid=c.created_by
          WHERE c.kb_id=#{kbId} AND f.layer='open' AND f.invalidated_at IS NULL
          ORDER BY c.created_at DESC,c.id
     </select>

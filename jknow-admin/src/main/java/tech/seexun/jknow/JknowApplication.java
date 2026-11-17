@@ -3,13 +3,15 @@ package tech.seexun.jknow;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * 启动程序
- * 
+ *
  * @author jknow
  */
 @SpringBootApplication(exclude = { DataSourceAutoConfiguration.class })
+@EnableScheduling
 public class JknowApplication
 {
     public static void main(String[] args)

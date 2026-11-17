@@ -30,11 +30,12 @@
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
         </dependency>
 
-        <!-- PostgreSQL驱动包 -->
+        <!-- PostgreSQL驱动包（P1 任务 7 改 compile：JobWorker 的 LISTEN 走 pgjdbc 专用接口
+             PGConnection/getNotifications，编译期需要驱动类型） -->
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <scope>runtime</scope>
+            <scope>compile</scope>
         </dependency>
         <!-- Flyway 迁移 -->
         <dependency>
@@ -69,6 +70,54 @@
             <artifactId>jknow-generator</artifactId>
         </dependency>
 
+        <!-- ===== P1 任务 7：utopia-server 业务域随迁依赖（源 utopia-server pom 对应并论） ===== -->
+        <!-- 业务存储域（46 mapper + 实体 + 服务；jknow-common 由其传递） -->
+        <dependency>
+            <groupId>tech.seexun</groupId>
+            <artifactId>jknow-store</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- search 域（ES 索引/检索编排，ES 客户端锁 8.x 由根 pom 收口） -->
+        <dependency>
+            <groupId>tech.seexun</groupId>
+            <artifactId>jknow-search</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- 文档摄取域（RSS/WebDAV/格式探测） -->
+        <dependency>
+            <groupId>tech.seexun</groupId>
+            <artifactId>jknow-ingest</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- 抽取域（pdfbox/jsoup/poi 等版本经根 pom 收口） -->
+        <dependency>
+            <groupId>tech.seexun</groupId>
+            <artifactId>jknow-extract</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- LLM 客户端（jackson-databind 经 Boot BOM 托管） -->
+        <dependency>
+            <groupId>tech.seexun</groupId>
+            <artifactId>jknow-llm</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- query 域本体推理（jena-arq 版本经根 pom jena.version 收口） -->
+        <dependency>
+            <groupId>org.apache.jena</groupId>
+            <artifactId>jena-arq</artifactId>
+        </dependency>
+        <!-- query 域 SQL 引擎族解析（版本经根 pom 收口） -->
+        <dependency>
+            <groupId>com.github.jsqlparser</groupId>
+            <artifactId>jsqlparser</artifactId>
+        </dependency>
+        <!-- query 域 MySQL 引擎驱动（版本 Boot BOM 托管；PG 驱动已在上方） -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
         <!-- 测试：Testcontainers（PG 迁移闸门 MigrationTests）。
              TC 2.x 构件改名：postgresql→testcontainers-postgresql、junit-jupiter→testcontainers-junit-jupiter，
              版本由 Boot 4.1.2 BOM（testcontainers-bom 2.0.5）托管。 -->
@@ -86,6 +135,13 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- P1 任务 7：随迁 server 测试栈（@SpringBootTest/TestRestTemplate/AssertJ；
+             版本 Boot 4.1.2 BOM 托管；utopia-server 原 spring-boot-starter-test 对应物） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
 

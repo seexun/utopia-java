@@ -6,7 +6,7 @@
 
   <!-- audit.rs:65-68（actor_label 身份快照） -->
   <select id="selectActorLabel" resultType="java.lang.String">
-    SELECT email FROM users WHERE id = #{actorId}
+    SELECT user_name FROM sys_user WHERE utopia_uuid = #{actorId}
   </select>
 
   <!-- audit.rs:73-82（INSERT audit_events，id=UUIDv7，client_ip/user_agent 由请求上下文给） -->
@@ -44,8 +44,8 @@
   <!-- audit.rs:153-168（台账行：created_at DESC, id DESC；LEFT JOIN 取显示名） -->
   <select id="selectKbAuditEvents" resultMap="auditEventView">
     SELECT e.id, e.action, e.target_kind, e.target_id, e.detail,
-                e.actor_id, u.display_name AS actor_name, e.created_at
-         FROM audit_events e LEFT JOIN users u ON u.id = e.actor_id
+                e.actor_id, u.nick_name AS actor_name, e.created_at
+         FROM audit_events e LEFT JOIN sys_user u ON u.utopia_uuid = e.actor_id
          WHERE e.kb_id = #{kbId}
            AND (#{action}::text IS NULL OR e.action LIKE #{action} || '%')
            AND (#{actor}::uuid IS NULL OR e.actor_id = #{actor})

@@ -221,7 +221,7 @@ public class VectorIndexService {
 
     /**
      * 用表的 owner 建（vector_index.rs:221-237 build_as_owner）。{@code ownerUrl} 是迁移
-     * 身份的连接串（UTOPIA_MIGRATION_URL），只在它跟运行身份分开时才有——<b>建索引要的是
+     * 身份的连接串（JKNOW_MIGRATION_URL），只在它跟运行身份分开时才有——<b>建索引要的是
      * 表的所有权，授权顶替不了</b>：应用连库用受限角色时自己建索引会拿到
      * {@code must be owner of table}，任务失败三次、索引永远建不出来。分开了身份就用迁移
      * 那个身份开一条连接（max 1），建完即关；没分开（null/空）照旧用应用的池子。

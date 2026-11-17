@@ -420,7 +420,7 @@
        + list 的 WHERE/ORDER/LIMIT 后缀；for_chunk 同主体（241-248）。 -->
 
   <sql id="pendingViewSelect">
-    SELECT p.id, p.subject_id, s.canonical_name AS subject_name,p.predicate_id, r.label AS predicate_label, p.proposed_predicate,p.object_id, o.canonical_name AS object_name, p.object_value,p.valid_from, p.valid_from_precision, p.valid_to, p.valid_to_precision,p.confidence, p.chunk_id, c.text AS quote,p.proposed_by, u.display_name AS proposed_by_name,t.name AS proposed_token_name, p.created_at,p.phrase, p.qualifiers, p.time_words, p.quote_start, p.quote_end FROM pending_facts p JOIN entities s ON s.id = p.subject_id LEFT JOIN relation_types r ON r.id = p.predicate_id LEFT JOIN entities o ON o.id = p.object_id JOIN chunks c ON c.id = p.chunk_id LEFT JOIN users u ON u.id = p.proposed_by LEFT JOIN personal_tokens t ON t.id = p.proposed_token
+    SELECT p.id, p.subject_id, s.canonical_name AS subject_name,p.predicate_id, r.label AS predicate_label, p.proposed_predicate,p.object_id, o.canonical_name AS object_name, p.object_value,p.valid_from, p.valid_from_precision, p.valid_to, p.valid_to_precision,p.confidence, p.chunk_id, c.text AS quote,p.proposed_by, u.nick_name AS proposed_by_name,t.name AS proposed_token_name, p.created_at,p.phrase, p.qualifiers, p.time_words, p.quote_start, p.quote_end FROM pending_facts p JOIN entities s ON s.id = p.subject_id LEFT JOIN relation_types r ON r.id = p.predicate_id LEFT JOIN entities o ON o.id = p.object_id JOIN chunks c ON c.id = p.chunk_id LEFT JOIN sys_user u ON u.utopia_uuid = p.proposed_by LEFT JOIN personal_tokens t ON t.id = p.proposed_token
   </sql>
 
   <select id="selectPendingFacts" resultMap="pendingFactView">
@@ -784,11 +784,11 @@
 
   <select id="selectMerges" resultMap="mergeLogView">
     SELECT m.id, s.canonical_name AS source_name, t.canonical_name AS target_name,
-            u.display_name AS merged_by_name, m.reason, m.created_at, m.reverted_at
+            u.nick_name AS merged_by_name, m.reason, m.created_at, m.reverted_at
      FROM entity_merges m
      JOIN entities s ON s.id = m.source_id
      JOIN entities t ON t.id = m.target_id
-     LEFT JOIN users u ON u.id = m.merged_by
+     LEFT JOIN sys_user u ON u.utopia_uuid = m.merged_by
      WHERE m.kb_id = #{kbId}
      ORDER BY m.created_at DESC, m.id DESC LIMIT #{limit} OFFSET #{offset}
   </select>
@@ -799,10 +799,10 @@
     SELECT d.id, d.run_id, d.target_kind, d.target_id, d.action, d.confidence,
             d.reason, d.precedents, d.status, d.merge_id, d.question, d.trace, d.calls,
             d.created_at, d.decided_at,
-            u.display_name AS decided_by_name,
+            u.nick_name AS decided_by_name,
             a.canonical_name AS "left", b.canonical_name AS "right"
         FROM agent_decisions d
-        LEFT JOIN users u ON u.id = d.decided_by
+        LEFT JOIN sys_user u ON u.utopia_uuid = d.decided_by
         LEFT JOIN resolution_reviews rr ON rr.id = d.target_id
         LEFT JOIN entities a ON a.id = rr.left_id
         LEFT JOIN entities b ON b.id = rr.right_id WHERE d.kb_id = #{kbId} ORDER BY d.created_at DESC, d.id DESC LIMIT #{limit} OFFSET #{offset}
@@ -813,8 +813,8 @@
 
   <select id="selectReviewHistory" resultMap="auditEventView">
     SELECT e.id, e.action, e.target_kind, e.target_id, e.detail,
-                    e.actor_id, u.display_name AS actor_name, e.created_at
-             FROM audit_events e LEFT JOIN users u ON u.id = e.actor_id
+                    e.actor_id, u.nick_name AS actor_name, e.created_at
+             FROM audit_events e LEFT JOIN sys_user u ON u.utopia_uuid = e.actor_id
              WHERE e.kb_id = #{kbId} AND (e.action LIKE 'review.%' OR e.action LIKE 'fact.%'
                                 OR e.action LIKE 'conflict.%' OR e.action LIKE 'merge.%') ORDER BY e.created_at DESC, e.id DESC LIMIT #{limit} OFFSET #{offset}
   </select>

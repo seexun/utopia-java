@@ -69,10 +69,10 @@
   <sql id="VIEW">SELECT d.id, d.run_id, d.target_kind, d.target_id, d.action, d.confidence,
         d.reason, d.precedents, d.status, d.merge_id, d.question, d.trace, d.calls,
         d.created_at, d.decided_at,
-        u.display_name AS decided_by_name,
+        u.nick_name AS decided_by_name,
         a.canonical_name AS "left", b.canonical_name AS "right"
     FROM agent_decisions d
-    LEFT JOIN users u ON u.id = d.decided_by
+    LEFT JOIN sys_user u ON u.utopia_uuid = d.decided_by
     LEFT JOIN resolution_reviews rr ON rr.id = d.target_id
     LEFT JOIN entities a ON a.id = rr.left_id
     LEFT JOIN entities b ON b.id = rr.right_id</sql>

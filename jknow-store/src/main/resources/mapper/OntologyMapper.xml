@@ -583,9 +583,9 @@
   </resultMap>
   <select id="selectOntologyImports" resultMap="ontologyImport">
     SELECT i.id, i.filename, i.format, i.byte_size, i.summary, i.imported_at,
-           u.display_name AS imported_by_name
+           u.nick_name AS imported_by_name
     FROM ontology_imports i
-    LEFT JOIN users u ON u.id = i.imported_by
+    LEFT JOIN sys_user u ON u.utopia_uuid = i.imported_by
     WHERE i.kb_id = #{kbId} ORDER BY i.imported_at DESC LIMIT 50
   </select>
 

@@ -74,27 +74,37 @@
     SELECT * FROM workspaces WHERE id = #{id}
   </select>
 
-  <!-- members.rs:6-19（list：停用的人不出现；源内行注释原样保留） -->
+  <!-- members.rs:6-19（list：停用的人不出现）——身份主档切 sys_user（P1 任务 7）：
+       email→user_name、display_name→nick_name、is_admin→user_id=1 或授超级管理员角色 -->
   <select id="selectMembers" resultMap="memberView">
-    SELECT m.user_id, u.email, u.display_name, m.role, u.is_admin
-             FROM memberships m JOIN users u ON u.id = m.user_id
-             -- 停用的人不再出现在成员列表里（见 `users.deactivated_at`）。成员关系那一行留着——
+    SELECT m.user_id, u.user_name AS email, u.nick_name AS display_name, m.role,
+           (u.user_id = 1 OR EXISTS (SELECT 1 FROM sys_user_role ur
+                WHERE ur.user_id = u.user_id AND ur.role_id = 1)) AS is_admin
+             FROM memberships m JOIN sys_user u ON u.utopia_uuid = m.user_id
+             -- 停用的人不再出现在成员列表里（sys_user del_flag='2' 或 status='1'）。成员关系那一行留着——
              -- 恢复账号时不必重新加回每一个工作区
-             WHERE m.workspace_id = #{workspaceId} AND u.deactivated_at IS NULL
+             WHERE m.workspace_id = #{workspaceId} AND u.del_flag = '0' AND u.status = '0'
              ORDER BY m.created_at
   </select>
 
-  <!-- members.rs:22-31（org_users：部署内全部在职用户，成员选人器） -->
+  <!-- members.rs:22-31（org_users：部署内全部在职用户，成员选人器）——
+       单租户：sys_user 无 org 列，orgId 参数仅为签名兼容保留（在职=未删未停用） -->
   <select id="selectOrgUsers" resultMap="orgUser">
-    SELECT id, email, display_name, is_admin FROM users
-             WHERE org_id = #{orgId} AND deactivated_at IS NULL ORDER BY created_at
+    SELECT u.utopia_uuid AS id, u.user_name AS email, u.nick_name AS display_name,
+           (u.user_id = 1 OR EXISTS (SELECT 1 FROM sys_user_role ur
+                WHERE ur.user_id = u.user_id AND ur.role_id = 1)) AS is_admin
+             FROM sys_user u
+             WHERE u.del_flag = '0' AND u.status = '0' ORDER BY u.create_time
   </select>
 
-  <!-- members.rs:99-108（deactivated_users：与 org_users 分开查——读者不同，按停用时刻倒序） -->
+  <!-- members.rs:99-108（deactivated_users：与 org_users 分开查——读者不同，按停用时刻倒序）——
+       sys_user 无停用时刻列：按 update_time 倒序近似（停用/删除是最近一次状态变更） -->
   <select id="selectDeactivatedUsers" resultMap="orgUser">
-    SELECT id, email, display_name, is_admin FROM users
-             WHERE org_id = #{orgId} AND deactivated_at IS NOT NULL
-             ORDER BY deactivated_at DESC
+    SELECT u.utopia_uuid AS id, u.user_name AS email, u.nick_name AS display_name,
+           (u.user_id = 1 OR EXISTS (SELECT 1 FROM sys_user_role ur
+                WHERE ur.user_id = u.user_id AND ur.role_id = 1)) AS is_admin
+             FROM sys_user u
+             WHERE (u.del_flag = '2' OR u.status = '1') ORDER BY u.update_time DESC NULLS LAST
   </select>
 
   <!-- settings.rs:17-24（get：SELECT *；api_key 封印原样——服务层只折 has_*_key 布尔） -->
