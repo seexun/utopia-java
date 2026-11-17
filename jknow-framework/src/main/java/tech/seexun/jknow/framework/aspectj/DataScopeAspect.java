@@ -111,7 +111,7 @@ public class DataScopeAspect
             }
             else if (Constants.Dept.DATA_SCOPE_DEPT_AND_CHILD.equals(dataScope))
             {
-                sqlString.append(StringUtils.format(" OR {}.{} IN ( SELECT dept_id FROM sys_dept WHERE dept_id = {} or find_in_set( {} , ancestors ) )", deptAlias, deptField, user.getDeptId(), user.getDeptId()));
+                sqlString.append(StringUtils.format(" OR {}.{} IN ( SELECT dept_id FROM sys_dept WHERE dept_id = {} or position(',' || {} || ',' in ',' || ancestors || ',') > 0 )", deptAlias, deptField, user.getDeptId(), user.getDeptId()));
             }
             else if (Constants.Dept.DATA_SCOPE_SELF.equals(dataScope))
             {

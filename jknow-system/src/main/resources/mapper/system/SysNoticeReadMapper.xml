@@ -11,10 +11,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="readTime" column="read_time"   />
     </resultMap>
 
-    <!-- 新增已读记录 -->
+    <!-- 新增已读记录（原 MySQL insert ignore + uk_user_notice 唯一键，PG 无该键，改为 not exists 幂等写法） -->
     <insert id="insertNoticeRead" parameterType="SysNoticeRead">
-        insert ignore into sys_notice_read (notice_id, user_id, read_time)
-        values (#{noticeId}, #{userId}, sysdate())
+        insert into sys_notice_read (notice_id, user_id, read_time)
+        select #{noticeId}, #{userId}, now()
+        where not exists (select 1 from sys_notice_read where notice_id = #{noticeId} and user_id = #{userId})
     </insert>
 
     <!-- 查询未读数量：正常状态公告 减去 当前用户已读数 -->
@@ -46,13 +47,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         limit #{limit}
     </select>
 
-    <!-- 批量标记已读 -->
+    <!-- 批量标记已读（原 MySQL insert ignore + uk_user_notice 唯一键，PG 无该键，改为 not exists 幂等写法） -->
     <insert id="insertNoticeReadBatch">
-        insert ignore into sys_notice_read (notice_id, user_id, read_time)
-        values
-        <foreach collection="noticeIds" item="noticeId" separator=",">
-            (#{noticeId}, #{userId}, sysdate())
+        insert into sys_notice_read (notice_id, user_id, read_time)
+        select x.notice_id, x.user_id, now()
+        from (
+        <foreach collection="noticeIds" item="noticeId" separator=" union all ">
+            select #{noticeId} as notice_id, #{userId} as user_id
         </foreach>
+        ) x
+        where not exists (select 1 from sys_notice_read r where r.notice_id = x.notice_id and r.user_id = x.user_id)
     </insert>
 
     <!-- 删除公告时清理已读记录 -->

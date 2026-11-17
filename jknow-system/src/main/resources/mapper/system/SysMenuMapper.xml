@@ -146,7 +146,7 @@
 			<if test="orderNum != null">order_num = #{orderNum},</if>
 			<if test="path != null and path != ''">path = #{path},</if>
 			<if test="component != null">component = #{component},</if>
-			<if test="query != null">`query` = #{query},</if>
+			<if test="query != null">query = #{query},</if>
 			<if test="routeName != null">route_name = #{routeName},</if>
 			<if test="isFrame != null and isFrame != ''">is_frame = #{isFrame},</if>
 			<if test="isCache != null and isCache != ''">is_cache = #{isCache},</if>
@@ -157,7 +157,7 @@
 			<if test="icon !=null and icon != ''">icon = #{icon},</if>
 			<if test="remark != null and remark != ''">remark = #{remark},</if>
 			<if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
-			update_time = sysdate()
+			update_time = now()
 		</set>
 		where menu_id = #{menuId}
 	</update>
@@ -170,7 +170,7 @@
 		<if test="orderNum != null">order_num,</if>
 		<if test="path != null and path != ''">path,</if>
 		<if test="component != null and component != ''">component,</if>
-		<if test="query != null and query != ''">`query`,</if>
+		<if test="query != null and query != ''">query,</if>
 		<if test="routeName != null">route_name,</if>
 		<if test="isFrame != null and isFrame != ''">is_frame,</if>
 		<if test="isCache != null and isCache != ''">is_cache,</if>
@@ -200,7 +200,7 @@
 		<if test="icon != null and icon != ''">#{icon},</if>
 		<if test="remark != null and remark != ''">#{remark},</if>
 		<if test="createBy != null and createBy != ''">#{createBy},</if>
-		sysdate()
+		now()
 		)
 	</insert>
 
