@@ -53,6 +53,10 @@ spring:
     basename: i18n/messages
   profiles:
     active: druid
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
   # 文件上传
   servlet:
     multipart:
@@ -112,7 +116,7 @@ mybatis:
 
 # PageHelper分页插件
 pagehelper:
-  helperDialect: mysql
+  helperDialect: postgresql
   supportMethodsArguments: true
   params: count=countSql
 
