@@ -1,11 +1,11 @@
 import request from '@/utils/request'
-import type { AjaxResult, TableDataInfo, ${BusinessName}QuejknowParams, ${ClassName} } from '@/types'
+import type { AjaxResult, TableDataInfo, ${BusinessName}QueryParams, ${ClassName} } from '@/types'
 
 // 查询${functionName}列表
 #if($table.tree)
-export function list${BusinessName}(query?: ${BusinessName}QuejknowParams): Promise<AjaxResult<${ClassName}[]>> {
+export function list${BusinessName}(query?: ${BusinessName}QueryParams): Promise<AjaxResult<${ClassName}[]>> {
 #else
-export function list${BusinessName}(query: ${BusinessName}QuejknowParams): Promise<TableDataInfo<${ClassName}[]>> {
+export function list${BusinessName}(query: ${BusinessName}QueryParams): Promise<TableDataInfo<${ClassName}[]>> {
 #end
   return request({
     url: '/${moduleName}/${businessName}/list',
