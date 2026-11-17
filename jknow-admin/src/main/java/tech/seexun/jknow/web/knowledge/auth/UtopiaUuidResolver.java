@@ -48,7 +48,8 @@ public class UtopiaUuidResolver {
     /**
      * 按业务 uuid 反查在职若依主档（P1 任务 8 pt- 令牌面）：personal_tokens 行的
      * user_id（utopia uuid）→ sys_user；在职口径与前向一致（del_flag='0' AND
-     * status='0'——停用立即生效）。未绑定/不在职返回 null，调用方按 401 走。
+     * status='0'）。<b>结果进反查缓存、无失效</b>（与前向 userOf 同裁定）——停用/解绑
+     * 的生效窗口到进程重启，不是下一次请求立即生效。未绑定/不在职返回 null，调用方按 401 走。
      */
     public Binding bindingOf(UUID utopiaUuid) {
         return byUuid.computeIfAbsent(utopiaUuid, this::queryBinding);

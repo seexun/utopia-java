@@ -66,8 +66,11 @@ public class PersonalTokenAuthFilter extends OncePerRequestFilter {
             unauthorized(response);
             return;
         }
-        // 发令人以发令时的 utopia 身份行事；uuid 反查现职 sys_user（停用立即生效，
-        // 源 accounts.rs:234-241 语义），查无此人 = 401
+        // 发令人以发令时的 utopia 身份行事；uuid 反查 sys_user（在职口径 del_flag='0'
+        // AND status='0'，源 accounts.rs:234-241 语义）。注意：resolver 的反查带进程内
+        // 缓存、无失效（T7 裁定的 YAGNI 同口径）——停用/解绑的生效窗口到进程重启，
+        // 不是「下一次请求立即生效」；表行的撤销/过期（authenticate 的 SQL 判定）才是
+        // 立即生效面。查无此人（首次反查即不在职）= 401。
         UtopiaUuidResolver.Binding binding = resolver.bindingOf(auth.userId());
         if (binding == null) {
             unauthorized(response);

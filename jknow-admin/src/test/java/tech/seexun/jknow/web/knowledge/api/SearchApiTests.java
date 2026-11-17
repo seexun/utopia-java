@@ -88,10 +88,12 @@ class SearchApiTests extends ApiTestBase {
 
     @Test
     void missingQIsDeserializeShape() throws Exception {
+        // 金样本 search-missing-q-422 原文（裸文案，serde 对等——cause 传递修复后回紧全等）
         Resp resp = post("/api/v1/kbs/" + kbId + "/search", adminId, "{}");
-        assertEquals(422, resp.status(), "缺必填字段 → 422（serde 对等语义）：" + resp.raw());
-        assertTrue(resp.raw().contains("missing field") || resp.raw().contains("q"),
-                "文案指认缺失字段：" + resp.raw());
+        assertEquals(422, resp.status(), "缺必填字段 → 422：" + resp.raw());
+        assertEquals("Failed to deserialize the JSON body into the target type: "
+                        + "missing field `q` at line 1 column 2",
+                resp.raw(), "文案逐字（AppExceptionHandler 的 MismatchedInput 分支）");
     }
 
     @Test

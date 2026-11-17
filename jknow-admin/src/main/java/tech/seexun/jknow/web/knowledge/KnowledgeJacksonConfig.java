@@ -41,11 +41,13 @@ public class KnowledgeJacksonConfig implements WebMvcConfigurer {
         // 源 application.yml 的全局 jackson 段逐键对齐：SNAKE_CASE（API 契约）+
         // fail-on-missing-creator-properties（缺必填 → serde 对等文案，AppExceptionHandler 译）；
         // 时间渲染 ISO 字符串（Boot 自动配置对 jackson2 的缺省 = WRITE_DATES_AS_TIMESTAMPS 关，
-        // 终版双通实测 epoch 小数漂移后补齐）
+        // 终版双通实测 epoch 小数漂移后补齐）；未知字段忽略（Boot Jackson2ObjectMapperBuilder
+        // 缺省关闭 FAIL_ON_UNKNOWN_PROPERTIES——对齐，别让多带字段 422）
         return JsonMapper.builder()
                 .findAndAddModules()
                 .propertyNamingStrategy(com.fasterxml.jackson.databind.PropertyNamingStrategies.SNAKE_CASE)
                 .enable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES)
+                .disable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
                 .build();
     }
@@ -77,15 +79,17 @@ public class KnowledgeJacksonConfig implements WebMvcConfigurer {
         /**
          * 声明集（canWrite 拿到的是<b>运行时类</b>——ImmutableCollections$MapN 这类，
          * 匹配必须 isAssignableFrom）：JsonNode 子树 + Map/List 子型 + 业务包类型。
-         * 若依系（AjaxResult 是 HashMap 子类、SysXxx DTO）由包名前缀先行排除——
-         * 若依 controller 面全走 AjaxResult/SysXxx（web/controller 下无裸 Map/List 返回，
-         * 已核对），业务 controller 的 Map.of/List 返回由本转换器接走（源 snake 契约）。
+         * 若依系（AjaxResult 是 HashMap 子类、SysXxx DTO、TableDataInfo 分页信封）由包名
+         * 前缀先行排除——若依 controller 面全走 AjaxResult/SysXxx/TableDataInfo
+         * （web/controller 下无裸 Map/List 返回，已核对），业务 controller 的 Map.of/List
+         * 返回由本转换器接走（源 snake 契约）。
          */
         static boolean businessType(Class<?> clazz) {
             String name = clazz.getName();
             if (name.startsWith("tech.seexun.jknow.common.core.domain.")
-                    || name.startsWith("tech.seexun.jknow.web.controller.")
-                    || name.startsWith("tech.seexun.jknow.common.core.model.")) {
+                    || name.startsWith("tech.seexun.jknow.common.core.page.")
+                    || name.startsWith("tech.seexun.jknow.common.core.model.")
+                    || name.startsWith("tech.seexun.jknow.web.controller.")) {
                 return false;
             }
             return JsonNode.class.isAssignableFrom(clazz)
@@ -105,8 +109,10 @@ public class KnowledgeJacksonConfig implements WebMvcConfigurer {
             try {
                 return mapper.readValue(inputMessage.getBody(), clazz);
             } catch (Exception e) {
+                // cause 必须传：AppExceptionHandler 的 422 分支从 cause 链识别
+                // MismatchedInputException/JsonParseException，译出 serde 对等文案
                 throw new HttpMessageNotReadableException("业务请求体反序列化失败: " + e.getMessage(),
-                        inputMessage);
+                        e, inputMessage);
             }
         }
 
