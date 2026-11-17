@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>tech.seexun</groupId>
+    <artifactId>jknow</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>jknow-llm</artifactId>
+  <name>jknow-llm</name>
+  <description>模型层抽象——嵌入客户端先行（对应旧 utopia-llm crate 的 embed 面）</description>
+
+  <dependencies>
+    <!-- EmbedClient/ChatClient 的请求/响应 JSON：Jackson 2（com.fasterxml），版本经 Boot 4.1.2 BOM
+         导入的 jackson-2-bom(2.21.7) 托管——本模块无 spring 强依赖，HTTP 直用 java.net.http.HttpClient。 -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+  </dependencies>
+</project>

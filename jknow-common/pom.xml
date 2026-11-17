@@ -124,6 +124,13 @@
             <artifactId>jakarta.servlet-api</artifactId>
         </dependency>
 
+        <!-- 单元测试（utopia-common 并入的 RrfTests 等） -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
 
 </project>

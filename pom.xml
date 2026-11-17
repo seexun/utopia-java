@@ -30,6 +30,13 @@
         <velocity.version>2.4.1</velocity.version>
         <jwt.version>0.13.0</jwt.version>
         <springdoc.version>3.2.0</springdoc.version>
+        <jena.version>5.3.0</jena.version>
+        <jsqlparser.version>5.4</jsqlparser.version>
+        <pdfbox.version>3.0.3</pdfbox.version>
+        <juniversalchardet.version>2.4.0</juniversalchardet.version>
+        <jsoup.version>1.17.2</jsoup.version>
+        <bouncycastle.version>1.80</bouncycastle.version>
+        <!-- poi 沿用若依 6.0.0（utopia 5.2.3 取高）；jjwt 0.13、mybatis-spring-boot 4.1.0 已由 P0 就位 -->
     </properties>
 
     <!-- 依赖声明 -->
@@ -177,6 +184,48 @@
                 <version>${jknow.version}</version>
             </dependency>
 
+            <!-- RDF/知识图谱（jena-arq SPARQL） -->
+            <dependency>
+                <groupId>org.apache.jena</groupId>
+                <artifactId>jena-arq</artifactId>
+                <version>${jena.version}</version>
+            </dependency>
+
+            <!-- SQL 解析器 -->
+            <dependency>
+                <groupId>com.github.jsqlparser</groupId>
+                <artifactId>jsqlparser</artifactId>
+                <version>${jsqlparser.version}</version>
+            </dependency>
+
+            <!-- PDF 文本抽取 -->
+            <dependency>
+                <groupId>org.apache.pdfbox</groupId>
+                <artifactId>pdfbox</artifactId>
+                <version>${pdfbox.version}</version>
+            </dependency>
+
+            <!-- 文件编码探测 -->
+            <dependency>
+                <groupId>com.github.albfernandez</groupId>
+                <artifactId>juniversalchardet</artifactId>
+                <version>${juniversalchardet.version}</version>
+            </dependency>
+
+            <!-- HTML 解析 -->
+            <dependency>
+                <groupId>org.jsoup</groupId>
+                <artifactId>jsoup</artifactId>
+                <version>${jsoup.version}</version>
+            </dependency>
+
+            <!-- 加密库（bcprov） -->
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcprov-jdk18on</artifactId>
+                <version>${bouncycastle.version}</version>
+            </dependency>
+
         </dependencies>
     </dependencyManagement>
 
@@ -187,6 +236,7 @@
         <module>jknow-quartz</module>
         <module>jknow-generator</module>
         <module>jknow-common</module>
+        <module>jknow-llm</module>
     </modules>
     <packaging>pom</packaging>
 
