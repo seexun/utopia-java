@@ -68,9 +68,13 @@ public class PersonalTokenAuthFilter extends OncePerRequestFilter {
         }
         // pt- scope 的 REST 面强制（P1 终审 I1）：read 令牌只读（GET/HEAD），
         // 写方法要 scope=write（tokens.rs:192-194 can_write 同判）——scope 是上限，
-        // RBAC 的第二道收窄在其后的业务 controller 里照常
+        // RBAC 的第二道收窄在其后的业务 controller 里照常。
+        // <b>豁免 MCP 面</b>（复审第 2 轮收口）：POST /api/v1/kbs/{id}/mcp 有意向读取
+        // 令牌开放只读工具（源 mcp.rs：require_kb Viewer 即可，can_write 只决定写工具
+        // 是否暴露）——范围语义由 McpController 按源自持，这里一刀切会把它误杀在门外
         String method = request.getMethod();
-        if (!"GET".equalsIgnoreCase(method) && !"HEAD".equalsIgnoreCase(method)
+        boolean mcpFace = request.getRequestURI().matches("/api/v1/kbs/[^/]+/mcp");
+        if (!mcpFace && !"GET".equalsIgnoreCase(method) && !"HEAD".equalsIgnoreCase(method)
                 && !auth.canWrite()) {
             unauthorized(response);
             return;

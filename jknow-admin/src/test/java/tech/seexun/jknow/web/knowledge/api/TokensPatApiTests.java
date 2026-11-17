@@ -127,4 +127,40 @@ class TokensPatApiTests extends ApiTestBase {
         return new Resp(result.getResponse().getStatus(),
                 raw.isEmpty() ? null : mapper.readTree(raw), raw);
     }
+
+    /** rawGet 的 POST 形（MCP 面回归用）。 */
+    protected Resp rawPost(String path, String bearer, String json) throws Exception {
+        org.springframework.security.test.context.TestSecurityContextHolder.clearContext();
+        var result = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .post(path).contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content(json).accept(org.springframework.http.MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + bearer)).andReturn();
+        String raw = result.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        return new Resp(result.getResponse().getStatus(),
+                raw.isEmpty() ? null : mapper.readTree(raw), raw);
+    }
+
+    @Test
+    void readPatTokenReachesMcpReadOnlyFace() throws Exception {
+        // 复审第 2 轮回归位：读取 pt- 令牌打 MCP 面（POST）不被 scope 闸门拦截——
+        // 源 mcp.rs 有意向读取令牌开放只读工具（require_kb Viewer 即可，can_write 只
+        // 决定写工具是否暴露），范围语义由 McpController 按源自持
+        Resp issued = post("/api/v1/me/tokens", userId, "{\"name\":\"t8-mcp-read\",\"scope\":\"read\"}");
+        assertEquals(200, issued.status(), issued.raw());
+        String plain = issued.body().get("token").asText();
+        Resp mcp = rawPost("/api/v1/kbs/" + kbId + "/mcp", plain,
+                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\","
+                        + "\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},"
+                        + "\"clientInfo\":{\"name\":\"t8\",\"version\":\"0\"}}}");
+        // 关键断言：没被过滤器 401 挡（过滤器 401 带「Not signed in」源体形状）；
+        // initialize 应走通 McpController 全链路：JSON-RPC 200 应答
+        assertTrue(mcp.status() != 401 || !mcp.raw().contains("Not signed in"),
+                "MCP 面不被 scope 闸门拦截：" + mcp.raw());
+        assertEquals(200, mcp.status(), mcp.raw());
+        assertEquals("2.0", mcp.body().path("jsonrpc").asText(), mcp.raw());
+        // 对照：同一枚 read 令牌打 REST 写面仍被闸（401 过滤器体形状）
+        Resp blocked = rawPost("/api/v1/workspaces", plain, "{\"name\":\"should-fail\"}");
+        assertEquals(401, blocked.status());
+        assertEquals("Not signed in or invalid credentials", blocked.body().get("error").asText());
+    }
 }
