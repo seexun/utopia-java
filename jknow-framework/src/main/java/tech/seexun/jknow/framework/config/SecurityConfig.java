@@ -1,5 +1,6 @@
 package tech.seexun.jknow.framework.config;
 
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.Filter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -137,6 +138,12 @@ public class SecurityConfig
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             // 注解标记允许匿名访问的url
             .authorizeHttpRequests((requests) -> {
+                // ASYNC/ERROR 转发放行（P1 任务 9 冒烟暴露）：StreamingResponseBody（kb 导出）
+                // 流完回容器的 ASYNC dispatch 会再过一遍安全链，而 OncePerRequestFilter 族的
+                // jwt/pt-/桥接 filter 默认不跑二趟——上下文为空即 Access Denied，committed
+                // 响应写不了 401，chunked 终止块发不出去（curl 18「缺一段」）。鉴权在
+                // REQUEST dispatch 已完成，转发放行不弱化请求面；ERROR 同放（错误页可渲染）。
+                requests.dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll();
                 permitAllUrl.getUrls().forEach(url -> requests.requestMatchers(url).permitAll());
                 // 对于登录login 注册register 验证码captchaImage 允许匿名访问
                 requests.requestMatchers("/login", "/register", "/captchaImage").permitAll()
