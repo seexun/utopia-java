@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>tech.seexun</groupId>
+    <artifactId>jknow</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>jknow-contract</artifactId>
+  <name>jknow-contract</name>
+  <description>契约测试安全网：黄金录制器 + 双打回放器（自 utopia-contract 搬运，规格 §3）</description>
+
+  <!-- 纯 JVM 工具模块为主：Jackson（Boot BOM）+ SnakeYAML + JDK HttpClient + JUnit。
+       main 类入口选 exec-maven-plugin（版本钉死 3.6.3——根 pom 并不托管它，无版本是浮动解析）：
+       工具模块免 fat jar，「mvn -pl jknow-contract compile exec:java」加 Dexec.args 传参即可跑；
+       Replayer/Diff 用 Dexec.mainClass 切换。
+       pgjdbc（compile：Snapshot 直连共享 PG，materialize 引用 PGobject——jsonb/vector 判型；
+       版本由 Boot BOM 托管，与 jknow-store 同源）。
+       jknow-store（compile）：store: 步的 StoreBridge——最小 Spring 上下文直调心脏 bean
+       （decide_review 合并）。这是本模块唯一的 Spring 依赖点（惰性、仅 store: 步触达）：
+       spring-context/spring-jdbc/mybatis-spring 均为 jknow-store 的传递依赖，
+       不在本 pom 重复声明。 -->
+  <dependencies>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.yaml</groupId>
+      <artifactId>snakeyaml</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>tech.seexun</groupId>
+      <artifactId>jknow-store</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- RDF 归一化比对（Normalizer.triples——Turtle/JSON-LD 解析回三元组集）。
+         Jena 与 oxrdfio 的序列化空白/前缀展开顺序不同，导出步的双打比对按三元组集归一，
+         版本经根 POM dependencyManagement 收口（jena.version 5.3.0）。 -->
+    <dependency>
+      <groupId>org.apache.jena</groupId>
+      <artifactId>jena-arq</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <!-- 版本钉死：根 pom 不托管该插件，缺版本会浮动解析（稳定构建隐患） -->
+        <version>3.6.3</version>
+        <configuration>
+          <!-- 经由属性而非字面量，命令行可用 Dexec.mainClass 覆盖（Diff/Replayer） -->
+          <mainClass>${exec.mainClass}</mainClass>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+  <properties>
+    <exec.mainClass>tech.seexun.jknow.contract.Recorder</exec.mainClass>
+  </properties>
+</project>

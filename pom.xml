@@ -260,6 +260,7 @@
         <module>jknow-extract</module>
         <module>jknow-store</module>
         <module>jknow-search</module>
+        <module>jknow-contract</module>
     </modules>
     <packaging>pom</packaging>
 
