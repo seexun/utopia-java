@@ -12,6 +12,38 @@ jknow:
   addressEnabled: false
   # 验证码类型 math 数字计算 char 字符验证
   captchaType: math
+  # —— 以下业务键自 utopia-server application.yml 的 utopia: 段并入（P1 任务 5：
+  #    env 变量 UTOPIA_* → JKNOW_*，默认值原样；health.version 取 jknow 当前版本 1.0.0）——
+  health:
+    # /api/v1/health 的 version 字段（源 utopia.health.version 对齐 Rust 0.1.0；jknow 侧取本仓版本）
+    version: 1.0.0
+  # 凭据封印数据目录（{data-dir}/secret.key，首启生成 64 位十六进制；源默认 ./data）
+  data-dir: ${JKNOW_DATA_DIR:data}
+  # 建向量索引所需表所有权的独立连接串（空/缺省=与运行身份同一个，用应用连接池；源注释 #1120）
+  migration-url: ${JKNOW_MIGRATION_URL:}
+  jobs:
+    # worker 开关（写路径所有权信号；默认关——部署/集成测试显式开 JKNOW_JOBS_WORKER=true）
+    worker-enabled: ${JKNOW_JOBS_WORKER:false}
+  elasticsearch:
+    # search 域 ES（每 KB 一索引 utopia-kb-{kbId}，IK 分词）。不可达时服务照常启动、检索译 500；
+    # 启动全量对账默认关（多库共享一个 ES 的测试形态下孤儿清理是破坏性的），需要时置 true。
+    url: ${JKNOW_ES_URL:http://localhost:9200}
+    reconcile-on-startup: ${JKNOW_ES_RECONCILE:false}
+
+# —— utopia: 别名段：与上方 jknow: 业务子键同值（T7 统一改 jknow. 后删除）——
+# 过渡期双键：jknow-store SecretsConfiguration @Value("${utopia.data-dir:data}")、
+# jknow-search ElasticsearchConfig @Value("${utopia.elasticsearch.url:...}") 等源码引用
+# 尚未改键（server 侧 T7 搬运时统一替换为 jknow.*，届时本段整体删除，勿新增引用）。
+utopia:
+  health:
+    version: 1.0.0
+  data-dir: ${JKNOW_DATA_DIR:data}
+  migration-url: ${JKNOW_MIGRATION_URL:}
+  jobs:
+    worker-enabled: ${JKNOW_JOBS_WORKER:false}
+  elasticsearch:
+    url: ${JKNOW_ES_URL:http://localhost:9200}
+    reconcile-on-startup: ${JKNOW_ES_RECONCILE:false}
 
 # 开发环境配置
 server:

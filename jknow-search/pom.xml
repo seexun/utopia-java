@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>tech.seexun</groupId>
+    <artifactId>jknow</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>jknow-search</artifactId>
+  <name>jknow-search</name>
+  <description>检索层——ES 索引 + BM25 + RRF（对应旧 utopia-search crate：Tantivy 换 ES+IK）</description>
+
+  <dependencies>
+    <!-- store：chunks 读取/按 id 取块（ChunkIndexer/SearchService 编排，旧仓库这部分在
+         utopia-server retrieval.rs/main.rs——Java 侧按 M1 任务简报收进本模块）。
+         spring 上下文/事务经 store 的 mybatis-spring-boot-starter 传递（@Service 编译期可见）。 -->
+    <dependency>
+      <groupId>tech.seexun</groupId>
+      <artifactId>jknow-store</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <!-- ES Java Client：co.elastic.clients:elasticsearch-java + 低层 RestClient。
+         两构件版本经根 POM dependencyManagement 收口 8.13.4（同源仓 Boot 3.3.13 BOM 托管款；
+         不随 Boot 4 BOM 的 9.4.8——9.x 客户端对 ES 服务器 8.14.3 线不兼容，理由见根 POM 注释）。 -->
+    <dependency>
+      <groupId>co.elastic.clients</groupId>
+      <artifactId>elasticsearch-java</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.elasticsearch.client</groupId>
+      <artifactId>elasticsearch-rest-client</artifactId>
+    </dependency>
+    <!-- ES 侧不共享 Boot 的 SNAKE_CASE ObjectMapper（索引文档名逐字段 @JsonProperty 钉死，
+         不受全局命名策略漂移影响）；jackson-databind 版本经 Boot BOM。 -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+
+    <!-- EsChunkIndexTests 纯 JUnit（真实 ES 不可达整类 @EnabledIf 跳过；
+         junit 版本经 Boot BOM 托管） -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

@@ -36,6 +36,10 @@
         <juniversalchardet.version>2.4.0</juniversalchardet.version>
         <jsoup.version>1.17.2</jsoup.version>
         <bouncycastle.version>1.80</bouncycastle.version>
+        <!-- ES 客户端锁 8.x 线（=源仓 Boot 3.3.13 BOM 托管款 8.13.4）：Boot 4.1.2 BOM 的 9.4.8 对
+             ES 服务器 8.14.3 线不兼容（compatible-with=9 头被 8.x 服务器拒，indices.exists 400 实测），
+             服务器版本按计划钉 8.14.3+IK——客户端随服务器走，两构件同版本收口 -->
+        <elasticsearch-client.version>8.13.4</elasticsearch-client.version>
         <!-- poi 沿用若依 6.0.0（utopia 5.2.3 取高）；jjwt 0.13、mybatis-spring-boot 4.1.0 已由 P0 就位 -->
     </properties>
 
@@ -226,6 +230,20 @@
                 <version>${bouncycastle.version}</version>
             </dependency>
 
+            <!-- ES 客户端（jknow-search）：覆盖 Boot 4 BOM 的 9.4.8（对本 pom 直接声明的
+                 dependencyManagement，先于 import BOM 生效）——锁 8.x 线的理由见 properties 注释；
+                 elasticsearch-rest-client 不在 Boot 4 BOM（其主推 rest5-client），一并同版本收口 -->
+            <dependency>
+                <groupId>co.elastic.clients</groupId>
+                <artifactId>elasticsearch-java</artifactId>
+                <version>${elasticsearch-client.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.elasticsearch.client</groupId>
+                <artifactId>elasticsearch-rest-client</artifactId>
+                <version>${elasticsearch-client.version}</version>
+            </dependency>
+
         </dependencies>
     </dependencyManagement>
 
@@ -241,6 +259,7 @@
         <module>jknow-ingest</module>
         <module>jknow-extract</module>
         <module>jknow-store</module>
+        <module>jknow-search</module>
     </modules>
     <packaging>pom</packaging>
 
