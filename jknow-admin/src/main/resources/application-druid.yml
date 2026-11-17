@@ -6,9 +6,9 @@ spring:
         druid:
             # 主库数据源
             master:
-                url: jdbc:postgresql://${JKNOW_PG_HOST:localhost}:${JKNOW_PG_PORT:5432}/jknow
-                username: postgres
-                password: postgres
+                url: ${JKNOW_JDBC_URL:jdbc:postgresql://${JKNOW_PG_HOST:localhost}:${JKNOW_PG_PORT:5432}/jknow}
+                username: ${JKNOW_DB_USERNAME:postgres}
+                password: ${JKNOW_DB_PASSWORD:postgres}
             # 从库数据源
             slave:
                 # 从数据源开关/默认关闭
