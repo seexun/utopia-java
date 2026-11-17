@@ -7,3 +7,12 @@
 - 坐标：`tech.seexun:jknow`，包根 `tech.seexun.jknow`
 
 迁移设计规格见 `docs/superpowers/specs/`。
+
+## 本地启动
+
+```bash
+docker compose -f docker-compose.dev.yml up -d   # PG 宿主 15432 + Redis 36379
+mvn install -q -DskipTests                       # 先刷新本地仓库（-pl 启动会解析旧 SNAPSHOT jar）
+JKNOW_PG_PORT=15432 SERVER_PORT=19080 mvn spring-boot:run -pl jknow-admin   # Flyway 自动建表（V0000）
+# 默认账号 admin / admin123；接口文档 http://localhost:19080/swagger-ui.html
+```
