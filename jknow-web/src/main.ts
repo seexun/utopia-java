@@ -7,7 +7,33 @@ import 'element-plus/dist/index.css'
 import 'element-plus/theme-chalk/dark/css-vars.css'
 import locale from 'element-plus/es/locale/lang/zh-cn'
 
+// 知识库词条 i18n（对齐源仓 utopia-web：词典在 src/i18n/dicts，en 定结构 zh 补齐；
+// locale 从 localStorage 读（src/i18n 的 detect()，键 utopia.lang，默认 zh），fallback zh）。
+// 若依原生页面文本不经过 t()，此实例只服务 knowledge 页面。
+import { createI18n } from 'vue-i18n'
+import { lang, stringsProjection } from '@/i18n'
+import { en as dictEn } from '@/i18n/dicts/en'
+import { zh as dictZh } from '@/i18n/dicts/zh'
+
+// vue-i18n 消息树叶子（对齐 @intlify 的 LocaleMessage 约定：叶子只能是 string，
+// 嵌套只能是词典；stringsProjection 返回的 Record<string, unknown> 过宽，收窄后
+// createI18n 的泛型推断才能成立。number 叶子运行时可用，类型面按 string 记）
+type MessageTree = { [key: string]: string | MessageTree }
+
+const i18n = createI18n({
+  legacy: false,
+  locale: lang,
+  fallbackLocale: 'zh',
+  // 函数值词条 vue-i18n 表达不了，走 S（见 src/i18n/index.ts）；这里只装字符串子集
+  messages: {
+    en: stringsProjection(dictEn) as MessageTree,
+    zh: stringsProjection(dictZh) as MessageTree
+  }
+})
+
 import '@/assets/styles/index.scss' // global css
+// tailwind4 入口（必须在 main.ts 引入，避免 vite 每次 hmr 重新请求整个 scss 入口）
+import '@/style/tailwind.css'
 
 import App from './App.vue'
 import store from './store'
@@ -68,6 +94,7 @@ app.component('Editor', Editor)
 
 app.use(router)
 app.use(store)
+app.use(i18n)
 app.use(plugins)
 app.use(elementIcons)
 app.component('svg-icon', SvgIcon)

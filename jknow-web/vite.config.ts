@@ -1,5 +1,7 @@
+/// <reference types="vitest/config" />
 import { defineConfig, loadEnv } from 'vite'
 import path from 'path'
+import tailwindcss from '@tailwindcss/vite'
 import createVitePlugins from './vite/plugins'
 
 const baseUrl = 'http://localhost:8080' // 后端接口
@@ -10,10 +12,10 @@ export default defineConfig(({ mode, command }) => {
   const { VITE_APP_ENV } = env
   return {
     // 部署生产环境和开发环境下的URL。
-    // 默认情况下，vite 会假设你的应用是被部署在一个域名的根路径上
-    // 例如 https://www.ruoyi.vip/。如果应用被部署在一个子路径上，你就需要用这个选项指定这个子路径。例如，如果你的应用被部署在 https://www.ruoyi.vip/admin/，则设置 baseUrl 为 /admin/。
+    // 默认情况下，vite 会假设你的应用是被部署在一个域名的根路径下
+    // 例如 https://www.ruoyi.vip/。如果应用被部署在一个子路径下，你就需要在这个选项指定子路径。例如 https://www.ruoyi.vip/admin/，则设置 base 为 '/admin/。
     base: VITE_APP_ENV === 'production' ? '/' : '/',
-    plugins: createVitePlugins(env, command === 'build'),
+    plugins: [tailwindcss(), ...createVitePlugins(env, command === 'build')],
     resolve: {
       // https://cn.vitejs.dev/config/#resolve-alias
       alias: {
@@ -74,6 +76,14 @@ export default defineConfig(({ mode, command }) => {
           }
         ]
       }
+    },
+    // vitest（对齐源仓 utopia-web 的 app 测试面：jsdom 环境、tests|src 下 *.spec.ts；
+    // 源仓的 domain 面（node 环境 + vitest-setup.ts）待任务 3 引入 src/domain 时再加。
+    // 空仓阶段无测试文件，passWithNoTests 让 `pnpm test` 空跑绿）
+    test: {
+      environment: 'jsdom',
+      include: ['tests/**/*.spec.ts', 'src/**/*.spec.ts'],
+      passWithNoTests: true
     }
   }
 })
