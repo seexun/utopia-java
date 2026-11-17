@@ -56,6 +56,10 @@ class MigrationTests {
                         + " AND table_name <> 'flyway_schema_history'"),
                 "public schema 应有 31 张表（20 sys/gen + 11 qrtz，不含 flyway_schema_history）");
         assertEquals("admin", queryInt2Str("select user_name from sys_user where user_id=1"));
+        assertEquals(85, queryInt("select count(*) from sys_menu"),
+                "sys_menu 种子应为 85 行（钉住种子保真，任务 6 UI 走查同值）");
+        assertEquals(3, queryInt("select count(*) from sys_job where invoke_target like 'jknowTask.%'"),
+                "sys_job 3 个任务 invoke_target 应全部为 jknowTask.* 前缀（钉住任务 2 改名联动）");
     }
 
     @Test

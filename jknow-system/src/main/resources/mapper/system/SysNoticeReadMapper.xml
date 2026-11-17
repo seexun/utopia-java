@@ -11,7 +11,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="readTime" column="read_time"   />
     </resultMap>
 
-    <!-- 新增已读记录（原 MySQL insert ignore；V0000 已建 uk_user_notice(user_id, notice_id) 唯一索引，on conflict 与 insert ignore 语义严格等价） -->
+    <!-- 新增已读记录（原 MySQL insert ignore；V0000 已建 uk_user_notice(user_id, notice_id) 唯一索引，on conflict 就本去重场景等价（insert ignore 还会吞截断/FK 等其他错误，本表 3 列无 FK）） -->
     <insert id="insertNoticeRead" parameterType="SysNoticeRead">
         insert into sys_notice_read (notice_id, user_id, read_time)
         values (#{noticeId}, #{userId}, now())
@@ -47,7 +47,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         limit #{limit}
     </select>
 
-    <!-- 批量标记已读（原 MySQL insert ignore；V0000 已建 uk_user_notice(user_id, notice_id) 唯一索引，on conflict 与 insert ignore 语义严格等价） -->
+    <!-- 批量标记已读（原 MySQL insert ignore；V0000 已建 uk_user_notice(user_id, notice_id) 唯一索引，on conflict 就本去重场景等价（insert ignore 还会吞截断/FK 等其他错误，本表 3 列无 FK）） -->
     <insert id="insertNoticeReadBatch">
         insert into sys_notice_read (notice_id, user_id, read_time)
         values

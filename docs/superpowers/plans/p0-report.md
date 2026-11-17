@@ -56,6 +56,26 @@ PASS: system/user/list date-range
 ALL PASS
 ```
 
+### 整分支审查收口复验（终审 Important-1，收口提交见 git log）
+
+smoke 断言 13 → **20**（login 1 + 核心读 11 + 日期面 8），全部 curl 加 `--max-time 10`，脚本自足化（开头自动关验证码：compose psql update + redis flushdb，新环境重放后可直接跑）：
+
+```
+$ ./scripts/smoke-p0.sh
+PASS: login … PASS: monitor/job/list          （11 项核心读，同上）
+PASS: system/user/list date-range
+PASS: system/role/list date-range
+PASS: system/dict/type/list date-range
+PASS: system/config/list date-range
+PASS: monitor/jobLog/list date-range
+PASS: monitor/logininfor/list date-range
+PASS: monitor/operlog/list date-range
+PASS: tool/gen/list date-range
+ALL PASS                                     （20/20，exit=0）
+```
+
+`mvn test -pl jknow-admin -Dtest=MigrationTests` → `Tests run: 2, Failures: 0, Errors: 0`（首测新增 2 断言：sys_menu=85、sys_job invoke_target like 'jknowTask.%'=3，钉住种子保真与改名联动）。
+
 ### mvn test 尾部（全量，7 模块，exit=0；`mvn -q test` 复跑 exit=0）
 
 ```
@@ -101,14 +121,14 @@ t.s.j.JknowApplication - Started JknowApplication in 7.878 seconds (process runn
 
 ## 六、遗留问题清单（P1 候选，均不阻塞验收）
 
-1. **smoke 日期断言仅钉 1 面**：脚本只断言 system/user/list date-range；其余 8 个日期面（role/dict.type/config/jobLog/logininfor/operlog/gen 等）任务 6 为手工复测声明，未脚本化。
+1. ~~**smoke 日期断言仅钉 1 面**：脚本只断言 system/user/list date-range；其余 8 个日期面（role/dict.type/config/jobLog/logininfor/operlog/gen 等）任务 6 为手工复测声明，未脚本化。~~ **已收口（终审 Important-1）**：收口提交将日期断言扩至全部 8 面（user/role/dict.type/config/jobLog/logininfor/operlog/tool gen），断言总数 13→20，全部 curl 加 `--max-time 10`，并自足化（脚本自动关验证码）。
 2. **gen 日期筛选 no-op**：GenTableMapper 列表的 beginTime/endTime `<if>` 块在方言改写时删除（PG 下无对应语义，过滤不生效）；order by 改 relname 语义微变；gen 元数据查询 create_time/update_time 置 null（"导入表"对话框时间列为空，PG 无对应物，如需真实值要走触发器）。
 3. **surefire 3.5.6 硬编码在 jknow-admin 模块内**，宜上移根 pom pluginManagement（现在其他模块加测试需重复声明）。
 4. **本地仓库 SNAPSHOT 陷阱**：任何 mapper/资源改动后 `spring-boot:run -pl jknow-admin` 前必须 `mvn install`（否则解析旧 jar"改了没生效"），已在 README 快速开始写明前置步骤。
 5. **V0000 种子含上游演示数据**：17 行"若依"字样（若依科技部门、演示公告等）。V0000 已应用不可改，P1 业务数据迁移（V0001+）时自然替换；GenUtils.replaceText 正则 `(?:表|若依)` 为功能性过滤，保留。
 6. **前端登录按钮自动化点击无响应**（任务 6 UI 走查，人工浏览器预期正常），P2 前端阶段处理；pristine 前端缺 sortablejs 依赖，P2 首任务补。
 7. **端口占用动态**：本机双 dockerd（Windows + WSL），WSL 监听 netstat 不可见；dev 固定 15432/36379/19080 已写实进 README 与脚本默认值，选新端口需 `docker ps` + `wsl ss -tln` 双查。
-8. 小项：bin/run.bat:11 JVM 参数在 jar 后（上游原样保留）；smoke curl 无 --max-time（沿用计划原文）；.gitignore 追加为"空行+logs/"非单行；首提交 390 文件经历 CRLF→LF（autocrlf 行为，字节级 pristine 打折）；V0000 头部注释含规则关键词字样（第三方扫描非零，均注释行）；pom 内 flyway 两个依赖被隔开（美观）；Druid wall filter 无需 db-type 特殊处理（validationQuery 已改 `SELECT 1`，终验无拦截）；验证码当前为关态（sys_config 'false'，开态已两态验证）；uk_user_notice 唯一索引存在（任务 6 曾误判缺失，已勘误，mapper 用 on conflict 与其配合）。
+8. 小项：bin/run.bat:11 JVM 参数在 jar 后（上游原样保留）；~~smoke curl 无 --max-time（沿用计划原文）~~ **已收口（终审 Important-1，全部 curl 加 --max-time 10）**；.gitignore 追加为"空行+logs/"非单行；首提交 390 文件经历 CRLF→LF（autocrlf 行为，字节级 pristine 打折）；V0000 头部注释含规则关键词字样（第三方扫描非零，均注释行）；pom 内 flyway 两个依赖被隔开（美观）；Druid wall filter 无需 db-type 特殊处理（validationQuery 已改 `SELECT 1`，终验无拦截）；验证码当前为关态（sys_config 'false'，开态已两态验证；smoke 脚本已自足化自动关码）；uk_user_notice 唯一索引存在（任务 6 曾误判缺失，已勘误，mapper 用 on conflict 与其配合）。
 
 ## 七、复跑指引
 
