@@ -15,8 +15,8 @@ import org.springframework.web.bind.annotation.RestController;
 import tech.seexun.jknow.common.AppException;
 import tech.seexun.jknow.web.knowledge.auth.AuditService;
 import tech.seexun.jknow.web.knowledge.auth.ClientContext;
+import tech.seexun.jknow.web.knowledge.auth.PersonalTokenService;
 import tech.seexun.jknow.web.knowledge.auth.SessionFilter;
-import tech.seexun.jknow.store.TokensService;
 import tech.seexun.jknow.store.entity.TokenView;
 import tech.seexun.jknow.store.entity.UserRow;
 import tech.seexun.jknow.store.mapper.TokensMapper;
@@ -30,10 +30,10 @@ import tech.seexun.jknow.store.mapper.TokensMapper;
 public class TokensController {
 
     private final TokensMapper tokens;
-    private final TokensService tokenService;
+    private final PersonalTokenService tokenService;
     private final AuditService audit;
 
-    public TokensController(TokensMapper tokens, TokensService tokenService,
+    public TokensController(TokensMapper tokens, PersonalTokenService tokenService,
                             AuditService audit) {
         this.tokens = tokens;
         this.tokenService = tokenService;
@@ -74,7 +74,7 @@ public class TokensController {
         }
         long expiresInDays = body.path("expires_in_days").asLong(0);
         OffsetDateTime expiresAt = tokenExpiresAt(expiresInDays);
-        TokensService.Issued issued = tokenService.issue(user.id(), name, scope,
+        PersonalTokenService.Issued issued = tokenService.issue(user, name, scope,
                 kbIds, expiresAt);
         audit.record(client(request), null, user.id(), "token.issued", "personal_token",
                 issued.view().id(),

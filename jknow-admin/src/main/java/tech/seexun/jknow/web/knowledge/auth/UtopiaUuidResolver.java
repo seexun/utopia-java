@@ -30,6 +30,9 @@ public class UtopiaUuidResolver {
 
     private final ConcurrentHashMap<Long, UserRow> cache = new ConcurrentHashMap<>();
 
+    /** 反查缓存（utopia_uuid → 若依主档，P1 任务 8 pt- 兜底用；同前向口径无失效）。 */
+    private final ConcurrentHashMap<UUID, Binding> byUuid = new ConcurrentHashMap<>();
+
     public UtopiaUuidResolver(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
@@ -40,6 +43,30 @@ public class UtopiaUuidResolver {
      */
     public UserRow userOf(Long userId) {
         return cache.computeIfAbsent(userId, this::query);
+    }
+
+    /**
+     * 按业务 uuid 反查在职若依主档（P1 任务 8 pt- 令牌面）：personal_tokens 行的
+     * user_id（utopia uuid）→ sys_user；在职口径与前向一致（del_flag='0' AND
+     * status='0'——停用立即生效）。未绑定/不在职返回 null，调用方按 401 走。
+     */
+    public Binding bindingOf(UUID utopiaUuid) {
+        return byUuid.computeIfAbsent(utopiaUuid, this::queryBinding);
+    }
+
+    /** 若依主档四件套（LoginUser 构造所需的最小集）。 */
+    public record Binding(Long userId, Long deptId, String userName, String nickName) {
+    }
+
+    private Binding queryBinding(UUID utopiaUuid) {
+        List<Binding> rows = jdbc.query(
+                "SELECT user_id, dept_id, user_name, nick_name FROM sys_user "
+                        + "WHERE utopia_uuid = ? AND del_flag = '0' AND status = '0'",
+                (rs, i) -> new Binding(rs.getLong("user_id"),
+                        (Long) rs.getObject("dept_id"),
+                        rs.getString("user_name"), rs.getString("nick_name")),
+                utopiaUuid);
+        return rows.isEmpty() ? null : rows.get(0);
     }
 
     private UserRow query(Long userId) {

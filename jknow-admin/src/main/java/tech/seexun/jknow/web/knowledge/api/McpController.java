@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import tech.seexun.jknow.common.AppException;
 import tech.seexun.jknow.web.knowledge.auth.AuditService;
 import tech.seexun.jknow.web.knowledge.auth.ClientContext;
+import tech.seexun.jknow.web.knowledge.auth.PersonalTokenService;
 import tech.seexun.jknow.web.knowledge.auth.SessionFilter;
 import tech.seexun.jknow.web.knowledge.chat.ChatToolSchema;
 import tech.seexun.jknow.web.knowledge.chat.ToolExecutor;
@@ -23,7 +24,6 @@ import tech.seexun.jknow.web.knowledge.chat.ToolSink;
 import tech.seexun.jknow.web.knowledge.rbac.KbAccess;
 import tech.seexun.jknow.web.knowledge.rbac.Role;
 import tech.seexun.jknow.store.mapper.AccountsMapper;
-import tech.seexun.jknow.store.TokensService;
 import tech.seexun.jknow.store.entity.KbRow;
 import tech.seexun.jknow.store.entity.UserRow;
 
@@ -70,14 +70,14 @@ public class McpController {
      */
     private static final Set<String> WRITABLE = Set.of("remember");
 
-    private final TokensService tokens;
+    private final PersonalTokenService tokens;
     private final AccountsMapper accounts;
     private final KbAccess rbac;
     private final ChatToolSchema schema;
     private final ToolExecutor tools;
     private final AuditService audit;
 
-    public McpController(TokensService tokens, AccountsMapper accounts, KbAccess rbac,
+    public McpController(PersonalTokenService tokens, AccountsMapper accounts, KbAccess rbac,
                          ChatToolSchema schema, ToolExecutor tools, AuditService audit) {
         this.tokens = tokens;
         this.accounts = accounts;
@@ -93,7 +93,7 @@ public class McpController {
     }
 
     /** 认证 + 授权的产物：人、令牌、库、有效写权限（mcp.rs:80-83 Authorized）。 */
-    private record Authorized(UserRow user, TokensService.Authenticated auth, KbRow kb,
+    private record Authorized(UserRow user, PersonalTokenService.Authenticated auth, KbRow kb,
                               boolean canWrite) {
     }
 
@@ -106,7 +106,7 @@ public class McpController {
         String header = request.getHeader("Authorization");
         String raw = header != null && header.startsWith("Bearer ")
                 ? header.substring("Bearer ".length()).trim() : null;
-        TokensService.Authenticated auth = tokens.authenticate(raw);
+        PersonalTokenService.Authenticated auth = tokens.authenticate(raw);
         if (!auth.covers(kbId)) {
             throw AppException.FORBIDDEN;
         }

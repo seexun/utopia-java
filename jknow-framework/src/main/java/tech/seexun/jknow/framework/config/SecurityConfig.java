@@ -70,6 +70,16 @@ public class SecurityConfig
     @Qualifier("clientContextBridgeFilter")
     private Filter clientContextBridgeFilter;
 
+    /**
+     * pt- 个人令牌兜底 filter（jknow-admin 的 web.knowledge.auth.PersonalTokenAuthFilter，
+     * 同上 bean 名限定注入）。挂在 JwtAuthenticationTokenFilter 之后（P1 任务 8 认证收口）：
+     * 若依 parser 认不出的 pt- 前缀 Bearer 在这里验个人令牌并建立 LoginUser，身后的
+     * 桥接 filter 照常折算业务身份——对若依 token 与 pt- 双通。
+     */
+    @Autowired(required = false)
+    @Qualifier("personalTokenAuthFilter")
+    private Filter personalTokenAuthFilter;
+
 	/**
 	 * 身份验证实现
 	 */
@@ -97,11 +107,19 @@ public class SecurityConfig
     @Bean
     protected SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception
     {
-        // 业务身份桥接（P1 任务 7）：若依 token → 业务 UserRow/ClientContext 请求属性。
-        // 桥挂在 UsernamePasswordAuthenticationFilter 之后（JwtAuthenticationTokenFilter 经
-        // addFilterBefore 站在它前面——即链序 jwt → bridge，LoginUser 已就位才有得折算；
-        // addFilterAfter 的锚必须是有注册序的标准 filter，自定义 filter 类不行）。bean 缺席
-        // （非 admin 装配形态）时链不变。
+        // pt- 个人令牌兜底（P1 任务 8）：addFilterAt 站 UsernamePasswordAuthenticationFilter
+        // 本槽（该槽在无表单登录的链里无实例，占位不撞车）——链序收口为
+        // jwt(-1) → pt 兜底(0) → 桥接(+1)：若依 parser 先跑（pt- 串解析失败被其
+        // getLoginUser 吞掉不 401），pt- 凭据在兜底位换装 LoginUser，桥接最后统一
+        // 折算业务 UserRow/ClientContext——若依 token 与 pt- 对业务面同构。锚同样
+        // 必须是有注册序的标准 filter（自定义类不行）。bean 缺席（非 admin 装配形态）时链不变。
+        if (personalTokenAuthFilter != null)
+        {
+            httpSecurity.addFilterAt(personalTokenAuthFilter, UsernamePasswordAuthenticationFilter.class);
+        }
+        // 业务身份桥接（P1 任务 7）：若依 token / pt- 建立的 LoginUser → 业务
+        // UserRow/ClientContext 请求属性。桥挂在 UsernamePasswordAuthenticationFilter 之后
+        // （即链序 … → pt 兜底(0) → 桥接(+1)，LoginUser 已就位才有得折算）。
         if (clientContextBridgeFilter != null)
         {
             httpSecurity.addFilterAfter(clientContextBridgeFilter, UsernamePasswordAuthenticationFilter.class);

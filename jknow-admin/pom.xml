@@ -144,6 +144,19 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- P1 任务 8：MockMvc 过安全链（SecurityMockMvcConfigurers）+
+             LoginUser+SecurityContext 铸若依登录态（SecurityMockMvcRequestPostProcessers）；
+             Boot 4 起 MockMvc 自动配置拆入 webmvc-test 模块（starter-test 不再携带） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
 
     </dependencies>
 
