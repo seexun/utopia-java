@@ -16,7 +16,7 @@ J='Content-Type: application/json'
 # 关验证码（若依 CaptchaController 读 redis 缓存的 sys_config，故 DB+redis 双清）
 docker compose -f docker-compose.dev.yml exec -T pg psql -U postgres -d jknow -c \
   "update sys_config set config_value='false' where config_key='sys.account.captchaEnabled';" >/dev/null
-docker compose -f docker-compose.dev.yml exec redis redis-cli flushdb >/dev/null
+docker compose -f docker-compose.dev.yml exec -T redis redis-cli flushdb >/dev/null
 
 # 若依登录（会话 token 打全程写面/清理面）
 TOKEN=$(curl -s --max-time 10 -X POST "$BASE/login" -H "$J" \
@@ -62,7 +62,7 @@ echo "PASS: POST api/v1/kbs/{id}/ontology/relation-types (rt=$RT)"; PASS=$((PASS
 
 # 各域只读走查（GET 200）。三面带必填 query 参数（controller 实况）：
 #   entities 要 q、review/pending 要 chunk_id、graph/neighborhood 要 entity——
-#   缺参经全局异常处理器回 500，属参数实况非回归，冒烟按契约补参打。
+#   缺参自 P1 终审 I3 起回源契约 400（下方专段断言），走查按契约补参打。
 ZERO="00000000-0000-0000-0000-000000000000"
 GET_EPS=(
   "api/v1/workspaces"
@@ -117,6 +117,44 @@ for ep in "${GET_EPS[@]}"; do
     || { echo "FAIL: GET $ep code=$CODE"; exit 1; }
 done
 
+# 公开路由面与参数契约（P1 终审 C1/I3 断言）：
+#   匿名 health 200 且体含 version（不再 200+code401 的若依鉴权体）；
+#   推送端点 permitAll 后自带推送密钥门——api 源造好后无密钥推 401 源体形状
+#   （判定序同源：源不存在 404 在前，故先造真源再断 401）；
+#   缺必填 query 参数 400 源文案（q/chunk_id 两面）。
+HEALTH_BODY=$(curl -s --max-time 10 "$BASE/api/v1/health")
+HEALTH_CODE=$(curl -s --max-time 10 -o /dev/null -w '%{http_code}' "$BASE/api/v1/health")
+if [ "$HEALTH_CODE" = 200 ] && printf '%s' "$HEALTH_BODY" | LC_ALL=C grep -aq '"version"'; then
+  echo "PASS: 匿名 GET api/v1/health（200+version）"; PASS=$((PASS+1))
+else
+  echo "FAIL: 匿名 GET api/v1/health code=$HEALTH_CODE body=$HEALTH_BODY"; exit 1
+fi
+PUSH_SRC=$(curl -s --max-time 10 -X POST -H "$AUTH" -H "$J" \
+  -d '{"kind":"api","name":"p1-smoke-push"}' "$BASE/api/v1/kbs/$KB/sources")
+PUSH_SID=$(printf '%s' "$PUSH_SRC" | sed -n 's/.*"source":{"id":"\([^"]*\)".*/\1/p')
+[ -n "$PUSH_SID" ] || { echo "FAIL: 造 api 源（推送 401 断言前置）resp=$(printf '%s' "$PUSH_SRC" | head -c 120)"; exit 1; }
+PUSH_CODE=$(curl -s --max-time 10 -o /tmp/smoke-p1-push.txt -w '%{http_code}' -X POST -H "$J" \
+  -d '{"filename":"x.txt","content":"x"}' "$BASE/api/v1/sources/$PUSH_SID/ingest")
+if [ "$PUSH_CODE" = 401 ] && LC_ALL=C grep -aq 'Not signed in or invalid credentials' /tmp/smoke-p1-push.txt; then
+  echo "PASS: POST api/v1/sources/{id}/ingest 无密钥 401（源体形状）"; PASS=$((PASS+1))
+else
+  echo "FAIL: 推送端点无密钥 code=$PUSH_CODE body=$(head -c 120 /tmp/smoke-p1-push.txt)"; exit 1
+fi
+Q_CODE=$(curl -s --max-time 10 -o /tmp/smoke-p1-q.txt -w '%{http_code}' -H "$AUTH" \
+  "$BASE/api/v1/kbs/$KB/mappings/relevant")
+if [ "$Q_CODE" = 400 ] && LC_ALL=C grep -aq 'Failed to deserialize query string: missing field `q`' /tmp/smoke-p1-q.txt; then
+  echo "PASS: GET api/v1/kbs/{id}/mappings/relevant 缺 q 400（源文案）"; PASS=$((PASS+1))
+else
+  echo "FAIL: 缺 q code=$Q_CODE body=$(head -c 120 /tmp/smoke-p1-q.txt)"; exit 1
+fi
+CH_CODE=$(curl -s --max-time 10 -o /tmp/smoke-p1-ch.txt -w '%{http_code}' -H "$AUTH" \
+  "$BASE/api/v1/kbs/$KB/review/pending")
+if [ "$CH_CODE" = 400 ] && LC_ALL=C grep -aq 'Failed to deserialize query string: missing field `chunk_id`' /tmp/smoke-p1-ch.txt; then
+  echo "PASS: GET api/v1/kbs/{id}/review/pending 缺 chunk_id 400（源文案）"; PASS=$((PASS+1))
+else
+  echo "FAIL: 缺 chunk_id code=$CH_CODE body=$(head -c 120 /tmp/smoke-p1-ch.txt)"; exit 1
+fi
+
 # pt- 个人令牌双通：签发（明文只此一次）→pt- 打业务读面 200→撤销→pt- 即时 401
 PT_RESP=$(curl -s --max-time 10 -X POST -H "$AUTH" -H "$J" \
   -d '{"name":"p1-smoke","scope":"read","expires_in_days":1}' "$BASE/api/v1/me/tokens")
@@ -134,6 +172,14 @@ CODE=$(curl -s --max-time 10 -o /dev/null -w '%{http_code}' \
   -H "Authorization: Bearer $PT" "$BASE/api/v1/kbs/$KB")
 [ "$CODE" = 200 ] && { echo "PASS: pt- GET api/v1/kbs/{id}"; PASS=$((PASS+1)); } \
   || { echo "FAIL: pt- GET api/v1/kbs/{id} code=$CODE"; exit 1; }
+# pt- scope 的 REST 面强制（P1 终审 I1）：read 令牌打写方法 → 401 源体形状
+WCODE=$(curl -s --max-time 10 -o /tmp/smoke-p1-ptw.txt -w '%{http_code}' -X POST \
+  -H "Authorization: Bearer $PT" -H "$J" -d '{"name":"p1-smoke-pt-read"}' "$BASE/api/v1/workspaces")
+if [ "$WCODE" = 401 ] && LC_ALL=C grep -aq 'Not signed in or invalid credentials' /tmp/smoke-p1-ptw.txt; then
+  echo "PASS: pt- read 打写面 401（scope 强制）"; PASS=$((PASS+1))
+else
+  echo "FAIL: pt- read 打写面 code=$WCODE body=$(head -c 120 /tmp/smoke-p1-ptw.txt)"; exit 1
+fi
 CODE=$(curl -s --max-time 10 -X DELETE -H "$AUTH" -o /dev/null -w '%{http_code}' \
   "$BASE/api/v1/me/tokens/$PTID")
 [ "$CODE" = 200 ] && { echo "PASS: DELETE api/v1/me/tokens/{id}（撤销）"; PASS=$((PASS+1)); } \

@@ -147,9 +147,15 @@ public class SecurityConfig
                 permitAllUrl.getUrls().forEach(url -> requests.requestMatchers(url).permitAll());
                 // 对于登录login 注册register 验证码captchaImage 允许匿名访问
                 requests.requestMatchers("/login", "/register", "/captchaImage").permitAll()
-                    // 静态资源，可匿名访问
+                    // 静态资源，匿名访问
                     .requestMatchers(HttpMethod.GET, "/", "/*.html", "/**.html", "/**.css", "/**.js", "/profile/**").permitAll()
                     .requestMatchers("/swagger-ui.html", "/v3/api-docs/**", "/swagger-ui/**", "/druid/**").permitAll()
+                    // 公开路由面承接（P1 终审 C1）：源 SessionFilter 的 PUBLIC_EXACT 族随
+                    // auth 域退役后无人放行——health 两形与按源推送 token 的两族端点在此
+                    // 放行；推送端点自带 requireBearer 推送密钥/404 判定（ApiPushController），
+                    // 安全面与源等价；auth/oidc 族继续舍弃不放开
+                    .requestMatchers(HttpMethod.GET, "/api/v1/health", "/health").permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/sources/*/ingest", "/api/v1/sources/*/statements").permitAll()
                     // 除上面外的所有请求全部需要鉴权认证
                     .anyRequest().authenticated();
             })

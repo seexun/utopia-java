@@ -24,7 +24,8 @@ import java.util.Locale;
  *   <li><b>解析白名单</b>（{@link #guardSqlFor}，JSqlParser 对等 Rust sqlparser 0.62）：
  *       仅放行<b>单条</b> SELECT/WITH（含 CTE），拒绝 DML/DDL/多语句。按引擎选方言——
  *       JSqlParser 是单一语法，反引号（Databricks/MySQL）、:: 转型（Snowflake）、
- *       ClickHouse 的 FINAL/SETTINGS 一体认得（PoC 5.4，2026-11-13）；Rust 侧
+ *       ClickHouse 的 FINAL/SETTINGS 一体认得（PoC 于 5.4 验证，2026-11-13；P1 终审随
+ *       pagehelper 6.1.1 兼容把版本收口至 4.7，此处四方言面 4.7 同认得）；Rust 侧
  *       「sqlparser 没有 Trino 方言，Generic 是它的超集」在 Java 侧对应「单一语法
  *       即 Trino 超集」——同一策略；</li>
  *   <li><b>强制外包一层 LIMIT</b>（{@link #wrapLimit}）：cap+1 探测截断——模型要求

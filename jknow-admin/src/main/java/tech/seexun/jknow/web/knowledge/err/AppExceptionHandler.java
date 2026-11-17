@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -90,6 +91,17 @@ public class AppExceptionHandler {
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     ResponseEntity<String> methodNotAllowed(HttpRequestMethodNotSupportedException e) {
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).build();
+    }
+
+    /**
+     * 缺必填 query 参数（P1 终审 I3，对齐 axum Query 提取器拒绝）：400 文本
+     * "Failed to deserialize query string: missing field `x`"（mappings/relevant 缺 q
+     * 的源金样本逐字；chunk_id/entity 面同形）。此前 MVC 缺参冒泡 500，契约回归。
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    ResponseEntity<String> missingParam(MissingServletRequestParameterException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body("Failed to deserialize query string: missing field `" + e.getParameterName() + "`");
     }
 
     /**

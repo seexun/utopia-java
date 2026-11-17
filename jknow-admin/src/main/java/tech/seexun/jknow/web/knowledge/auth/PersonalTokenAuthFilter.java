@@ -66,6 +66,15 @@ public class PersonalTokenAuthFilter extends OncePerRequestFilter {
             unauthorized(response);
             return;
         }
+        // pt- scope 的 REST 面强制（P1 终审 I1）：read 令牌只读（GET/HEAD），
+        // 写方法要 scope=write（tokens.rs:192-194 can_write 同判）——scope 是上限，
+        // RBAC 的第二道收窄在其后的业务 controller 里照常
+        String method = request.getMethod();
+        if (!"GET".equalsIgnoreCase(method) && !"HEAD".equalsIgnoreCase(method)
+                && !auth.canWrite()) {
+            unauthorized(response);
+            return;
+        }
         // 发令人以发令时的 utopia 身份行事；uuid 反查 sys_user（在职口径 del_flag='0'
         // AND status='0'，源 accounts.rs:234-241 语义）。注意：resolver 的反查带进程内
         // 缓存、无失效（T7 裁定的 YAGNI 同口径）——停用/解绑的生效窗口到进程重启，

@@ -12,7 +12,7 @@
 | 1 | P0 交接收口（surefire 上移根 pluginManagement / 数据源变量对齐规格 §3 JKNOW_JDBC_URL 全串优先 / run.bat JVM 参数序） | `2cde7f4` | [x] DONE |
 | 2 | 属性收口（jena/jsqlparser/pdfbox/juniversalchardet/jsoup/bc）+ utopia-common 并入 jknow-common（8 类+RrfTests）+ jknow-llm 搬运 | `b8590ed` | [x] DONE |
 | 3 | jknow-reason / jknow-ingest / jknow-extract 三域搬运（20 测试随迁绿，POI 6 兼容面实证） | `16ff4f8` | [x] DONE |
-| 4 | jknow-store 搬运（46 mapper）+ Flyway 全链 V0001-V0101 入库（102 迁移/源 99 文件字节保真含 19 个改号）+ V0100 菜单种子 + V0101 用户重绑（28 FK 改指 26 表） | `00e6581` | [x] DONE |
+| 4 | jknow-store 搬运（46 mapper†）+ Flyway 全链 V0001-V0101 入库（102 迁移/源 99 文件字节保真含 19 个改号）+ V0100 菜单种子 + V0101 用户重绑（28 FK 改指 26 表） | `00e6581` | [x] DONE |
 | 5 | jknow-search 搬运 + ES/业务配置键并入（jknow.* 主段 + utopia.* 别名，ES 不可达启动不炸） | `2da7ab5` | [x] DONE |
 | 6 | jknow-contract 搬运（6 测试随迁绿）——七域模块全部就位（13 模块 reactor） | `40eea5c` | [x] DONE |
 | 7 | utopia-server 全量业务落位 jknow-admin web.knowledge（16 业务包，auth/oidc 舍弃，ClientContext 桥接若依 LoginUser，users SQL 28 条处置，234 测试随迁 195/删 39）+ packs/docs 资源并入 | `ca17484` | [x] DONE |
@@ -21,6 +21,8 @@
 | 10 | P1 收尾——全测终验、p1-report、README 模块图、.gitignore data/、tag | 本提交（tag `p1-done` 处） | [x] DONE |
 
 计划文档提交：`fcf1332`（P1 实现计划，T1 前置）。各任务详报：`.superpowers/sdd/2026-11-17-p1-backend/task-{1..10}-report.md`（git-ignored 台账）。
+
+† T4 的「46 mapper」为源仓口径：实况 45——OidcMapper 随 oidc 域退役（T7 删 OidcMapper.java/.xml 含 FlowRow，见 §六随迁对账）。
 
 ## 二、规格覆盖对照（设计规格 §2/§3/§5-P1）
 
@@ -136,8 +138,8 @@ ALL PASS (PASS=55 SKIP=2)
 
 **行为差异（对齐源契约）**
 
-1. **必填参数缺失回 500 而非源 400**：缺 `q`/`chunk_id`/`entity` 三面，全局异常处理器把 MissingServletRequestParameterException 归 500「Internal server error」（源 axum 400/反序列化原文）。冒烟按契约补参绕开；P2 前后端联调时对齐（AppExceptionHandler 补 400 分支即可）。
-2. **若依 entry point 无凭据是 200+体 401，与源真 401 有差异**：RuoYi 原生 renderString 行为（HTTP 200 + {"code":401}）；pt- 凭据失效面走 filter 直写真 401 源体形状。业务 API 前端拦截器若按真 401 判会漏——P2 联调定夺（改若依 entry point 会影响若依前端面）。
+1. **必填参数缺失回 500 而非源 400**：缺 `q`/`chunk_id`/`entity` 三面，全局异常处理器把 MissingServletRequestParameterException 归 500「Internal server error」（源 axum 400/反序列化原文）。冒烟按契约补参绕开；P2 前后端联调时对齐（AppExceptionHandler 补 400 分支即可）。**（P1 终审已修：补 MissingServletRequestParameterException 分支回 400 源文案「Failed to deserialize query string: missing field \`x\`」，冒烟已挂 q/chunk_id 两面断言）**
+2. **若依 entry point 无凭据是 200+体 401，与源真 401 有差异**：RuoYi 原生 renderString 行为（HTTP 200 + {"code":401}）；pt- 凭据失效面走 filter 直写真 401 源体形状。业务 API 前端拦截器若按真 401 判会漏——**升级为 P2 硬依赖（见追加 4）**。
 3. **SSE 滞后帧 Boot4/Tomcat 收口竞态容忍**：流早关时退化验注册表侧收口（帧断言保留），slowReaders 队列面滞后语义已全量断言；若要求帧级确定性需 sseFrom 收口前 flush。
 
 **测试/冒烟覆盖面**
@@ -170,6 +172,13 @@ ALL PASS (PASS=55 SKIP=2)
 **本任务收口项**
 
 16. `data/secret.key` 运行时产物 → `.gitignore` 已补 `data/`（本提交）；README 后端模块结构图补 13 模块清单（本提交）。
+
+**P1 终审补录（第 1/5 轮收口后追加，四项）**
+
+17. **公开路由面回归与修复（终审 C1）**：源 SessionFilter 的 PUBLIC_EXACT 族（health 两形、sources 按推送 token 的 ingest/statements 两族）随 auth 域退役后无人承接——匿名 `GET /api/v1/health` 落到若依鉴权面（200+体 code401，监控探针不可用）。修复：SecurityConfig authorizeHttpRequests 补两组 permitAll（GET `/api/v1/health`+`/health`；POST `/api/v1/sources/*/ingest`+`/statements`）——推送端点自带 requireBearer 推送密钥/404 判定，安全面与源等价；auth/oidc 族继续舍弃不放开。smoke-p1 已挂匿名 health（200+version）与推送无密钥 401 断言。
+18. **pt- scope 的 REST 面强制（终审 I1）**：read 令牌此前只读得了（RBAC 各端点自判），写方法未被 scope 拦——PersonalTokenAuthFilter 对非 GET/HEAD 加 `canWrite()` 校验（tokens.rs:192-194 同判：scope 是上限，RBAC 收窄在其后照常），read pt- 打写接口 → 401 源体形状。
+19. **@PreAuthorize 规格项 P1 未挂注解为有意延后——P2 硬任务**：业务面权限目前由 RBAC（KbAccess/矩阵角色）持有，菜单权限注解（`@PreAuthorize("@ss.hasPermi(...)")`）未挂。P2 落地时须一并定夺 **pt- 权限集策略**：本实现给 pt- LoginUser 的 `knowledge:*` 在若依 hasPermi 的**精确匹配**下不匹配任何 `knowledge:xxx:yyy` 实权限——二选一在 P2 计划落字：(a) 按 V0100 perms 全集展开授给 pt- LoginUser；(b) PermissionService 支持前缀匹配（`*` 通配）。挂注解而不先定此策略会让 pt- 面全线 403。
+20. **entry point 200+体401 升级为 P2 硬依赖**：前端 401 拦截按真 401 判会话失效，现状（RuoYi renderString 的 HTTP 200+体 code401）会让业务 API 前端拦截器漏判——必须与 P2 前后端联调同轮处理（改若依 entry point 影响若依前端面，需一并回归）。
 
 ## 七'、复跑指引
 
