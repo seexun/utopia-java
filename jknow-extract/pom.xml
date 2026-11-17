@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>tech.seexun</groupId>
+    <artifactId>jknow</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>jknow-extract</artifactId>
+  <name>jknow-extract</name>
+  <description>抽取层——open 提示词与容错解析/时间解读/对齐消息（对应旧 utopia-extract crate）</description>
+
+  <dependencies>
+    <!-- 解析器与提示词共用 Jackson 的 JsonNode（紧凑 JSON 逐条宽容读；版本经 Boot 4.1.2 BOM
+         导入的 jackson-2-bom(2.21.7) 托管）。 -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+    <!-- 提示词构造返回 jknow-llm 的 ChatMessage（对齐 Rust：utopia-extract 依赖 utopia-llm）。 -->
+    <dependency>
+      <groupId>tech.seexun</groupId>
+      <artifactId>jknow-llm</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

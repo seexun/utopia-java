@@ -237,6 +237,9 @@
         <module>jknow-generator</module>
         <module>jknow-common</module>
         <module>jknow-llm</module>
+        <module>jknow-reason</module>
+        <module>jknow-ingest</module>
+        <module>jknow-extract</module>
     </modules>
     <packaging>pom</packaging>
 

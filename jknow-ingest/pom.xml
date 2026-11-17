@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>tech.seexun</groupId>
+    <artifactId>jknow</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>jknow-ingest</artifactId>
+  <name>jknow-ingest</name>
+  <description>摄取层——解析矩阵 + 300-token 分块器（对应旧 utopia-ingest crate 的 parse/chunker/provenance）</description>
+
+  <dependencies>
+    <!-- chunks.anchor / ParseWarning.detail 的 JsonNode（版本经 Boot 4.1.2 BOM 导入的 jackson-2-bom(2.21.7) 托管） -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+
+    <!-- PDF 文本层（pdf-extract 的对等；文本层空=扫描件→NeedsReader）。
+         版本经父 POM 属性 pdfbox.version 收口（Boot BOM 不托管 pdfbox）。 -->
+    <dependency>
+      <groupId>org.apache.pdfbox</groupId>
+      <artifactId>pdfbox</artifactId>
+      <version>${pdfbox.version}</version>
+    </dependency>
+
+    <!-- docx（XWPF）/xlsx（XSSF）/xls（HSSF）/pptx（XSLF）——POI 一站（版本收口同上，
+         父 POM poi.version=6.0.0，utopia 5.2.3 取高）。
+         xls 在 poi 核心 jar，无需 scratchpad。 -->
+    <dependency>
+      <groupId>org.apache.poi</groupId>
+      <artifactId>poi-ooxml</artifactId>
+      <version>${poi.version}</version>
+    </dependency>
+
+    <!-- html 正文提取（readability 简化版：article/main + 去 chrome + 去 interstitial）。
+         版本经父 POM 属性 jsoup.version 收口（Boot BOM 不含 jsoup）。 -->
+    <dependency>
+      <groupId>org.jsoup</groupId>
+      <artifactId>jsoup</artifactId>
+      <version>${jsoup.version}</version>
+    </dependency>
+
+    <!-- plain_text 编码探测（chardetng 的对等，覆盖 GBK/GB18030/UTF-16；约 130KB，
+         比「引 tiktoken 过重」的同一条线上选了最轻的探测器）。版本收口同上。 -->
+    <dependency>
+      <groupId>com.github.albfernandez</groupId>
+      <artifactId>juniversalchardet</artifactId>
+      <version>${juniversalchardet.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

@@ -1,0 +1,32 @@
+# Stellar Ground Stations: An Annual Review
+
+Over the past year, the commercial space ground station operator Stellar Networks has expanded its portfolio of owned and managed sites from twenty-one to thirty-nine, extending coverage from the eastern seaboard to the western interior. This review draws on the company's annual report, public interviews with its leadership, and independent telemetry to trace the pace of construction, the technical choices behind the antenna fleet, and the commercial logic that ties them together.
+
+## Construction cadence: from coastline to frontier
+
+The company opened the year with a plan it called "three stations in one hundred days," completing fixed-site commissioning in Jimusi, Qingdao, and Kashgar in quick succession. The Kashgar site posed the greatest challenge: the winter construction window there is short, and the actual build schedule was compressed to seventy-four days, breaking the company's previous record. During the second half of the year the emphasis shifted toward retrofit and expansion. The Sanya station added a second twelve-meter dish, and the Urumqi site completed an uplink capacity upgrade that doubled its scheduled pass volume. At an earnings briefing, management indicated that the next fiscal year would prioritize coverage in the southwest, with candidate sites in Kunming and Lhasa already in the survey phase.
+
+Each new station follows a repeatable playbook: a sheltered equipment hall, redundant fiber backhaul to two separate points of presence, and a local operations contract with a regional partner. The playbook keeps commissioning time predictable, which matters because customers buy coverage by the month and every week of delay is revenue that never arrives.
+
+## Site inventory
+
+| Site | Aperture | Commissioned | Antennas |
+|------|----------|--------------|----------|
+| Jimusi | 12 m | 2021 | 3 |
+| Qingdao | 12 m | 2022 | 4 |
+| Kashgar | 7.3 m | 2023 | 2 |
+| Sanya | 12 m | 2022 | 5 |
+| Urumqi | 7.3 m | 2021 | 3 |
+| Chengdu | 12 m | 2024 | 2 |
+
+The table above counts commissioned antennas only. Two additional sites are under construction and are expected to add a combined seven antennas before the end of the second quarter next year.
+
+## Technical choices and the supply chain
+
+Stellar's fixed stations standardize on two aperture classes, twelve meters and 7.3 meters, paired with in-house baseband equipment that supports simultaneous reception across multiple frequency bands. The dual-aperture strategy reflects a deliberate trade: twelve-meter dishes capture weaker downlinks from spacecraft in transfer orbits, while the smaller aperture class serves the high-volume earth observation market at a materially lower cost per pass.
+
+On the supply side, radio-frequency components remain predominantly imported, and the company has begun substitution trials with two domestic vendors. Management expects the first fully localized batch to ship next year. The portable station product line takes a different approach entirely: it favors integration over raw performance, and a single operator can complete setup in under two hours, which has proven decisive for disaster-response and short-duration campaign contracts.
+
+## Commercial outlook
+
+Industry analysts note that the capital-intensive character of ground station networks ties expansion pace to financing capacity. The series B round Stellar completed this year provides roughly eighteen months of runway, while several competitors pursue asset-light models built on hosting agreements and co-built sites. Neither approach has yet proven decisively better, but customer demand for "one station, many satellites" capability is steadily raising the technical bar across the sector. The company's disclosure suggests it will keep buying antenna capacity ahead of contracted demand, a posture that carries real risk if launch schedules slip, and equally real advantage if they do not.
