@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.seexun.jknow.store.mapper.ImplicationRulesMapper">
+
+    <!-- 蕴含规则 SQL（implication_rules.rs 逐字搬迁）。object_text_sql（:244-246）与
+         RULE_MATCH（:249-253）两片段随查询展开（Rust format! 对等）。 -->
+
+    <resultMap id="rule" type="tech.seexun.jknow.store.mapper.ImplicationRulesMapper$Rule">
+        <constructor>
+            <arg column="id" javaType="java.util.UUID"/>
+            <arg column="trigger" javaType="java.lang.String"/>
+            <arg column="phrase" javaType="java.lang.String"/>
+            <arg column="subject_type_id" javaType="java.util.UUID"/>
+            <arg column="object_type_id" javaType="java.util.UUID"/>
+            <arg column="object_is_value" javaType="_boolean"/>
+            <arg column="conclude_property_id" javaType="java.util.UUID"/>
+            <arg column="reading" javaType="java.lang.String"/>
+            <arg column="status" javaType="java.lang.String"/>
+            <arg column="votes" javaType="com.fasterxml.jackson.databind.JsonNode"
+                 typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+            <arg column="decided_by" javaType="java.lang.String"/>
+            <arg column="basis" javaType="java.lang.String"/>
+            <arg column="statement_count" javaType="_int"/>
+            <arg column="examples" javaType="java.util.List"
+                 typeHandler="tech.seexun.jknow.store.typehandler.TextArrayTypeHandler"/>
+            <arg column="decided_at" javaType="java.time.OffsetDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="pendingReading" type="tech.seexun.jknow.store.mapper.ImplicationRulesMapper$PendingReading">
+        <constructor>
+            <arg column="reading" javaType="java.lang.String"/>
+            <arg column="phrase" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <!-- implication_rules.rs:106-117 -->
+    <select id="upsertProposal" resultType="java.util.UUID">
+        INSERT INTO implication_rules
+             (id, kb_id, trigger, phrase, subject_type_id, object_type_id, object_is_value,
+              conclude_property_id, reading, status, votes, decided_by, basis, statement_count, examples)
+         VALUES (#{id}, #{kbId}, #{trigger}, #{phrase}, #{subjectTypeId}, #{objectTypeId},
+                 #{objectIsValue}, #{concludePropertyId}, #{reading}, #{status},
+                 #{votes,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler},
+                 'agent', #{basis}, #{statementCount},
+                 #{examples,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler})
+         ON CONFLICT (kb_id, trigger, phrase, subject_type_id, object_type_id, object_is_value,
+                      conclude_property_id, reading) DO UPDATE
+            SET status = EXCLUDED.status, votes = EXCLUDED.votes, basis = EXCLUDED.basis,
+                statement_count = EXCLUDED.statement_count, examples = EXCLUDED.examples,
+                decided_at = now()
+          WHERE implication_rules.decided_by = 'agent'
+         RETURNING id
+    </select>
+
+    <select id="selectList" resultMap="rule">
+        SELECT id, trigger, phrase, subject_type_id, object_type_id, object_is_value,
+                conclude_property_id, reading, status, votes, decided_by, basis,
+                statement_count, examples, decided_at
+           FROM implication_rules
+          WHERE kb_id = #{kbId} AND (#{status}::text IS NULL OR status = #{status})
+          ORDER BY decided_at, phrase
+    </select>
+
+    <select id="selectGet" resultMap="rule">
+        SELECT id, trigger, phrase, subject_type_id, object_type_id, object_is_value,
+                conclude_property_id, reading, status, votes, decided_by, basis,
+                statement_count, examples, decided_at
+           FROM implication_rules WHERE kb_id = #{kbId} AND id = #{id}
+    </select>
+
+    <select id="decideByPerson" resultType="java.lang.String">
+        UPDATE implication_rules
+            SET status = #{status}, votes = #{votes,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler},
+                decided_by = 'person', decided_at = now()
+          WHERE kb_id = #{kbId} AND id = #{id}
+      RETURNING reading
+    </select>
+
+    <!-- implication_rules.rs:222-236 pending_readings：object_text_sql 逐字展开
+         （coalesce(oe.canonical_name, s.object_value ->> 'value', s.object_value #>> '{}', '')），
+         RULE_MATCH 同（b 换成 r）。 -->
+    <select id="selectPendingReadings" parameterType="java.util.UUID"
+            resultMap="pendingReading">
+        SELECT DISTINCT r.reading, lower(btrim(regexp_replace(coalesce(oe.canonical_name, s.object_value ->> 'value', s.object_value #>> '{}', ''), '\s+', ' ', 'g'))) AS phrase
+           FROM implication_rules r
+           JOIN facts s ON s.kb_id = r.kb_id AND s.layer = 'open' AND s.invalidated_at IS NULL
+           JOIN entities se ON se.id = s.subject_id
+      LEFT JOIN entities oe ON oe.id = s.object_id
+          WHERE r.kb_id = #{kbId} AND r.status = 'approved' AND r.trigger = 'phrase' AND r.reading IS NOT NULL
+            AND r.phrase = lower(btrim(regexp_replace(s.phrase, '\s+', ' ', 'g')))
+       AND r.subject_type_id IS NOT DISTINCT FROM se.type_id
+       AND r.object_is_value = (s.object_id IS NULL)
+       AND (s.object_id IS NULL OR r.object_type_id IS NOT DISTINCT FROM oe.type_id)
+            AND NOT EXISTS (SELECT 1 FROM phrase_readings pr
+                             WHERE pr.kb_id = r.kb_id AND pr.reading = r.reading
+                               AND pr.phrase = lower(btrim(regexp_replace(coalesce(oe.canonical_name, s.object_value ->> 'value', s.object_value #>> '{}', ''), '\s+', ' ', 'g'))))
+         UNION
+         SELECT DISTINCT r.reading, r.phrase
+           FROM implication_rules r
+          WHERE r.kb_id = #{kbId} AND r.status = 'approved' AND r.trigger = 'kind_word' AND r.reading IS NOT NULL
+            AND NOT EXISTS (SELECT 1 FROM phrase_readings pr
+                             WHERE pr.kb_id = r.kb_id AND pr.reading = r.reading AND pr.phrase = r.phrase)
+    </select>
+
+    <!-- implication_rules.rs:265-271 -->
+    <insert id="upsertReading">
+        INSERT INTO phrase_readings (kb_id, reading, phrase, entity_id, value)
+         VALUES (#{kbId}, #{reading}, #{phrase}, #{entityId},
+                 #{value,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler})
+         ON CONFLICT (kb_id, reading, phrase) DO UPDATE
+            SET entity_id = EXCLUDED.entity_id, value = EXCLUDED.value, answered_at = now()
+    </insert>
+</mapper>

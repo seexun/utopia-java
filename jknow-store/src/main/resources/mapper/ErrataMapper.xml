@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.seexun.jknow.store.mapper.ErrataMapper">
+
+    <!-- 勘误 SQL（errata.rs 逐字搬迁，0044 决定 7）。结构先报（domain/range/name_absent/
+         no_date），撤与改经 0027 的闸门；撤销要站得住——物化与蕴含都跳过被勘误撤过的
+         (陈述, 属性)（MaterializeMapper 的 due/隐含查询各有一句 errata_actions NOT EXISTS）。 -->
+
+    <resultMap id="candidate" type="tech.seexun.jknow.store.mapper.ErrataMapper$Candidate">
+        <constructor>
+            <arg column="fact_id" javaType="java.util.UUID"/>
+            <arg column="statement_id" javaType="java.util.UUID"/>
+            <arg column="predicate_id" javaType="java.util.UUID"/>
+            <arg column="subject_id" javaType="java.util.UUID"/>
+            <arg column="subject" javaType="java.lang.String"/>
+            <arg column="subject_class" javaType="java.lang.String"/>
+            <arg column="property" javaType="java.lang.String"/>
+            <arg column="property_label" javaType="java.lang.String"/>
+            <arg column="object_id" javaType="java.util.UUID"/>
+            <arg column="object" javaType="java.lang.String"/>
+            <arg column="object_class" javaType="java.lang.String"/>
+            <arg column="flag" javaType="java.lang.String"/>
+            <arg column="quote" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="propertyRow" type="tech.seexun.jknow.store.mapper.ErrataMapper$PropertyRow">
+        <constructor>
+            <arg column="id" javaType="java.util.UUID"/>
+            <arg column="kind" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="objectRow" type="tech.seexun.jknow.store.mapper.ErrataMapper$ObjectRow">
+        <constructor>
+            <arg column="object_id" javaType="java.util.UUID"/>
+            <arg column="object_value" javaType="com.fasterxml.jackson.databind.JsonNode"
+                 typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="validityRow" type="tech.seexun.jknow.store.mapper.ErrataMapper$ValidityRow">
+        <constructor>
+            <arg column="valid_from" javaType="java.time.OffsetDateTime"/>
+            <arg column="valid_from_precision" javaType="java.lang.String"/>
+            <arg column="valid_from_grade" javaType="java.lang.String"/>
+            <arg column="valid_to" javaType="java.time.OffsetDateTime"/>
+            <arg column="valid_to_precision" javaType="java.lang.String"/>
+            <arg column="attested_from" javaType="java.time.OffsetDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="heldRow" type="tech.seexun.jknow.store.mapper.ErrataMapper$HeldRow">
+        <constructor>
+            <arg column="action" javaType="java.lang.String"/>
+            <arg column="fact_id" javaType="java.util.UUID"/>
+            <arg column="document_id" javaType="java.util.UUID"/>
+            <arg column="proposed" javaType="com.fasterxml.jackson.databind.JsonNode"
+                 typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+            <arg column="quote" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="waitingRow" type="tech.seexun.jknow.store.mapper.ErrataMapper$WaitingRow">
+        <constructor>
+            <arg column="count" javaType="_long"/>
+            <arg column="min" javaType="java.time.OffsetDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <!-- errata.rs:51-113 CANDIDATES_SQL 逐字：类的祖先闭包在 SQL 里算；没有类的一端
+         不报——「不知道是什么」不是「在类之外」。报了的在前（flag IS NULL 升序）。 -->
+    <select id="selectCandidates" resultMap="candidate">
+        WITH RECURSIVE up AS (
+            SELECT id AS child, id AS anc FROM entity_types WHERE kb_id = #{kbId}
+            UNION
+            SELECT up.child, p.parent_id FROM up JOIN entity_type_parents p ON p.child_id = up.anc
+        ),
+        closure AS (SELECT child, array_agg(anc) AS ancs FROM up GROUP BY child),
+        doc AS (
+            SELECT lower(string_agg(text, ' ' ORDER BY seq)) AS text
+              FROM chunks WHERE document_id = #{documentId} AND superseded_at IS NULL
+        ),
+        sources AS (
+            SELECT src.fact_id, src.statement_id FROM typed_fact_sources src
+              JOIN fact_evidence fe ON fe.fact_id = src.statement_id AND fe.document_id = #{documentId}
+            UNION
+            SELECT i.fact_id, i.statement_id FROM implied_fact_sources i
+              JOIN fact_evidence fe ON fe.fact_id = i.statement_id AND fe.document_id = #{documentId}
+             WHERE i.statement_id IS NOT NULL
+        ),
+        typed AS (SELECT DISTINCT ON (fact_id) fact_id, statement_id FROM sources ORDER BY fact_id, statement_id)
+        SELECT * FROM (
+        SELECT t.id AS fact_id, ty.statement_id, t.predicate_id, t.subject_id, t.recorded_at,
+               s.canonical_name AS subject, st.key AS subject_class,
+               r.key AS property, r.label AS property_label,
+               t.object_id,
+               COALESCE(o.canonical_name, t.object_value #>> '{value}', t.object_value::text, '') AS object,
+               ot.key AS object_class,
+               CASE
+                 WHEN s.type_id IS NOT NULL
+                  AND EXISTS (SELECT 1 FROM relation_type_domains d WHERE d.relation_type_id = r.id)
+                  AND NOT EXISTS (SELECT 1 FROM relation_type_domains d
+                                   WHERE d.relation_type_id = r.id AND d.entity_type_id = ANY(sc.ancs))
+                   THEN 'domain'
+                 WHEN o.type_id IS NOT NULL
+                  AND EXISTS (SELECT 1 FROM relation_type_ranges g WHERE g.relation_type_id = r.id)
+                  AND NOT EXISTS (SELECT 1 FROM relation_type_ranges g
+                                   WHERE g.relation_type_id = r.id AND g.entity_type_id = ANY(oc.ancs))
+                   THEN 'range'
+                 WHEN r.datatype = 'date' AND t.object_id IS NULL
+                  AND NOT COALESCE((t.object_value #>> '{value}') ~ '^\d{4}(-\d{2}(-\d{2})?)?', false)
+                   THEN 'no_date'
+                 WHEN position(lower(s.canonical_name) IN doc.text) = 0
+                   OR (o.id IS NOT NULL AND position(lower(o.canonical_name) IN doc.text) = 0)
+                   THEN 'name_absent'
+               END AS flag,
+               (SELECT fe.quote FROM fact_evidence fe
+                 WHERE fe.fact_id = t.id AND fe.document_id = #{documentId} AND fe.quote IS NOT NULL
+                 ORDER BY fe.chunk_id LIMIT 1) AS quote
+          FROM typed ty
+          JOIN facts t ON t.id = ty.fact_id
+          JOIN entities s ON s.id = t.subject_id
+          LEFT JOIN entity_types st ON st.id = s.type_id
+          LEFT JOIN closure sc ON sc.child = s.type_id
+          JOIN relation_types r ON r.id = t.predicate_id
+          LEFT JOIN entities o ON o.id = t.object_id
+          LEFT JOIN entity_types ot ON ot.id = o.type_id
+          LEFT JOIN closure oc ON oc.child = o.type_id
+          CROSS JOIN doc
+         WHERE t.kb_id = #{kbId} AND t.layer = 'typed' AND t.invalidated_at IS NULL
+           AND NOT EXISTS (SELECT 1 FROM errata_actions ea WHERE ea.fact_id = t.id)
+        ) c
+        ORDER BY (c.flag IS NULL), c.recorded_at, c.fact_id
+    </select>
+
+    <!-- errata.rs:144-159 documents_due：最早摄入的在前 -->
+    <select id="selectDocumentsDue" resultType="java.util.UUID">
+        SELECT d.id FROM documents d
+          WHERE d.kb_id = #{kbId} AND d.deleted_at IS NULL
+            AND (EXISTS (
+              SELECT 1 FROM fact_evidence fe
+                JOIN (SELECT fact_id, statement_id FROM typed_fact_sources
+                      UNION ALL
+                      SELECT fact_id, statement_id FROM implied_fact_sources
+                       WHERE statement_id IS NOT NULL) src ON src.statement_id = fe.fact_id
+                JOIN facts t ON t.id = src.fact_id
+               WHERE fe.document_id = d.id AND t.invalidated_at IS NULL
+                 AND NOT EXISTS (SELECT 1 FROM errata_actions ea WHERE ea.fact_id = t.id))
+              OR (d.graph_status = 'done'
+                  AND NOT EXISTS (SELECT 1 FROM errata_runs r WHERE r.document_id = d.id)))
+          ORDER BY d.created_at, d.id
+          LIMIT #{limit}
+    </select>
+
+    <select id="runsOf" parameterType="java.util.UUID" resultType="long">
+        SELECT count(*) FROM errata_runs WHERE document_id = #{documentId}
+    </select>
+
+    <insert id="insertRun">
+        INSERT INTO errata_runs (id, kb_id, document_id, flagged, sampled)
+        VALUES (#{id}, #{kbId}, #{documentId}, #{flagged}, #{sampled})
+    </insert>
+
+    <update id="finishRun">
+        UPDATE errata_runs SET requests = #{requests}, prompt_tokens = #{promptTokens},
+                completion_tokens = #{completionTokens}, finished_at = now() WHERE id = #{runId}
+    </update>
+
+    <select id="selectPropertyByKey" resultMap="propertyRow">
+        SELECT id, kind FROM relation_types WHERE kb_id = #{kbId} AND key = #{key}
+    </select>
+
+    <select id="selectPropertyKind" parameterType="java.util.UUID" resultType="java.lang.String">
+        SELECT kind FROM relation_types WHERE id = #{predicateId}
+    </select>
+
+    <select id="selectFactObject" resultMap="objectRow">
+        SELECT object_id, object_value FROM facts WHERE id = #{factId}
+    </select>
+
+    <select id="selectIsMoment" parameterType="java.util.UUID" resultType="java.lang.Boolean">
+        SELECT valid_from IS NOT NULL AND valid_to IS NOT DISTINCT FROM valid_from
+           FROM facts WHERE id = #{factId}
+    </select>
+
+    <select id="selectValidityOf" resultMap="validityRow">
+        SELECT valid_from, valid_from_precision, valid_from_grade, valid_to, valid_to_precision,
+                attested_from FROM facts WHERE id = #{factId}
+    </select>
+
+    <select id="selectDocTime" parameterType="java.util.UUID" resultType="java.time.OffsetDateTime">
+        SELECT doc_time FROM documents WHERE id = #{documentId}
+    </select>
+
+    <insert id="insertAction">
+        INSERT INTO errata_actions
+             (id, kb_id, run_id, document_id, fact_id, statement_id, predicate_id, flag,
+              action, reason, quote, proposed, status, detail)
+         VALUES (#{id}, #{kbId}, #{runId}, #{documentId}, #{factId}, #{statementId},
+                 #{predicateId}, #{flag}, #{action}, #{reason}, #{quote},
+                 #{proposed,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler},
+                 #{status}, #{detail})
+    </insert>
+
+    <update id="setNewFact">
+        UPDATE errata_actions SET new_fact_id = #{newFactId} WHERE id = #{id}
+    </update>
+
+    <!-- errata.rs:668-675 证据：引文所在的分块；first=true 是跨块时的退路（文档第一块） -->
+    <insert id="insertEvidenceInChunk">
+        INSERT INTO fact_evidence (fact_id, chunk_id, quote, document_id, doc_version)
+         SELECT #{factId}, c.id, #{quote}, c.document_id, c.doc_version FROM chunks c
+          WHERE c.document_id = #{documentId} AND c.superseded_at IS NULL
+            <if test="!first">
+            AND position(lower(#{quote}) IN lower(c.text)) &gt; 0
+            </if>
+          ORDER BY c.seq LIMIT 1
+         ON CONFLICT DO NOTHING
+    </insert>
+
+    <select id="selectHeldAction" resultMap="heldRow">
+        SELECT action, fact_id, document_id, proposed, quote FROM errata_actions
+          WHERE id = #{id} AND kb_id = #{kbId} AND status = 'held'
+    </select>
+
+    <update id="decideHeld">
+        UPDATE errata_actions SET status = #{status}, new_fact_id = #{newFactId},
+               decided_by = #{actor}, decided_at = now()
+          WHERE id = #{id} AND kb_id = #{kbId} AND status = 'held'
+    </update>
+
+    <resultMap id="heldItem" type="tech.seexun.jknow.store.mapper.ErrataMapper$HeldItem">
+        <constructor>
+            <arg column="id" javaType="java.util.UUID"/>
+            <arg column="document_id" javaType="java.util.UUID"/>
+            <arg column="document" javaType="java.lang.String"/>
+            <arg column="action" javaType="java.lang.String"/>
+            <arg column="flag" javaType="java.lang.String"/>
+            <arg column="fact_id" javaType="java.util.UUID"/>
+            <arg column="proposed" javaType="com.fasterxml.jackson.databind.JsonNode"
+                 typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+            <arg column="reason" javaType="java.lang.String"/>
+            <arg column="quote" javaType="java.lang.String"/>
+            <arg column="detail" javaType="java.lang.String"/>
+            <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectHeld" resultMap="heldItem">
+        SELECT ea.id, ea.document_id, d.filename AS document, ea.action, ea.flag, ea.fact_id,
+                ea.proposed, ea.reason, ea.quote, ea.detail, ea.created_at
+           FROM errata_actions ea JOIN documents d ON d.id = ea.document_id
+          WHERE ea.kb_id = #{kbId} AND ea.status = 'held'
+          ORDER BY ea.created_at, ea.id
+          LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="selectWaiting" parameterType="java.util.UUID" resultMap="waitingRow">
+        SELECT count(*), min(created_at) FROM errata_actions WHERE kb_id = #{kbId} AND status = 'held'
+    </select>
+</mapper>

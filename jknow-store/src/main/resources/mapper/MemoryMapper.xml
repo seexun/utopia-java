@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  Agent/对话记忆 episodes 快速路径（逐字搬迁自旧仓库 utopia-0.1.0-rc9/crates/utopia-store/src/memory.rs；
+  铁律：占位符改写 #{param} 外 token 流一字不动，每条注明 file:line）。
+  设计（零新轮子）：记忆空间 = 知识库本身；每条 episode = 隐式 "Memory" 来源下
+  "Memory log" 文档上追加的一个 chunk（文本内嵌事发时间戳行）。
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.MemoryMapper">
+
+  <!-- memory.rs:22-30 每 KB 的隐式 Memory 来源（不可删；Library 里可见——记忆透明是特性）。 -->
+  <select id="selectMemorySource" resultType="java.util.UUID">
+    SELECT id FROM sources WHERE kb_id = #{kbId} AND kind = #{kind} LIMIT 1
+  </select>
+
+  <insert id="insertMemorySource">
+    INSERT INTO sources (id, kb_id, kind, name, config) VALUES (#{id}, #{kbId}, #{kind}, 'Memory', '{}')
+  </insert>
+
+  <!-- memory.rs:35-41 Memory log 文档（每 KB 一份）。绕开 documents::create 的同内容去重——
+       它不是内容寻址的文件，sha256 填哨兵值。 -->
+  <select id="selectMemoryDoc" resultType="java.util.UUID">
+    SELECT id FROM documents
+      WHERE kb_id = #{kbId} AND external_key = #{externalKey} AND deleted_at IS NULL LIMIT 1
+  </select>
+
+  <insert id="insertMemoryDoc">
+    INSERT INTO documents
+        (id, kb_id, source_id, filename, mime, size_bytes, sha256,
+         status, graph_status, external_key, doc_time_source)
+     VALUES (#{id}, #{kbId}, #{sourceId}, 'memory-log.md', 'text/markdown', 0, 'memory:log',
+             'ready', 'done', #{externalKey}, 'none')
+  </insert>
+
+  <!-- memory.rs:97-103 追加一条 episode：新 chunk（extracted_at 空 → 增量抽取会拾起；
+       embedding 空 → memory_ingest 会补）。事发时间内嵌进文本首行，抽取模型据此定 valid_from。 -->
+  <insert id="insertEpisodeChunk">
+    INSERT INTO chunks (id, kb_id, document_id, seq, text, char_start, char_end, doc_version)
+     VALUES (#{id}, #{kbId}, #{documentId},
+             (SELECT COALESCE(MAX(seq), -1) + 1 FROM chunks
+              WHERE document_id = #{documentId} AND superseded_at IS NULL),
+             #{text}, 0, #{charEnd}, 1)
+  </insert>
+
+  <!-- memory.rs:111-116 文档账面跟着走。 -->
+  <update id="bumpMemoryDoc">
+    UPDATE documents SET chunk_count = chunk_count + 1, size_bytes = size_bytes + #{addedBytes},
+            updated_at = now() WHERE id = #{id}
+  </update>
+
+  <!-- memory.rs:132-137 is_memory_document 逐字。 -->
+  <select id="selectIsMemoryDocument" resultType="java.lang.Integer">
+    SELECT 1 FROM documents d JOIN sources s ON s.id = d.source_id
+     WHERE d.id = #{documentId} AND s.kind = #{kind}
+  </select>
+</mapper>

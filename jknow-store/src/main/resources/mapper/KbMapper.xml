@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  KB 行读取（逐字搬迁自旧仓库 utopia-0.1.0-rc9/crates/utopia-store/src/kbs.rs；
+  占位符 $1 改写 #{id} 外一字不动）。resultMap 按 DB 列序映射全 20 列
+  （SELECT * 的 FromRow 语义；rbac 只消费 id/workspace_id/visibility，其余列任务 5 读面复用）。
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.KbMapper">
+
+  <resultMap id="kbRow" type="tech.seexun.jknow.store.entity.KbRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="workspace_id" javaType="java.util.UUID"/>
+      <arg column="name" javaType="java.lang.String"/>
+      <arg column="kind" javaType="java.lang.String"/>
+      <arg column="description" javaType="java.lang.String"/>
+      <arg column="is_default" javaType="_boolean"/>
+      <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="updated_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="visibility" javaType="java.lang.String"/>
+      <arg column="auto_extend_ontology" javaType="_boolean"/>
+      <arg column="ontology_lang" javaType="java.lang.String"/>
+      <arg column="materialize_inferences" javaType="_boolean"/>
+      <arg column="inference_interval_minutes" javaType="_int"/>
+      <arg column="last_inference_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="auto_type_resolution" javaType="_boolean"/>
+      <arg column="governance" javaType="_boolean"/>
+      <arg column="governance_since" javaType="java.time.OffsetDateTime"/>
+      <arg column="data_description" javaType="java.lang.String"/>
+      <arg column="data_questions" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="data_conventions" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <!-- kbs.rs:68-73（get：require_kb 的库存在性判定，无行→NotFound） -->
+  <select id="selectById" resultMap="kbRow">
+    SELECT * FROM knowledge_bases WHERE id = #{id}
+  </select>
+
+  <!-- access.rs:52（全部 KB 的 id：visible_kb_roles 的 is_admin 支——is_admin → 全库 Owner）。
+       只 SELECT id 就只映射 id：Rust 侧是 Vec&lt;(Uuid,)&gt; 单列同构（resultType 走已注册的
+       UuidTypeHandler），不得复用 kbRow——显式构造器映射缺列必抛 ExecutorException，
+       admin 一进 /alerts 即 500（走查1 Critical）。 -->
+  <select id="selectAllIds" resultType="java.util.UUID">
+    SELECT id FROM knowledge_bases
+  </select>
+
+  <!-- kbs.rs:6-13（list 的 id 面）：WHERE workspace_id ORDER BY created_at 逐字。
+       settings PUT 配好嵌入模型时逐库排 embed_ontology（settings_routes.rs:112-119），
+       只消费 id——与 selectAllIds 同一理由（单列 SELECT 配单列返回）。 -->
+  <select id="selectIdsForWorkspace" resultType="java.util.UUID">
+    SELECT id FROM knowledge_bases WHERE workspace_id = #{workspaceId} ORDER BY created_at
+  </select>
+</mapper>

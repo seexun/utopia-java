@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  KB 家族读 SQL（逐字搬迁自旧仓库 utopia-0.1.0-rc9/crates/utopia-store/src：kbs.rs / access.rs）。
+  铁律：占位符 $1..$n 改写 #{param}（布尔/数组经 typeHandler 绑定）外 token 流一字不动。
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.KbFamilyMapper">
+
+  <resultMap id="kbRow" type="tech.seexun.jknow.store.entity.KbRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="workspace_id" javaType="java.util.UUID"/>
+      <arg column="name" javaType="java.lang.String"/>
+      <arg column="kind" javaType="java.lang.String"/>
+      <arg column="description" javaType="java.lang.String"/>
+      <arg column="is_default" javaType="_boolean"/>
+      <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="updated_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="visibility" javaType="java.lang.String"/>
+      <arg column="auto_extend_ontology" javaType="_boolean"/>
+      <arg column="ontology_lang" javaType="java.lang.String"/>
+      <arg column="materialize_inferences" javaType="_boolean"/>
+      <arg column="inference_interval_minutes" javaType="_int"/>
+      <arg column="last_inference_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="auto_type_resolution" javaType="_boolean"/>
+      <arg column="governance" javaType="_boolean"/>
+      <arg column="governance_since" javaType="java.time.OffsetDateTime"/>
+      <arg column="data_description" javaType="java.lang.String"/>
+      <arg column="data_questions" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="data_conventions" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="readiness" type="tech.seexun.jknow.store.entity.Readiness">
+    <constructor>
+      <arg column="has_chat_model" javaType="_boolean"/>
+      <arg column="documents" javaType="_long"/>
+      <arg column="processing" javaType="_long"/>
+      <arg column="failed" javaType="_long"/>
+      <arg column="entities" javaType="_long"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="kbMemberView" type="tech.seexun.jknow.store.entity.KbMemberView">
+    <constructor>
+      <arg column="user_id" javaType="java.util.UUID"/>
+      <arg column="email" javaType="java.lang.String"/>
+      <arg column="display_name" javaType="java.lang.String"/>
+      <arg column="role" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="myKbInfo" type="tech.seexun.jknow.store.entity.MyKbInfo">
+    <constructor>
+      <arg column="kb_id" javaType="java.util.UUID"/>
+      <arg column="member_role" javaType="java.lang.String"/>
+      <arg column="joined_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="added_by_name" javaType="java.lang.String"/>
+      <arg column="doc_count" javaType="_long"/>
+      <arg column="member_count" javaType="_long"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="visibleKbRole" type="tech.seexun.jknow.store.mapper.KbFamilyMapper$VisibleKbRole">
+    <constructor>
+      <arg column="id" javaType="java.util.UUID"/>
+      <arg column="matrix_role" javaType="java.lang.String"/>
+      <arg column="open_member" javaType="_boolean"/>
+    </constructor>
+  </resultMap>
+
+  <!-- kbs.rs:16-37（list_visible：$3=is_admin 布尔；restricted 仅矩阵成员可见） -->
+  <select id="listVisible" resultMap="kbRow">
+    SELECT * FROM knowledge_bases k
+             WHERE k.workspace_id = #{workspaceId}
+               AND (#{isAdmin}
+                    OR k.visibility = 'open'
+                    OR EXISTS (SELECT 1 FROM kb_members m
+                               WHERE m.kb_id = k.id AND m.user_id = #{userId}))
+             ORDER BY k.created_at
+  </select>
+
+  <!-- kbs.rs:173-199（readiness：一次查询拿全；源内行注释原样保留） -->
+  <select id="selectReadiness" resultMap="readiness">
+    SELECT
+               EXISTS (
+                 SELECT 1 FROM llm_settings s
+                 JOIN knowledge_bases k ON k.workspace_id = s.workspace_id
+                 WHERE k.id = #{kbId} AND coalesce(s.chat_model, '') &lt;&gt; ''
+               ) AS has_chat_model,
+               (SELECT count(*) FROM documents
+                 WHERE kb_id = #{kbId} AND deleted_at IS NULL) AS documents,
+               -- 两条轴各有各的进行时：内容还没进库（status），或图还没抽完（graph_status）
+               (SELECT count(*) FROM documents
+                 WHERE kb_id = #{kbId} AND deleted_at IS NULL
+                   AND (status IN ('pending', 'parsing', 'indexing', 'embedding')
+                        OR graph_status IN ('queued', 'extracting'))) AS processing,
+               (SELECT count(*) FROM documents
+                 WHERE kb_id = #{kbId} AND deleted_at IS NULL
+                   AND (status = 'failed' OR graph_status = 'failed')) AS failed,
+               (SELECT count(*) FROM entities
+                 WHERE kb_id = #{kbId} AND merged_into IS NULL) AS entities
+  </select>
+
+  <!-- access.rs:101-112（kb_members：停用的人不出现，display_name 序；源内行注释保留） -->
+  <select id="selectKbMembers" resultMap="kbMemberView">
+    SELECT m.user_id, u.email, u.display_name, m.role
+             FROM kb_members m JOIN users u ON u.id = m.user_id
+             -- 停用的人不出现在成员列表里（见 `users.deactivated_at`）；成员关系那一行留着
+             WHERE m.kb_id = #{kbId} AND u.deactivated_at IS NULL ORDER BY u.display_name
+  </select>
+
+  <!-- access.rs:142-165（my_kb_infos：$2=user；LEFT JOIN 三连，doc/member 计数子查询） -->
+  <select id="selectMyKbInfos" resultMap="myKbInfo">
+    SELECT k.id AS kb_id,
+                    m.role AS member_role,
+                    m.created_at AS joined_at,
+                    inviter.display_name AS added_by_name,
+                    (SELECT count(*) FROM documents d
+                      WHERE d.kb_id = k.id AND d.deleted_at IS NULL) AS doc_count,
+                    (SELECT count(*) FROM kb_members mm WHERE mm.kb_id = k.id) AS member_count
+             FROM knowledge_bases k
+             LEFT JOIN kb_members m ON m.kb_id = k.id AND m.user_id = #{userId}
+             LEFT JOIN users inviter ON inviter.id = m.added_by
+             WHERE k.id = ANY(#{kbIds,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler})
+  </select>
+
+  <!-- access.rs:50-80（visible_kb_roles 非管理员支：$1=user；is_admin 支在 service 里展开为全库 Owner
+       ——源分支序：admin→全部 Owner / 矩阵→矩阵角色 / open+membership→Viewer）。
+       第三列在源里是无名布尔表达式（Rust 元组按位取列）；MyBatis 按名映射，补 AS open_member
+       （命名差异，token 流等价）。 -->
+  <select id="selectVisibleKbRoles" resultMap="visibleKbRole">
+    SELECT k.id,
+                    m.role AS matrix_role,
+                    (k.visibility = 'open'
+                     AND EXISTS (SELECT 1 FROM memberships ws
+                             WHERE ws.workspace_id = k.workspace_id AND ws.user_id = #{userId})) AS open_member
+             FROM knowledge_bases k
+             LEFT JOIN kb_members m ON m.kb_id = k.id AND m.user_id = #{userId}
+  </select>
+
+  <!-- 写面（M4 任务 6；kbs.rs:39-217 逐字）。 -->
+
+  <!-- kbs.rs:50-56（INSERT：第一个库 is_default=NOT EXISTS；ontology_lang 取部署默认） -->
+  <select id="insertKb" resultMap="kbRow">
+    INSERT INTO knowledge_bases
+        (id, workspace_id, name, kind, description, is_default, ontology_lang)
+    VALUES (#{id}, #{workspaceId}, #{name}, #{kind}, #{description},
+            NOT EXISTS (SELECT 1 FROM knowledge_bases WHERE workspace_id = #{workspaceId}),
+            COALESCE((SELECT default_ontology_lang FROM deployment_settings LIMIT 1), 'en'))
+    RETURNING *
+  </select>
+
+  <!-- kbs.rs:138-155（11 参 COALESCE UPDATE；源内行注释是 PG 语法成员原样保留） -->
+  <select id="updateKb" resultMap="kbRow">
+    UPDATE knowledge_bases
+    SET name = COALESCE(#{name}, name),
+        description = COALESCE(#{description}, description),
+        visibility = COALESCE(#{visibility}, visibility),
+        auto_extend_ontology = COALESCE(#{autoExtendOntology}, auto_extend_ontology),
+        ontology_lang = COALESCE(#{ontologyLang}, ontology_lang),
+        materialize_inferences = COALESCE(#{materializeInferences}, materialize_inferences),
+        inference_interval_minutes = COALESCE(#{inferenceIntervalMinutes}, inference_interval_minutes),
+        auto_type_resolution = COALESCE(#{autoTypeResolution}, auto_type_resolution),
+        governance = COALESCE(#{governance}, governance),
+        -- 从关到开的那一刻记下来：保险丝只数它之后的撤回。SET 右边读的是旧值
+        governance_since = CASE WHEN #{governance} IS TRUE AND NOT governance THEN now()
+                                ELSE governance_since END,
+        -- 人写的约定；清空要送空串，送 null 等于不改（与 description 同一约定）
+        data_conventions = COALESCE(#{dataConventions}, data_conventions),
+        updated_at = now()
+    WHERE id = #{id} RETURNING *
+  </select>
+
+  <!-- kbs.rs:209-212（DELETE；行数 0=NotFound） -->
+  <delete id="deleteKb">
+    DELETE FROM knowledge_bases WHERE id = #{id}
+  </delete>
+
+  <!-- kbs.rs:80-97 set_data_description 逐字（探索写描述/问题；人写的 data_conventions
+       在另一列另一条路——两个写路径互不覆盖，#570）。 -->
+  <update id="setDataDescription">
+    UPDATE knowledge_bases
+       SET data_description = #{description}, data_questions = #{questions}, updated_at = now()
+     WHERE id = #{id}
+  </update>
+</mapper>

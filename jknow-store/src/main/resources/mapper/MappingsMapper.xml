@@ -1,0 +1,343 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  语义层口径读 SQL（逐字搬迁自旧仓库 utopia-0.1.0-rc9/crates/utopia-store/src：
+  mappings.rs / exploration_runs.rs）。
+
+  Rust format! 片段：
+  · page 的 WHERE（mappings.rs:280-286，概念名/源/表名可搜）：
+    WHERE m.kb_id = $1
+           AND ($2::text IS NULL OR m.status = $2)
+           AND ($3::text IS NULL
+                OR e.canonical_name ILIKE '%' || $3 || '%'
+                OR m.source ILIKE '%' || $3 || '%'
+                OR m.table_name ILIKE '%' || $3 || '%')
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.MappingsMapper">
+
+  <resultMap id="conceptMapping" type="tech.seexun.jknow.store.entity.ConceptMapping">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="concept_id" javaType="java.util.UUID"/>
+      <arg column="concept_name" javaType="java.lang.String"/>
+      <arg column="source" javaType="java.lang.String"/>
+      <arg column="table_name" javaType="java.lang.String"/>
+      <arg column="expr" javaType="java.lang.String"/>
+      <arg column="sql" javaType="java.lang.String"/>
+      <arg column="unit" javaType="java.lang.String"/>
+      <arg column="summary" javaType="java.lang.String"/>
+      <arg column="derived" javaType="_boolean"/>
+      <arg column="status" javaType="java.lang.String"/>
+      <arg column="written_by" javaType="java.util.UUID"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="mappingRevision" type="tech.seexun.jknow.store.entity.MappingRevision">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="before" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="changed_by_name" javaType="java.lang.String"/>
+      <arg column="changed_at" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="explorationRun" type="tech.seexun.jknow.store.entity.ExplorationRun">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="started_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="finished_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="sources" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.TextArrayTypeHandler"/>
+      <arg column="tables_scanned" javaType="_int"/>
+      <arg column="columns_scanned" javaType="_int"/>
+      <arg column="schema_truncated" javaType="_boolean"/>
+      <arg column="cap" javaType="_int"/>
+      <arg column="returned" javaType="_int"/>
+      <arg column="accepted" javaType="_int"/>
+      <arg column="dropped" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="tables_covered" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.TextArrayTypeHandler"/>
+      <arg column="error" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="mappingText" type="tech.seexun.jknow.store.entity.MappingText">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="concept_name" javaType="java.lang.String"/>
+      <arg column="summary" javaType="java.lang.String"/>
+      <arg column="unit" javaType="java.lang.String"/>
+      <arg column="table_name" javaType="java.lang.String"/>
+      <arg column="expr" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="statusCounts" type="tech.seexun.jknow.store.mapper.MappingsMapper$StatusCounts">
+    <constructor>
+      <arg column="proposed" javaType="_long"/>
+      <arg column="confirmed" javaType="_long"/>
+      <arg column="rejected" javaType="_long"/>
+    </constructor>
+  </resultMap>
+
+  <!-- mappings.rs:270-299（page 主体：canonical_name/source/id 三级序） -->
+  <select id="selectMappingPage" resultMap="conceptMapping">
+    SELECT m.id, m.concept_id, e.canonical_name AS concept_name, m.source,
+                m.table_name, m.expr, m.sql, m.unit, m.summary, m.derived, m.status, m.written_by
+         FROM concept_mappings m
+         JOIN entities e ON e.id = m.concept_id
+         WHERE m.kb_id = #{kbId}
+           AND (#{status}::text IS NULL OR m.status = #{status})
+           AND (#{q}::text IS NULL
+                OR e.canonical_name ILIKE '%' || #{q} || '%'
+                OR m.source ILIKE '%' || #{q} || '%'
+                OR m.table_name ILIKE '%' || #{q} || '%')
+         ORDER BY e.canonical_name, m.source, m.id
+         LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <!-- mappings.rs:301-313（page 总数：同一 WHERE） -->
+  <select id="countMappingPage" resultType="_long">
+    SELECT count(*) FROM concept_mappings m
+         JOIN entities e ON e.id = m.concept_id WHERE m.kb_id = #{kbId}
+           AND (#{status}::text IS NULL OR m.status = #{status})
+           AND (#{q}::text IS NULL
+                OR e.canonical_name ILIKE '%' || #{q} || '%'
+                OR m.source ILIKE '%' || #{q} || '%'
+                OR m.table_name ILIKE '%' || #{q} || '%')
+  </select>
+
+  <!-- mappings.rs:314-323（status_counts：三种状态各多少） -->
+  <select id="selectStatusCounts" resultMap="statusCounts">
+    SELECT count(*) FILTER (WHERE status = 'proposed') AS proposed,
+                count(*) FILTER (WHERE status = 'confirmed') AS confirmed,
+                count(*) FILTER (WHERE status = 'rejected') AS rejected
+           FROM concept_mappings WHERE kb_id = #{kbId}
+  </select>
+
+  <!-- mappings.rs:518-540（revisions：kb 归属走 JOIN 校验（revisions 表自己没有 kb_id）） -->
+  <select id="selectRevisions" resultMap="mappingRevision">
+    SELECT r.id, r.before, u.display_name AS changed_by_name, r.changed_at
+           FROM concept_mapping_revisions r
+           JOIN concept_mappings m ON m.id = r.mapping_id
+           LEFT JOIN users u ON u.id = r.changed_by
+          WHERE r.mapping_id = #{mappingId} AND m.kb_id = #{kbId}
+          ORDER BY r.changed_at DESC
+          LIMIT 50
+  </select>
+
+  <!-- exploration_runs.rs:124-135（recent：started_at 倒序） -->
+  <select id="selectRecentRuns" resultMap="explorationRun">
+    SELECT id, started_at, finished_at, sources, tables_scanned, columns_scanned,
+                schema_truncated, cap, returned, accepted, dropped, tables_covered, error
+           FROM mapping_exploration_runs
+          WHERE kb_id = #{kbId}
+          ORDER BY started_at DESC
+          LIMIT #{limit}
+  </select>
+
+  <!-- mappings.rs:159-173（confirmed：问数注进 system prompt 的口径，字典序取前 k） -->
+  <select id="selectConfirmed" resultMap="conceptMapping">
+    SELECT m.id, m.concept_id, e.canonical_name AS concept_name, m.source,
+                m.table_name, m.expr, m.sql, m.unit, m.summary, m.derived, m.status, m.written_by
+         FROM concept_mappings m
+         JOIN entities e ON e.id = m.concept_id
+         WHERE m.kb_id = #{kbId} AND m.status = 'confirmed'
+         ORDER BY e.canonical_name, m.source
+         LIMIT #{limit}
+  </select>
+
+  <!-- mappings.rs:485-496（confirmed_texts：词面检索的全集行） -->
+  <select id="selectConfirmedTexts" resultMap="mappingText">
+    SELECT m.id, e.canonical_name AS concept_name, m.summary, m.unit, m.table_name, m.expr
+           FROM concept_mappings m JOIN entities e ON e.id = m.concept_id
+          WHERE m.kb_id = #{kbId} AND m.status = 'confirmed'
+  </select>
+
+  <!-- mappings.rs:497-510（by_ids：行集取回；调用方按 ids 序重排） -->
+  <select id="selectMappingsByIds" resultMap="conceptMapping">
+    SELECT m.id, m.concept_id, e.canonical_name AS concept_name, m.source,
+                m.table_name, m.expr, m.sql, m.unit, m.summary, m.derived, m.status, m.written_by
+           FROM concept_mappings m JOIN entities e ON e.id = m.concept_id
+          WHERE m.kb_id = #{kbId} AND m.id = ANY(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler})
+  </select>
+
+  <!-- mappings.rs:179-201 decide：**改状态不删行**——确认发生过、拒绝也发生过。拒绝
+       留痕当下就有用：下一轮探索会再次算出被拒绝的那条，propose 的 WHERE status='proposed'
+       据此不把它刷回待看。 -->
+  <update id="decideMapping">
+    UPDATE concept_mappings
+        SET status = #{status}, decided_by = #{actor}, decided_at = now(), updated_at = now()
+      WHERE id = #{mappingId} AND kb_id = #{kbId}
+  </update>
+
+  <!-- ==================================================================== -->
+  <!-- 口径写面（mappings.rs:92-132 create / 209-262 revise / 166-193
+       ensure_concept_types；M5 任务 3 随 create/revise/preview 落地）。 -->
+
+  <!-- mappings.rs:105-110 create：人从零写一条口径（#562）。**落下来就是确认的**：
+       写的人就是表态的人，不需要再过一遍审。同一个 (概念, 源) 已有行时唯一约束挡下
+       （service 折 Conflict——那一条可能是探索提的、人已确认过，覆盖等于抹掉一次表态）。 -->
+  <insert id="insertMapping">
+    INSERT INTO concept_mappings
+         (id, kb_id, concept_id, source, table_name, expr, sql, unit, summary, derived,
+          status, decided_by, decided_at, written_by)
+     VALUES (#{id}, #{kbId}, #{conceptId}, #{source}, #{tableName}, #{expr}, #{sql}, #{unit},
+             #{summary}, #{derived}, 'confirmed', #{actor}, now(), #{actor})
+  </insert>
+
+  <!-- mappings.rs:222-229 revise 第一步：改之前那一版先进 revisions——问数回溯历史报表
+       时要答得出「上季度这个数是怎么算的」。存整版快照（to_jsonb 去 id/kb_id）而不是
+       差异：读的时候要的就是「当时是什么」。jsonb 文本直读（service 解析后走
+       JsonNodeTypeHandler 写回，与 AuditMapper detail 同一绑定约定）。 -->
+  <select id="selectMappingBefore" resultType="java.lang.String">
+    SELECT to_jsonb(m) - 'id' - 'kb_id' FROM concept_mappings m
+      WHERE m.id = #{mappingId} AND m.kb_id = #{kbId}
+  </select>
+
+  <insert id="insertMappingRevision">
+    INSERT INTO concept_mapping_revisions (id, mapping_id, before, changed_by)
+     VALUES (#{id}, #{mappingId},
+             #{before,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler}::jsonb,
+             #{actor})
+  </insert>
+
+  <!-- mappings.rs:244-259 revise 第二步：整版覆写（空串已由调用方清成 NULL——「有没有
+       配 expr」的判断只问 IS NULL 一边）。 -->
+  <update id="reviseMapping">
+    UPDATE concept_mappings
+        SET table_name = #{tableName}, expr = #{expr}, sql = #{sql}, unit = #{unit},
+            summary = #{summary}, derived = #{derived}, updated_at = now()
+      WHERE id = #{mappingId} AND kb_id = #{kbId}
+  </update>
+
+  <!-- mappings.rs:166-193 ensure_concept_types：Metric/Dimension 两个内置类，缺了补
+       （WHERE NOT EXISTS 幂等）。 -->
+  <insert id="insertConceptTypeIfMissing">
+    INSERT INTO entity_types (id, kb_id, key, label, builtin, description)
+     SELECT #{id}, #{kbId}, #{key}, #{label}, TRUE, #{description}
+      WHERE NOT EXISTS (SELECT 1 FROM entity_types WHERE kb_id = #{kbId} AND key = #{key})
+  </insert>
+
+  <!-- mapping_routes.rs:291-296：create 里概念类的 id（ensure 之后必在）。 -->
+  <select id="selectEntityTypeId" resultType="java.util.UUID">
+    SELECT id FROM entity_types WHERE kb_id = #{kbId} AND key = #{key}
+  </select>
+  <!-- ==================================================================== -->
+  <!-- 口径向量（mappings.rs:367-481；M3 任务 10 随 relevant 向量路落地）。
+       确认口径里还没嵌、或嵌的时候文本/模型跟现在不一样的（#574）。判陈用生成
+       原文的同一个函数（MappingText.embedText）比，不在 SQL 里重拼（#672 教训）——
+       所以拆四查，文本比对在 Java 侧。 -->
+
+  <!-- mappings.rs:377-390 逐字（第一查：没嵌或模型不符，按 id 序取上限） -->
+  <select id="selectUnembeddedOrModelChanged" resultMap="mappingText">
+    SELECT m.id, e.canonical_name AS concept_name, m.summary, m.unit, m.table_name, m.expr
+           FROM concept_mappings m
+           JOIN entities e ON e.id = m.concept_id
+          WHERE m.kb_id = #{kbId} AND m.status = 'confirmed'
+            AND (m.embedding IS NULL OR m.embedded_model IS DISTINCT FROM #{model})
+          ORDER BY m.id
+          LIMIT #{limit}
+  </select>
+
+  <!-- mappings.rs:393-401 逐字（第二查：同模型嵌过的行——文本变了的也要重嵌） -->
+  <select id="selectModelMatchingIds" resultType="java.util.UUID">
+    SELECT m.id FROM concept_mappings m
+     WHERE m.kb_id = #{kbId} AND m.status = 'confirmed'
+       AND m.embedding IS NOT NULL AND m.embedded_model = #{model}
+  </select>
+
+  <!-- mappings.rs:405-412 逐字（第三查：现在的文字） -->
+  <select id="selectMappingTextsByIds" resultMap="mappingText">
+    SELECT m.id, e.canonical_name AS concept_name, m.summary, m.unit, m.table_name, m.expr
+           FROM concept_mappings m JOIN entities e ON e.id = m.concept_id
+      WHERE m.id = ANY(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler})
+  </select>
+
+  <resultMap id="embeddedText" type="tech.seexun.jknow.store.mapper.MappingsMapper$EmbeddedText">
+    <constructor>
+      <arg column="id" javaType="java.util.UUID"/>
+      <arg column="embedded_text" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <!-- mappings.rs:414-420 逐字（第四查：当时嵌的原文） -->
+  <select id="selectEmbeddedTexts" resultMap="embeddedText">
+    SELECT id, embedded_text FROM concept_mappings
+     WHERE id = ANY(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler})
+  </select>
+
+  <!-- mappings.rs:440-448 逐字（set_embeddings） -->
+  <update id="updateMappingEmbedding">
+    UPDATE concept_mappings
+       SET embedding = #{vector}::vector, embedded_model = #{model}, embedded_text = #{text}
+     WHERE id = #{id}
+  </update>
+
+  <!-- mappings.rs:466-473 逐字（vector_search）：只比同一个模型嵌出来的行——换过模型、
+       还没重嵌的不参与：维度碰巧相同时两个模型的空间也对不上，比出来的近远是假的；
+       维度不同的再多挡一道，免得 pgvector 直接报错 -->
+  <select id="selectMappingVectorSearch" resultType="java.util.UUID">
+    SELECT id FROM concept_mappings
+     WHERE kb_id = #{kbId} AND status = 'confirmed' AND embedding IS NOT NULL
+       AND embedded_model = #{model}
+       AND vector_dims(embedding) = vector_dims(#{vector}::vector)
+     ORDER BY embedding &lt;=&gt; #{vector}::vector
+     LIMIT #{limit}
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- M5 任务 5：探索提议写面（mappings.rs:24-90 propose）与探索账写面
+       （exploration_runs.rs:41-121 全量）。 -->
+
+  <!-- mappings.rs:29-36 propose 第一步：这条映射是哪一行（UPDATE 被 WHERE 挡下时
+       RETURNING 一行都不回，id 要单独查——撞上已确认/已拒绝的那一行是常态）。 -->
+  <select id="selectMappingRowId" resultType="java.util.UUID">
+    SELECT id FROM concept_mappings
+     WHERE kb_id = #{kbId} AND concept_id = #{conceptId} AND source = #{source}
+  </select>
+
+  <!-- mappings.rs:38-59 propose 第二步逐字：只刷 proposed 的行——人的决定不被探索盖掉。
+       返回行数即「写没写进待看」（撞上已决定的那一行时 WHERE 挡下、写入为零）。 -->
+  <insert id="upsertProposedMapping">
+    INSERT INTO concept_mappings
+        (id, kb_id, concept_id, source, table_name, expr, sql, unit, summary, derived)
+    VALUES (#{id}, #{kbId}, #{conceptId}, #{source}, #{tableName}, #{expr}, #{sql}, #{unit},
+            #{summary}, #{derived})
+    ON CONFLICT (kb_id, concept_id, source) DO UPDATE
+      SET table_name = EXCLUDED.table_name, expr = EXCLUDED.expr,
+          sql = EXCLUDED.sql, unit = EXCLUDED.unit,
+          summary = EXCLUDED.summary, derived = EXCLUDED.derived,
+          updated_at = now()
+    WHERE concept_mappings.status = 'proposed'
+  </insert>
+
+  <!-- exploration_runs.rs:43-49 start 逐字：先开行再干活（跑挂了的那一轮也留一行）。 -->
+  <insert id="insertExplorationRun">
+    INSERT INTO mapping_exploration_runs (id, kb_id) VALUES (#{id}, #{kbId})
+  </insert>
+
+  <!-- exploration_runs.rs:55-78 scanned 逐字（问模型前先记规模——可能要一分钟）。 -->
+  <update id="markExplorationScanned">
+    UPDATE mapping_exploration_runs
+       SET sources = #{sources,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler}, tables_scanned = #{tables}, columns_scanned = #{columns},
+           schema_truncated = #{truncated}, cap = #{cap}
+     WHERE id = #{id}
+  </update>
+
+  <!-- exploration_runs.rs:85-107 finish 逐字（dropped 形状：每原因一个 {n, example}）。 -->
+  <update id="finishExplorationRun">
+    UPDATE mapping_exploration_runs
+       SET finished_at = now(), returned = #{returned}, accepted = #{accepted},
+           dropped = #{dropped}, tables_covered = #{tablesCovered,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler}
+     WHERE id = #{id}
+  </update>
+
+  <!-- exploration_runs.rs:111-120 fail 逐字（left(,500) 截断）。 -->
+  <update id="failExplorationRun">
+    UPDATE mapping_exploration_runs
+       SET finished_at = now(), error = left(#{error}, 500) WHERE id = #{id}
+  </update>
+</mapper>

@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  账户域 SQL（逐字搬迁自旧仓库 utopia-0.1.0-rc9/crates/utopia-store/src/accounts.rs；
+  铁律：占位符 $1..$n 改写 #{param} 外一字不动，每条注明 file:line）。
+  find_user_by_email / find_user_by_id 的 deactivated_at IS NULL 谓词是软删除唯一必须
+  挡住的两条路径（挡登录、挡已签发 token）——语义见 0001_core.sql:22-26 注释。
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.AccountsMapper">
+
+  <resultMap id="userRow" type="tech.seexun.jknow.store.entity.UserRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="org_id" javaType="java.util.UUID"/>
+      <arg column="email" javaType="java.lang.String"/>
+      <arg column="password_hash" javaType="java.lang.String"/>
+      <arg column="display_name" javaType="java.lang.String"/>
+      <arg column="is_admin" javaType="_boolean"/>
+      <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="deactivated_at" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="workspaceRow" type="tech.seexun.jknow.store.entity.WorkspaceRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="org_id" javaType="java.util.UUID"/>
+      <arg column="name" javaType="java.lang.String"/>
+      <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <!-- accounts.rs:29-31（register 首用户判定） -->
+  <select id="selectOrgId" resultType="java.util.UUID">
+    SELECT id FROM organizations ORDER BY created_at LIMIT 1
+  </select>
+
+  <!-- accounts.rs:36-37（首用户：建组织，名字缺省 'Default Organization'） -->
+  <insert id="insertOrg">
+    INSERT INTO organizations (id, name) VALUES (#{id}, #{name})
+  </insert>
+
+  <!-- accounts.rs:109-120（insert_user；唯一索引 users_email_active_idx 撞车由 Service 转 409）。
+       INSERT...RETURNING 带结果集：MyBatis DTD 不许 insert 元素挂 resultMap，用 select 元素承载同一 SQL。 -->
+  <select id="insertUser" resultMap="userRow">
+    INSERT INTO users (id, org_id, email, password_hash, display_name, is_admin)
+         VALUES (#{id}, #{orgId}, #{email}, #{passwordHash}, #{displayName}, #{isAdmin})
+         RETURNING *
+  </select>
+
+  <!-- accounts.rs:46-49 / 91-95（建工作区，RETURNING *；同上以 select 元素承载） -->
+  <select id="insertWorkspace" resultMap="workspaceRow">
+    INSERT INTO workspaces (id, org_id, name) VALUES (#{id}, #{orgId}, #{name}) RETURNING *
+  </select>
+
+  <!-- accounts.rs:131-135（membership，role 存小写文本） -->
+  <insert id="insertMembership">
+    INSERT INTO memberships (user_id, workspace_id, role) VALUES (#{userId}, #{workspaceId}, #{role})
+  </insert>
+
+  <!-- accounts.rs:70-74（加入者的默认=最早工作区） -->
+  <select id="selectEarliestWorkspace" resultMap="workspaceRow">
+    SELECT * FROM workspaces WHERE org_id = #{orgId} ORDER BY created_at LIMIT 1
+  </select>
+
+  <!-- accounts.rs:159-166（首用户的 General 库：kind knowledge、is_default TRUE、visibility open） -->
+  <insert id="insertGeneralKb">
+    INSERT INTO knowledge_bases
+            (id, workspace_id, name, kind, description, is_default, visibility)
+         VALUES (#{id}, #{workspaceId}, 'General', 'knowledge', #{description}, TRUE, 'open')
+  </insert>
+
+  <!-- accounts.rs:171-176（建库者记本库 admin——系统管理员身份日后可撤销，本库权限不该随之蒸发） -->
+  <insert id="insertGeneralKbMember">
+    INSERT INTO kb_members (kb_id, user_id, role, added_by)
+         VALUES (#{kbId}, #{ownerId}, 'admin', #{ownerId})
+  </insert>
+
+  <!-- accounts.rs:228-232（find_user_by_email：只找在职的；部分唯一索引只约束在职账号） -->
+  <select id="selectUserByEmail" resultMap="userRow">
+    SELECT * FROM users WHERE email = #{email} AND deactivated_at IS NULL
+  </select>
+
+  <!-- accounts.rs:234-241（find_user_by_id：会话校验走它，停用立即生效） -->
+  <select id="selectUserById" resultMap="userRow">
+    SELECT * FROM users WHERE id = #{id} AND deactivated_at IS NULL
+  </select>
+
+  <!-- accounts.rs:245-252（改显示名，RETURNING *；UPDATE...RETURNING 以 select 元素承载） -->
+  <select id="updateUserDisplayName" resultMap="userRow">
+    UPDATE users SET display_name = #{displayName} WHERE id = #{id} RETURNING *
+  </select>
+
+  <!-- accounts.rs:255-262（改密码） -->
+  <update id="updateUserPassword">
+    UPDATE users SET password_hash = #{passwordHash} WHERE id = #{id}
+  </update>
+</mapper>

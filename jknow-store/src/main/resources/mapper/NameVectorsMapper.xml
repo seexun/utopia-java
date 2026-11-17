@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  名字向量 SQL（逐字搬迁自旧仓库 utopia-0.1.0-rc9/crates/utopia-store/src/name_vectors.rs；
+  占位符 $1..$n 改写 #{param} 外 token 流一字不动；vector_index.rs 的 distance/same_dims
+  片段按字面维度展开——0035 规矩 1/2，维度是 SQL 文本的一部分，经 ${dims} 内插）。
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.NameVectorsMapper">
+
+  <resultMap id="pendingName" type="tech.seexun.jknow.store.mapper.NameVectorsMapper$PendingName">
+    <constructor>
+      <arg column="id" javaType="java.util.UUID"/>
+      <arg column="subject_id" javaType="java.util.UUID"/>
+      <arg column="value" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="near" type="tech.seexun.jknow.store.mapper.NameVectorsMapper$Near">
+    <constructor>
+      <arg column="entity_id" javaType="java.util.UUID"/>
+      <arg column="fact_id" javaType="java.util.UUID"/>
+      <arg column="name" javaType="java.lang.String"/>
+      <arg column="type_label" javaType="java.lang.String"/>
+      <arg column="similarity" javaType="_float"/>
+    </constructor>
+  </resultMap>
+
+  <!-- name_vectors.rs:37-45 逐字：现行的 known_as 名字事实、name_vectors 里还没有它的。
+       按写入先后取（facts.id 是 uuid v7，按它排即按写入排——这张表没有 created_at） -->
+  <select id="selectPending" resultMap="pendingName">
+    SELECT f.id, f.subject_id, f.object_value->>'value' AS value
+      FROM facts f
+      JOIN relation_types nr ON nr.id = f.predicate_id
+      LEFT JOIN name_vectors v ON v.fact_id = f.id
+     WHERE f.kb_id = #{kbId} AND nr.kb_id = #{kbId} AND nr.builtin AND nr.key = #{knownAs}
+       AND f.invalidated_at IS NULL AND f.object_value IS NOT NULL
+       AND v.fact_id IS NULL
+     ORDER BY f.id
+     LIMIT #{limit}
+  </select>
+
+  <!-- name_vectors.rs:63-66 逐字：同一条事实重写就覆盖（换了模型重算） -->
+  <insert id="insertVector">
+    INSERT INTO name_vectors (fact_id, kb_id, entity_id, embedding)
+     VALUES (#{factId}, #{kbId}, #{entityId}, #{embedding}::vector)
+     ON CONFLICT (fact_id) DO UPDATE SET embedding = EXCLUDED.embedding
+  </insert>
+
+  <!-- name_vectors.rs:106-125 逐字（distance = "v.embedding::vector(N) &lt;=&gt; $2::vector(N)"、
+       same_dims = "vector_dims(v.embedding) = N"、外层次序 = RESORT "n.distance + 0, n.id"）：
+       不按 description 过滤——被描述的东西没有名字事实（0044），JOIN facts 已经把它排除 -->
+  <select id="selectNearest" resultMap="near">
+    WITH near AS MATERIALIZED (
+         SELECT v.fact_id AS id, v.entity_id, (v.embedding::vector(${dims}) &lt;=&gt; #{query}::vector(${dims})) AS distance
+           FROM name_vectors v
+          WHERE v.kb_id = #{kbId} AND vector_dims(v.embedding) = ${dims}
+          ORDER BY v.embedding::vector(${dims}) &lt;=&gt; #{query}::vector(${dims})
+          LIMIT #{scan}
+     )
+     SELECT n.entity_id, n.id AS fact_id,
+            f.object_value->>'value' AS name,
+            et.label AS type_label,
+            (1 - n.distance)::real AS similarity
+       FROM near n
+       JOIN facts f ON f.id = n.id AND f.invalidated_at IS NULL
+       JOIN entities e ON e.id = n.entity_id AND e.merged_into IS NULL
+       LEFT JOIN entity_types et ON et.id = e.type_id
+      ORDER BY n.distance + 0, n.id
+      LIMIT #{k}
+  </select>
+</mapper>

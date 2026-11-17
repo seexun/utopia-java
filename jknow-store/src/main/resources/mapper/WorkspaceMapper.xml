@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  workspace 域读 SQL（逐字搬迁自旧仓库 utopia-0.1.0-rc9/crates/utopia-store/src：
+  workspaces.rs / members.rs / settings.rs）。铁律：占位符 $1..$n 改写 #{param} 外
+  token 流一字不动，每条注明 file:line。源内 SQL 行注释（两个减号开头）是 PG 语法成员，
+  原样保留在 SQL 体内。
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.WorkspaceMapper">
+
+  <resultMap id="workspaceRow" type="tech.seexun.jknow.store.entity.WorkspaceRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="org_id" javaType="java.util.UUID"/>
+      <arg column="name" javaType="java.lang.String"/>
+      <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="memberView" type="tech.seexun.jknow.store.entity.MemberView">
+    <constructor>
+      <arg column="user_id" javaType="java.util.UUID"/>
+      <arg column="email" javaType="java.lang.String"/>
+      <arg column="display_name" javaType="java.lang.String"/>
+      <arg column="role" javaType="java.lang.String"/>
+      <arg column="is_admin" javaType="_boolean"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="orgUser" type="tech.seexun.jknow.store.entity.OrgUser">
+    <constructor>
+      <arg column="id" javaType="java.util.UUID"/>
+      <arg column="email" javaType="java.lang.String"/>
+      <arg column="display_name" javaType="java.lang.String"/>
+      <arg column="is_admin" javaType="_boolean"/>
+    </constructor>
+  </resultMap>
+
+  <!-- llm_settings SELECT *（settings.rs:19 的原句）；列序=迁移定型（V0001+V0059+V0060+V0075+V0102）。
+       四把 api_key 原样带出（封印形态，LlmSettingsRow javadoc：读面只折布尔，绝不解密）。 -->
+  <resultMap id="llmSettings" type="tech.seexun.jknow.store.entity.LlmSettingsRow">
+    <constructor>
+      <idArg column="workspace_id" javaType="java.util.UUID"/>
+      <arg column="chat_base_url" javaType="java.lang.String"/>
+      <arg column="chat_api_key" javaType="java.lang.String"/>
+      <arg column="chat_model" javaType="java.lang.String"/>
+      <arg column="embed_base_url" javaType="java.lang.String"/>
+      <arg column="embed_api_key" javaType="java.lang.String"/>
+      <arg column="embed_model" javaType="java.lang.String"/>
+      <arg column="embed_dim" javaType="java.lang.Integer"/>
+      <arg column="updated_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="ocr_base_url" javaType="java.lang.String"/>
+      <arg column="ocr_api_key" javaType="java.lang.String"/>
+      <arg column="ocr_backend" javaType="java.lang.String"/>
+      <arg column="ocr_provider" javaType="java.lang.String"/>
+      <arg column="ocr_model" javaType="java.lang.String"/>
+      <arg column="transcribe_base_url" javaType="java.lang.String"/>
+      <arg column="transcribe_api_key" javaType="java.lang.String"/>
+      <arg column="transcribe_model" javaType="java.lang.String"/>
+      <arg column="chat_reasoning_effort" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <!-- workspaces.rs:6-17（list_for_user：membership 联表，created_at 序） -->
+  <select id="listForUser" resultMap="workspaceRow">
+    SELECT w.* FROM workspaces w
+             JOIN memberships m ON m.workspace_id = w.id
+            WHERE m.user_id = #{userId}
+            ORDER BY w.created_at
+  </select>
+
+  <!-- workspaces.rs:44-50（get：require_role 的存在性判定） -->
+  <select id="selectById" resultMap="workspaceRow">
+    SELECT * FROM workspaces WHERE id = #{id}
+  </select>
+
+  <!-- members.rs:6-19（list：停用的人不出现；源内行注释原样保留） -->
+  <select id="selectMembers" resultMap="memberView">
+    SELECT m.user_id, u.email, u.display_name, m.role, u.is_admin
+             FROM memberships m JOIN users u ON u.id = m.user_id
+             -- 停用的人不再出现在成员列表里（见 `users.deactivated_at`）。成员关系那一行留着——
+             -- 恢复账号时不必重新加回每一个工作区
+             WHERE m.workspace_id = #{workspaceId} AND u.deactivated_at IS NULL
+             ORDER BY m.created_at
+  </select>
+
+  <!-- members.rs:22-31（org_users：部署内全部在职用户，成员选人器） -->
+  <select id="selectOrgUsers" resultMap="orgUser">
+    SELECT id, email, display_name, is_admin FROM users
+             WHERE org_id = #{orgId} AND deactivated_at IS NULL ORDER BY created_at
+  </select>
+
+  <!-- members.rs:99-108（deactivated_users：与 org_users 分开查——读者不同，按停用时刻倒序） -->
+  <select id="selectDeactivatedUsers" resultMap="orgUser">
+    SELECT id, email, display_name, is_admin FROM users
+             WHERE org_id = #{orgId} AND deactivated_at IS NOT NULL
+             ORDER BY deactivated_at DESC
+  </select>
+
+  <!-- settings.rs:17-24（get：SELECT *；api_key 封印原样——服务层只折 has_*_key 布尔） -->
+  <select id="selectSettings" resultMap="llmSettings">
+    SELECT * FROM llm_settings WHERE workspace_id = #{workspaceId}
+  </select>
+
+  <!-- 写面（M4 任务 6）。workspaces.rs:26-42 create 是一个事务：行 + owner membership；
+       Java 侧由 WorkspaceKbWriteService 的 TransactionTemplate 包住同一原子性。 -->
+
+  <!-- workspaces.rs:28-33（INSERT INTO workspaces ... RETURNING *） -->
+  <select id="insertWorkspace" resultMap="workspaceRow">
+    INSERT INTO workspaces (id, org_id, name) VALUES (#{id}, #{orgId}, #{name}) RETURNING *
+  </select>
+
+  <!-- workspaces.rs:34-38（创建者为 owner；role 字面量=Rust 侧 Role::Owner.as_str()） -->
+  <insert id="insertOwnerMembership">
+    INSERT INTO memberships (user_id, workspace_id, role) VALUES (#{userId}, #{workspaceId}, 'owner')
+  </insert>
+
+  <!-- workspaces.rs:78-83（UPDATE ... RETURNING *；无行=NotFound） -->
+  <select id="renameWorkspace" resultMap="workspaceRow">
+    UPDATE workspaces SET name = #{name} WHERE id = #{id} RETURNING *
+  </select>
+
+  <!-- workspaces.rs:87-90（DELETE；返回行数，0=NotFound） -->
+  <delete id="deleteWorkspace">
+    DELETE FROM workspaces WHERE id = #{id}
+  </delete>
+</mapper>

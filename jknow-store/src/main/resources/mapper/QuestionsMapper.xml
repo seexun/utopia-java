@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  能力问题读族 SQL（M4 任务 6——逐字搬迁旧仓库 crates/utopia-store/src/competency_questions.rs；
+  铁律：占位符 $1 改写 #{kbId} 外 token 流一字不动，每条注明 file:line）。
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.QuestionsMapper">
+
+  <resultMap id="questionRow" type="tech.seexun.jknow.store.mapper.QuestionsMapper$QuestionRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="kb_id" javaType="java.util.UUID"/>
+      <arg column="question" javaType="java.lang.String"/>
+      <arg column="expected_answer" javaType="java.lang.String"/>
+      <arg column="needs" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="origin" javaType="java.lang.String"/>
+      <arg column="status" javaType="java.lang.String"/>
+      <arg column="created_by" javaType="java.util.UUID"/>
+      <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="updated_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="last_checked_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="last_result" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+    </constructor>
+  </resultMap>
+
+  <!-- competency_questions.rs:8-9 COLS + :49-55 list（库里全部问题，新的在前） -->
+  <select id="selectQuestions" resultMap="questionRow">
+    SELECT id, kb_id, question, expected_answer, needs, origin, status, created_by,
+           created_at, updated_at, last_checked_at, last_result
+      FROM competency_questions WHERE kb_id = #{kbId} ORDER BY created_at DESC, id
+  </select>
+
+  <!-- competency_questions.rs:218-237 report（六格 FILTER：答上了且凭图谱/只凭图谱的分支） -->
+  <resultMap id="questionReport"
+             type="tech.seexun.jknow.store.mapper.QuestionsMapper$QuestionReportRow">
+    <constructor>
+      <arg column="accepted" javaType="_long"/>
+      <arg column="proposed" javaType="_long"/>
+      <arg column="checked" javaType="_long"/>
+      <arg column="answered" javaType="_long"/>
+      <arg column="answered_with_graph" javaType="_long"/>
+      <arg column="answered_graph_only" javaType="_long"/>
+    </constructor>
+  </resultMap>
+  <select id="selectQuestionReport" resultMap="questionReport">
+    SELECT count(*) FILTER (WHERE status = 'accepted') AS accepted,
+           count(*) FILTER (WHERE status = 'proposed') AS proposed,
+           count(*) FILTER (WHERE status = 'accepted' AND last_checked_at IS NOT NULL) AS checked,
+           count(*) FILTER (WHERE status = 'accepted' AND (last_result->>'answered')::boolean) AS answered,
+           count(*) FILTER (WHERE status = 'accepted' AND (last_result->>'answered')::boolean
+                              AND last_result->>'via' IN ('graph', 'both')) AS answered_with_graph,
+           count(*) FILTER (WHERE status = 'accepted' AND (last_result->>'answered')::boolean
+                              AND last_result->>'via' = 'graph') AS answered_graph_only
+      FROM competency_questions WHERE kb_id = #{kbId}
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- M5 任务 5：问题写面（competency_questions.rs:59-202 逐字——本体代理的
+       提问生产侧 + 采纳链）。 -->
+
+  <!-- competency_questions.rs:59-66 accepted（升序——本体提案轮按写的先后读）。 -->
+  <select id="selectAcceptedQuestions" resultMap="questionRow">
+    SELECT id, kb_id, question, expected_answer, needs, origin, status, created_by,
+           created_at, updated_at, last_checked_at, last_result
+      FROM competency_questions WHERE kb_id = #{kbId} AND status = 'accepted'
+     ORDER BY created_at, id
+  </select>
+
+  <!-- competency_questions.rs:80-106 create 逐字（question 已在服务层 validate/trim）。 -->
+  <insert id="insertQuestion">
+    INSERT INTO competency_questions
+        (id, kb_id, question, expected_answer, needs, origin, status, created_by)
+    VALUES (#{id}, #{kbId}, #{question}, #{expectedAnswer}, #{needs}, #{origin}, #{status},
+            #{createdBy})
+  </insert>
+
+  <!-- competency_questions.rs:121-140 update 逐字：没给的不动；期望答案空串是清掉。 -->
+  <update id="updateQuestion">
+    UPDATE competency_questions
+       SET question = COALESCE(#{question}, question),
+           expected_answer = CASE WHEN #{expectedAnswer} IS NULL THEN expected_answer
+                                  WHEN btrim(#{expectedAnswer}) = '' THEN NULL
+                                  ELSE btrim(#{expectedAnswer}) END,
+           needs = COALESCE(#{needs}, needs),
+           updated_at = now()
+     WHERE id = #{id} AND kb_id = #{kbId}
+  </update>
+
+  <!-- competency_questions.rs:162-171 set_status 逐字。 -->
+  <update id="setQuestionStatus">
+    UPDATE competency_questions SET status = #{status}, updated_at = now()
+     WHERE id = #{id} AND kb_id = #{kbId}
+  </update>
+
+  <!-- competency_questions.rs:173-179 delete 逐字。 -->
+  <delete id="deleteQuestion">
+    DELETE FROM competency_questions WHERE id = #{id} AND kb_id = #{kbId}
+  </delete>
+
+  <!-- competency_questions.rs:182-193 record_result 逐字。 -->
+  <update id="recordQuestionResult">
+    UPDATE competency_questions SET last_checked_at = now(), last_result = #{result}
+     WHERE kb_id = #{kbId} AND id = #{id}
+  </update>
+
+  <!-- competency_questions.rs:196-202 exists_text 逐字。 -->
+  <select id="questionTextExists" resultType="boolean">
+    SELECT EXISTS (SELECT 1 FROM competency_questions
+                    WHERE kb_id = #{kbId} AND lower(btrim(question)) = lower(btrim(#{question})))
+  </select>
+
+  <!-- ontology_agent.rs:1267-1281 逐字（度数最高的实体——连接最多的东西最值得问）。 -->
+  <select id="selectTopEntityDegrees"
+          resultType="tech.seexun.jknow.store.mapper.QuestionsMapper$DegreeRow">
+    SELECT e.canonical_name AS name, t.key AS class, count(f.id) AS degree
+      FROM entities e
+      LEFT JOIN entity_types t ON t.id = e.type_id
+      JOIN facts f ON f.kb_id = e.kb_id AND (f.subject_id = e.id OR f.object_id = e.id)
+                   AND f.invalidated_at IS NULL
+     WHERE e.kb_id = #{kbId}
+     GROUP BY e.id, e.canonical_name, t.key
+     ORDER BY count(f.id) DESC, e.canonical_name
+     LIMIT #{limit}
+  </select>
+</mapper>

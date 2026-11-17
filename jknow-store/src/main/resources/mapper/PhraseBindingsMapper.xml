@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.seexun.jknow.store.mapper.PhraseBindingsMapper">
+
+    <!-- 关系短语绑定 SQL（phrase_bindings.rs 逐字搬迁）。短语归一（:17-31）：
+         lower(btrim(regexp_replace(col,'\s+',' ','g')))——空白折一、去两端、小写。 -->
+
+    <resultMap id="phraseSignature" type="tech.seexun.jknow.store.mapper.PhraseBindingsMapper$PhraseSignature">
+        <constructor>
+            <arg column="phrase" javaType="java.lang.String"/>
+            <arg column="subject_type_id" javaType="java.util.UUID"/>
+            <arg column="subject_type_key" javaType="java.lang.String"/>
+            <arg column="object_type_id" javaType="java.util.UUID"/>
+            <arg column="object_type_key" javaType="java.lang.String"/>
+            <arg column="object_is_value" javaType="_boolean"/>
+            <arg column="count" javaType="_long"/>
+            <arg column="examples" javaType="java.util.List"
+                 typeHandler="tech.seexun.jknow.store.typehandler.TextArrayTypeHandler"/>
+            <arg column="quotes" javaType="java.util.List"
+                 typeHandler="tech.seexun.jknow.store.typehandler.TextArrayTypeHandler"/>
+            <arg column="example_statement_ids" javaType="java.util.List"
+                 typeHandler="tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="binding" type="tech.seexun.jknow.store.mapper.PhraseBindingsMapper$Binding">
+        <constructor>
+            <arg column="phrase" javaType="java.lang.String"/>
+            <arg column="subject_type_id" javaType="java.util.UUID"/>
+            <arg column="object_type_id" javaType="java.util.UUID"/>
+            <arg column="object_is_value" javaType="_boolean"/>
+            <arg column="relation_type_id" javaType="java.util.UUID"/>
+            <arg column="direction" javaType="java.lang.String"/>
+            <arg column="status" javaType="java.lang.String"/>
+            <arg column="decided_at" javaType="java.time.OffsetDateTime"/>
+            <arg column="decided_by" javaType="java.lang.String"/>
+            <arg column="basis" javaType="java.lang.String"/>
+            <arg column="marks" javaType="java.lang.String"/>
+            <arg column="marks_asked_at" javaType="java.time.OffsetDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <!-- phrase_bindings.rs:58-108 signatures：一趟聚出每组的计数与前 3 条例句（#1096：
+         从前每组的例句、引文各是一个关联子查询，耗时随开放陈述数平方增长）。
+         优先有完整位置的证据；分块的原文只为留下的那三条去读。
+         计数和短语相同、两端的类不同的签名按类的 id 定序（对齐按这个顺序分批送模型）。 -->
+    <select id="selectSignatures" parameterType="java.util.UUID" resultMap="phraseSignature">
+        WITH live AS (
+             SELECT f.id, lower(btrim(regexp_replace(f.phrase, '\s+', ' ', 'g'))) AS phrase,
+                    s.type_id AS subject_type_id, o.type_id AS object_type_id,
+                    (f.object_id IS NULL) AS object_is_value,
+                    s.canonical_name AS subject_name,
+                    coalesce(o.canonical_name, f.object_value #>> '{value}', '') AS object_name,
+                    f.phrase AS spelling, fe.chunk_id, fe.quote_start, fe.quote_end, f.recorded_at
+             FROM facts f
+             JOIN entities s ON s.id = f.subject_id
+             LEFT JOIN entities o ON o.id = f.object_id
+             LEFT JOIN LATERAL (
+                 SELECT chunk_id, quote_start, quote_end FROM fact_evidence
+                 WHERE fact_id = f.id
+                 ORDER BY (quote_start IS NULL OR quote_end IS NULL), chunk_id
+                 LIMIT 1
+             ) fe ON true
+             WHERE f.kb_id = #{kbId} AND f.layer = 'open' AND f.invalidated_at IS NULL
+               AND f.phrase IS NOT NULL AND btrim(f.phrase) &lt;&gt; ''
+         ),
+         ranked AS (
+             SELECT l.*,
+                    row_number() OVER (PARTITION BY l.phrase, l.subject_type_id, l.object_type_id, l.object_is_value
+                                       ORDER BY l.recorded_at, l.id) AS rn
+             FROM live l
+         ),
+         grouped AS (
+             SELECT r.phrase, r.subject_type_id, r.object_type_id, r.object_is_value, count(*) AS count,
+                    array_agg(r.subject_name || ' —' || r.spelling || '→ ' || r.object_name ORDER BY r.rn)
+                        FILTER (WHERE r.rn &lt;= 3) AS examples,
+                    array_agg(coalesce(substr(c.text, r.quote_start + 1, r.quote_end - r.quote_start), '') ORDER BY r.rn)
+                        FILTER (WHERE r.rn &lt;= 3) AS quotes,
+                    array_agg(r.id ORDER BY r.rn) FILTER (WHERE r.rn &lt;= 3) AS example_statement_ids
+             FROM ranked r
+             LEFT JOIN chunks c ON c.id = r.chunk_id AND r.rn &lt;= 3
+             GROUP BY r.phrase, r.subject_type_id, r.object_type_id, r.object_is_value
+         )
+         SELECT g.phrase, g.subject_type_id, st.key AS subject_type_key,
+                g.object_type_id, ot.key AS object_type_key, g.object_is_value, g.count,
+                coalesce(g.examples, '{}') AS examples, coalesce(g.quotes, '{}') AS quotes,
+                coalesce(g.example_statement_ids, '{}'::uuid[]) AS example_statement_ids
+         FROM grouped g
+         LEFT JOIN entity_types st ON st.id = g.subject_type_id
+         LEFT JOIN entity_types ot ON ot.id = g.object_type_id
+         ORDER BY g.count DESC, g.phrase, g.subject_type_id, g.object_type_id, g.object_is_value
+    </select>
+
+    <!-- phrase_bindings.rs:120-133 signature_of：例句照判定时记下的，陈述数同。 -->
+    <select id="selectSignatureOf" resultMap="phraseSignature">
+        SELECT b.phrase, b.subject_type_id, st.key AS subject_type_key,
+                b.object_type_id, ot.key AS object_type_key, b.object_is_value,
+                b.statement_count::bigint AS count, b.examples, '{}'::text[] AS quotes,
+                '{}'::uuid[] AS example_statement_ids
+           FROM phrase_bindings b
+      LEFT JOIN entity_types st ON st.id = b.subject_type_id
+      LEFT JOIN entity_types ot ON ot.id = b.object_type_id
+          WHERE b.kb_id = #{kbId} AND b.id = #{id}
+    </select>
+
+    <resultMap id="propertyVersion" type="tech.seexun.jknow.store.mapper.PhraseBindingsMapper$PropertyVersion">
+        <constructor>
+            <arg column="id" javaType="java.util.UUID"/>
+            <arg column="updated_at" javaType="java.time.OffsetDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectBindings" parameterType="java.util.UUID" resultMap="binding">
+        SELECT phrase, subject_type_id, object_type_id, object_is_value,
+                relation_type_id, direction, status, decided_at, decided_by, basis, marks,
+                marks_asked_at
+         FROM phrase_bindings WHERE kb_id = #{kbId} ORDER BY phrase
+    </select>
+
+    <select id="selectPropertyVersions" parameterType="java.util.UUID" resultMap="propertyVersion">
+        SELECT id, updated_at FROM relation_types WHERE kb_id = #{kbId}
+    </select>
+
+    <!-- phrase_bindings.rs:252-267 stale：绑到的属性在判定之后改过；或判成 none / undecided
+         之后库里有属性新建或修改（负向判定没有选中的属性，已有属性的新定义也可能让它对得上） -->
+    <select id="selectStale" parameterType="java.util.UUID" resultMap="binding">
+        SELECT b.phrase, b.subject_type_id, b.object_type_id, b.object_is_value,
+                b.relation_type_id, b.direction, b.status, b.decided_at, b.decided_by, b.basis,
+                b.marks, b.marks_asked_at
+         FROM phrase_bindings b
+         LEFT JOIN relation_types r ON r.id = b.relation_type_id
+         WHERE b.kb_id = #{kbId}
+           AND ((b.status = 'bound' AND r.updated_at &gt; b.decided_at)
+                OR (b.status IN ('none', 'undecided')
+                    AND b.decided_at &lt; (SELECT max(updated_at) FROM relation_types
+                                        WHERE kb_id = #{kbId})))
+         ORDER BY b.phrase
+    </select>
+
+    <!-- phrase_bindings.rs:405-447 decide_on upsert：人的判定不被代理覆盖
+         （WHERE NOT (...decided_by='person' AND EXCLUDED.decided_by='agent')）。 -->
+    <insert id="upsertDecision">
+        INSERT INTO phrase_bindings
+             (id, kb_id, phrase, subject_type_id, object_type_id, object_is_value,
+              relation_type_id, direction, status, votes, statement_count, examples,
+              decided_at, decided_by, basis, marks, marks_asked_at)
+         VALUES (#{id}, #{kbId}, #{phrase}, #{subjectTypeId}, #{objectTypeId}, #{objectIsValue},
+                 #{relationTypeId}, #{direction}, #{status},
+                 #{votes,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler},
+                 #{statementCount},
+                 #{examples,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler},
+                 now(), #{decidedBy}, #{basis}, #{marks},
+                 CASE WHEN #{marksAsked} THEN now() END)
+         ON CONFLICT (kb_id, phrase, subject_type_id, object_type_id, object_is_value) DO UPDATE
+            SET relation_type_id = EXCLUDED.relation_type_id,
+                direction = EXCLUDED.direction,
+                status = EXCLUDED.status,
+                votes = EXCLUDED.votes,
+                statement_count = EXCLUDED.statement_count,
+                examples = EXCLUDED.examples,
+                decided_at = now(),
+                decided_by = EXCLUDED.decided_by,
+                basis = EXCLUDED.basis,
+                marks = EXCLUDED.marks,
+                marks_asked_at = EXCLUDED.marks_asked_at
+          WHERE NOT (phrase_bindings.decided_by = 'person' AND EXCLUDED.decided_by = 'agent')
+    </insert>
+
+    <!-- phrase_bindings.rs:472-492 record_marks：只写问的时候那条绑定。 -->
+    <update id="recordMarks">
+        UPDATE phrase_bindings
+            SET marks = #{marks}, marks_asked_at = now()
+          WHERE kb_id = #{kbId} AND phrase = #{phrase}
+            AND subject_type_id IS NOT DISTINCT FROM #{subjectTypeId}
+            AND object_type_id IS NOT DISTINCT FROM #{objectTypeId}
+            AND object_is_value = #{objectIsValue}
+            AND status = 'bound' AND decided_by = 'agent' AND marks IS NULL
+            AND relation_type_id = #{relationTypeId} AND direction = #{direction}
+    </update>
+</mapper>

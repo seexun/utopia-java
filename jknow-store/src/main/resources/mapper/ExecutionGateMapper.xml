@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  执行闸门取数 SQL（逐字搬迁自旧仓库 utopia-0.1.0-rc9/crates/utopia-store/src/
+  execution_gate.rs；占位符改写 #{param} 外 token 流一字不动，每条注明 file:line）。
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.ExecutionGateMapper">
+
+  <!-- execution_gate.rs:120-124 逐字 -->
+  <select id="countDerivedTouching" resultType="java.lang.Long">
+    SELECT count(*) FROM derived_facts d
+     WHERE d.kb_id = #{kbId} AND d.invalidated_at IS NULL
+       AND (d.subject_id IN (#{a}, #{b}) OR d.object_id IN (#{a}, #{b}))
+  </select>
+
+  <!-- execution_gate.rs:132-136 逐字（id 文本进 jsonb 比较） -->
+  <select id="countAnswered" resultType="java.lang.Long">
+    SELECT count(*) FROM conversation_messages m
+     JOIN conversations c ON c.id = m.conversation_id
+     WHERE c.kb_id = #{kbId} AND m.role = 'assistant'
+       AND EXISTS (SELECT 1 FROM jsonb_array_elements(m.resolved) e
+                   WHERE e->>'id' IN (#{a}, #{b}))
+  </select>
+
+  <!-- execution_gate.rs:156-160 逐字 -->
+  <select id="countDerivedFromPremise" resultType="java.lang.Long">
+    SELECT count(DISTINCT d.id) FROM fact_derivations fd
+       JOIN derived_facts d ON d.id = fd.derived_fact_id
+      WHERE fd.premise_fact_id = #{factId} AND d.kb_id = #{kbId} AND d.invalidated_at IS NULL
+  </select>
+
+  <!-- execution_gate.rs:165-170 逐字 -->
+  <select id="countAnsweredBySubject" resultType="java.lang.Long">
+    SELECT count(*) FROM conversation_messages m
+       JOIN conversations c ON c.id = m.conversation_id
+      WHERE c.kb_id = #{kbId} AND m.role = 'assistant'
+        AND EXISTS (SELECT 1 FROM jsonb_array_elements(m.resolved) e
+                     WHERE e->>'id' = (SELECT subject_id::text FROM facts WHERE id = #{factId}))
+  </select>
+
+  <!-- execution_gate.rs:197-204 逐字：只看实体宾语的边，不看时间，不看字面值 -->
+  <select id="selectFunctionalClashLabel" resultType="java.lang.String">
+    SELECT r.label FROM relation_types r
+      WHERE r.id = #{predicateId} AND r.kb_id = #{kbId} AND r.functional
+        AND EXISTS (SELECT 1 FROM facts f
+                     WHERE f.kb_id = #{kbId} AND f.subject_id = #{subjectId} AND f.predicate_id = #{predicateId}
+                       AND f.invalidated_at IS NULL AND f.object_id IS NOT NULL
+                       AND f.object_id &lt;&gt; #{object} AND f.id IS DISTINCT FROM #{replacing})
+  </select>
+</mapper>

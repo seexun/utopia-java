@@ -240,6 +240,7 @@
         <module>jknow-reason</module>
         <module>jknow-ingest</module>
         <module>jknow-extract</module>
+        <module>jknow-store</module>
     </modules>
     <packaging>pom</packaging>
 

@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  事实落库写族 SQL（逐字搬迁自旧仓库 utopia-0.1.0-rc9/crates/utopia-store/src/graph.rs；
+  铁律：占位符 $1..$n 改写 #{param}（多处出现同名）外 token 流一字不动，每条注明 file:line）。
+  insert_fact_on 门（596-909）的分支编排在 GraphWriteService——这里只是它用到的语句。
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.FactsWriteMapper">
+
+  <resultMap id="factSpanRow" type="tech.seexun.jknow.store.mapper.FactsWriteMapper$FactSpanRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="valid_from" javaType="java.time.OffsetDateTime"/>
+      <arg column="valid_to" javaType="java.time.OffsetDateTime"/>
+      <arg column="valid_to_precision" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="qualifierRow" type="tech.seexun.jknow.store.mapper.FactsWriteMapper$QualifierRow">
+    <constructor>
+      <arg column="fact_id" javaType="java.util.UUID"/>
+      <arg column="qualifier_type_id" javaType="java.util.UUID"/>
+      <arg column="key" javaType="java.lang.String"/>
+      <arg column="label" javaType="java.lang.String"/>
+      <arg column="value" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="entity_id" javaType="java.util.UUID"/>
+      <arg column="entity_name" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="statementQualifierRow" type="tech.seexun.jknow.store.mapper.FactsWriteMapper$StatementQualifierRow">
+    <constructor>
+      <arg column="fact_id" javaType="java.util.UUID"/>
+      <arg column="role" javaType="java.lang.String"/>
+      <arg column="value" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="entity_id" javaType="java.util.UUID"/>
+      <arg column="entity_name" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <!-- ==================================================================== -->
+  <!-- insert_fact_on 同断言查询（graph.rs:598-607，match 起于 :596）。状态属性下起止同值的行
+       （#966 之前写下的）由服务层滤掉——SQL 逐字不带这个条件。 -->
+
+  <select id="selectSameEntity" resultMap="factSpanRow">
+    SELECT id, valid_from, valid_to, valid_to_precision FROM facts
+     WHERE kb_id = #{kbId} AND subject_id = #{subjectId} AND predicate_id = #{predicateId} AND object_id = #{objectId}
+       AND invalidated_at IS NULL
+  </select>
+
+  <select id="selectSameValue" resultMap="factSpanRow">
+    SELECT id, valid_from, valid_to, valid_to_precision FROM facts
+     WHERE kb_id = #{kbId} AND subject_id = #{subjectId} AND predicate_id = #{predicateId} AND object_value = #{objectValue,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler}
+       AND object_id IS NULL AND invalidated_at IS NULL
+  </select>
+
+  <!-- 新行 INSERT（graph.rs:838-852，match 起于 :835）。说结束了不知哪天的观察，说出结束的就是它自己
+       那份文档：attested_from 缺省此刻、attested_to 只在 unknown 时落锚。 -->
+  <insert id="insertFactEntity">
+    INSERT INTO facts (id, kb_id, subject_id, predicate_id, object_id,
+                        valid_from, valid_from_precision,
+                        valid_to, valid_to_precision, confidence,
+                        attested_from, attested_to, valid_from_grade)
+     VALUES (#{id}, #{kbId}, #{subjectId}, #{predicateId}, #{objectId}, #{from}, #{fromPrecision},
+             #{to}, #{toPrecision}, #{confidence}, COALESCE(#{attestedAt}, now()),
+             CASE WHEN #{toPrecision}::text = 'unknown' THEN COALESCE(#{attestedAt}, now()) END,
+             #{fromGrade})
+  </insert>
+
+  <insert id="insertFactValue">
+    INSERT INTO facts (id, kb_id, subject_id, predicate_id, object_value,
+                        valid_from, valid_from_precision,
+                        valid_to, valid_to_precision, confidence,
+                        attested_from, attested_to, valid_from_grade)
+     VALUES (#{id}, #{kbId}, #{subjectId}, #{predicateId}, #{objectValue,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler},
+             #{from}, #{fromPrecision}, #{to}, #{toPrecision}, #{confidence}, COALESCE(#{attestedAt}, now()),
+             CASE WHEN #{toPrecision}::text = 'unknown' THEN COALESCE(#{attestedAt}, now()) END,
+             #{fromGrade})
+  </insert>
+
+  <!-- 时间精化四条（graph.rs:858-887）：裸行（无时无终的同断言）被本次带时间的观察
+       取代——作废+链上，证据（含表层谓词、偏移）与边上的属性随行搬。 -->
+  <update id="invalidateFact">
+    UPDATE facts SET invalidated_at = now() WHERE id = #{factId}
+  </update>
+
+  <update id="setSupersedes">
+    UPDATE facts SET supersedes = #{oldId} WHERE id = #{id}
+  </update>
+
+  <insert id="copyEvidenceFrom">
+    INSERT INTO fact_evidence (fact_id, chunk_id, quote, proposed_predicate, document_id, doc_version,
+                                quote_start, quote_end)
+     SELECT #{to}, chunk_id, quote, proposed_predicate, document_id, doc_version,
+            quote_start, quote_end
+     FROM fact_evidence WHERE fact_id = #{from}
+     ON CONFLICT DO NOTHING
+  </insert>
+
+  <insert id="copyQualifiersFrom">
+    INSERT INTO fact_qualifiers (fact_id, qualifier_type_id, value, entity_id)
+     SELECT #{to}, qualifier_type_id, value, entity_id
+     FROM fact_qualifiers WHERE fact_id = #{from}
+     ON CONFLICT DO NOTHING
+  </insert>
+
+  <!-- ==================================================================== -->
+  <!-- attest_earlier（graph.rs:919-942，SQL 930-933）：同一断言又被观察到一次，锚点只往早挪。
+       ended=这次说的是「它结束了」——只有结束得更早的证据才挪终点锚（#875 的回放）。 -->
+  <update id="attestEarlier">
+    UPDATE facts SET attested_from = least(attested_from, #{at}),
+                     attested_to = CASE WHEN attested_to IS NULL OR NOT #{ended} THEN attested_to
+                                        ELSE least(attested_to, #{at}) END
+     WHERE id = #{factId}
+  </update>
+
+  <!-- ==================================================================== -->
+  <!-- add_evidence（graph.rs:1167-1230）：证据落在活着的那一行上（#679 第三轮评审）。
+       落库到写证据之间，时间线重算可能已把这一行改写掉（换了 id）：先 FOR SHARE 锁行，
+       等到的若已作废，顺着 supersedes 走到改写出来的那一行。被驳回、没有后继的，
+       证据仍记在它身上。 -->
+
+  <select id="selectLiveForShare" resultType="java.lang.Boolean">
+    SELECT invalidated_at IS NULL FROM facts WHERE id = #{factId} FOR SHARE
+  </select>
+
+  <select id="selectSuccessor" resultType="java.util.UUID">
+    SELECT id FROM facts WHERE supersedes = #{factId}
+      ORDER BY invalidated_at IS NULL DESC, recorded_at DESC LIMIT 1
+  </select>
+
+  <insert id="insertEvidence">
+    INSERT INTO fact_evidence (fact_id, chunk_id, quote, proposed_predicate, document_id, doc_version,
+                                quote_start, quote_end)
+     SELECT #{factId}, #{chunkId}, #{quote}, left(#{proposed}, 120), c.document_id, c.doc_version,
+            #{quoteStart}, #{quoteEnd}
+     FROM chunks c WHERE c.id = #{chunkId}
+     ON CONFLICT (fact_id, chunk_id) DO UPDATE
+       SET proposed_predicate = COALESCE(fact_evidence.proposed_predicate, EXCLUDED.proposed_predicate),
+           quote_start = COALESCE(fact_evidence.quote_start, EXCLUDED.quote_start),
+           quote_end = COALESCE(fact_evidence.quote_end, EXCLUDED.quote_end)
+  </insert>
+
+  <!-- ==================================================================== -->
+  <!-- 边上的属性（graph.rs:125-154 upsert_fact_qualifier / 181-213 fact_qualifiers_for）。
+       属性不进事实的去重键：同一条边再听到一次带了金额的，是同一条边补上金额。 -->
+  <select id="selectQualifierValue" resultType="com.fasterxml.jackson.databind.JsonNode">
+    SELECT value FROM fact_qualifiers WHERE fact_id = #{factId} AND qualifier_type_id = #{qualifierTypeId}
+  </select>
+
+  <insert id="insertQualifier">
+    INSERT INTO fact_qualifiers (fact_id, qualifier_type_id, value)
+     VALUES (#{factId}, #{qualifierTypeId}, #{value,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler})
+     ON CONFLICT DO NOTHING
+  </insert>
+
+  <select id="selectQualifiersFor" resultMap="qualifierRow">
+    SELECT q.fact_id, q.qualifier_type_id, r.key, r.label, q.value, q.entity_id,
+                e.canonical_name AS entity_name
+         FROM fact_qualifiers q
+         JOIN relation_types r ON r.id = q.qualifier_type_id
+         LEFT JOIN entities e ON e.id = q.entity_id
+         WHERE q.fact_id = ANY(#{factIds,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[])
+         ORDER BY q.fact_id, r.key
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- 开放陈述（graph.rs:1022-1095）：文档说了什么，用它自己的话——layer='open'、
+       短语照写、predicate_id 为空。去重按 (库, 主语, 短语, 宾语)；撞上了只把锚点往早挪。 -->
+
+  <select id="selectOpenStatementEntity" resultType="java.util.UUID">
+    SELECT id FROM facts
+     WHERE layer = 'open' AND kb_id = #{kbId} AND subject_id = #{subjectId} AND phrase = #{phrase}
+       AND object_id = #{objectId} AND invalidated_at IS NULL
+     ORDER BY recorded_at LIMIT 1
+  </select>
+
+  <select id="selectOpenStatementValue" resultType="java.util.UUID">
+    SELECT id FROM facts
+     WHERE layer = 'open' AND kb_id = #{kbId} AND subject_id = #{subjectId} AND phrase = #{phrase}
+       AND object_value = #{objectValue,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler}
+       AND object_id IS NULL AND invalidated_at IS NULL
+     ORDER BY recorded_at LIMIT 1
+  </select>
+
+  <insert id="insertOpenStatementEntity">
+    INSERT INTO facts (id, kb_id, subject_id, layer, phrase, object_id,
+                        confidence, attested_from)
+     VALUES (#{id}, #{kbId}, #{subjectId}, 'open', #{phrase}, #{objectId}, #{confidence}, #{attestedAt})
+  </insert>
+
+  <insert id="insertOpenStatementValue">
+    INSERT INTO facts (id, kb_id, subject_id, layer, phrase, object_value,
+                        confidence, attested_from)
+     VALUES (#{id}, #{kbId}, #{subjectId}, 'open', #{phrase}, #{objectValue,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler}, #{confidence}, #{attestedAt})
+  </insert>
+
+  <!-- ==================================================================== -->
+  <!-- 开放陈述的时间词落轴（graph.rs:1125-1162 set_open_validity，SQL 1139-1146）：
+       两端已按精度截断。attested_to 只在「结束了不知哪天」时锚上（COALESCE 保留更早）。 -->
+  <update id="setOpenValidity">
+    UPDATE facts
+       SET valid_from = #{from}, valid_from_precision = #{fromPrecision},
+           valid_to = #{to}, valid_to_precision = #{toPrecision}, valid_from_grade = #{grade},
+           attested_to = CASE WHEN #{to}::timestamptz IS NULL AND #{toPrecision} = 'unknown'
+                              THEN COALESCE(attested_to, attested_from, recorded_at) END
+     WHERE id = #{factId} AND layer = 'open' AND invalidated_at IS NULL
+  </update>
+
+  <!-- ==================================================================== -->
+  <!-- 陈述的见证（graph.rs:949-965 attest_statement，SQL 957-964）：它所在那一节里
+       文本说话的那一刻，连同那条日期的名字（0064 决定 3）。只往早挪——同一句话在更早的
+       文档里说过，见证就是更早的那份；名字跟着日期走，日期没动名字也不动。 -->
+  <update id="attestStatement">
+    UPDATE facts
+       SET attested_from = #{at}, attested_by = #{by}
+     WHERE id = #{factId} AND layer = 'open' AND invalidated_at IS NULL
+       AND (attested_from IS NULL OR attested_from &gt; #{at}
+            OR (attested_from = #{at} AND attested_by IS DISTINCT FROM #{by}))
+  </update>
+
+  <!-- ==================================================================== -->
+  <!-- 开放陈述的角色词属性（graph.rs:216-243 add_statement_qualifier，SQL 232-238）：
+       「值与实体恰好一个」「角色词非空」两查在服务层（SQL 之前给出人话）；
+       ON CONFLICT DO NOTHING——先写者留着，同一角色再听到一次不同值不覆盖。 -->
+  <insert id="insertStatementQualifier">
+    INSERT INTO statement_qualifiers (fact_id, role, value, entity_id)
+     VALUES (#{factId}, #{role}, #{value,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler}, #{entityId})
+     ON CONFLICT (fact_id, role) DO NOTHING
+  </insert>
+
+  <!-- statement_qualifiers_for（graph.rs:250-283，SQL 269-275）：一批开放陈述各自的
+       角色词属性，按事实 id 取回；实体那一格连上显示名。 -->
+  <select id="selectStatementQualifiersFor" resultMap="statementQualifierRow">
+    SELECT q.fact_id, q.role, q.value, q.entity_id, e.canonical_name AS entity_name
+     FROM statement_qualifiers q
+     LEFT JOIN entities e ON e.id = q.entity_id
+     WHERE q.fact_id = ANY(#{factIds,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler})
+     ORDER BY q.fact_id, q.role
+  </select>
+
+  <!-- graph.rs:975-992 witness_evidence 逐字：DISTINCT FROM 让「一样的」不重写。 -->
+  <update id="witnessEvidence">
+    UPDATE fact_evidence SET attested_at = #{at}, attested_by = #{by}
+     WHERE fact_id = #{factId} AND chunk_id = #{chunkId}
+       AND (attested_at IS DISTINCT FROM #{at} OR attested_by IS DISTINCT FROM #{by})
+  </update>
+
+  <!-- graph.rs:2042-2056 confirm_fact：置信度提到 1.0（只动还活着的行——已作废的没有
+       「确认」可言）。从前确认 mapped_to 时顺带作废旧映射的那段在 0011 搬去
+       concept_mappings 后恒匹配零行，Rust 已删，这里照搬删后的形态。 -->
+  <update id="confirmFact">
+    UPDATE facts SET confidence = 1.0
+     WHERE id = #{factId} AND kb_id = #{kbId} AND invalidated_at IS NULL
+  </update>
+
+  <!-- ============ purge_graph（graph.rs:2189-2221，M5 任务 6 重建面落位） ============ -->
+
+  <select id="countEntities" resultType="_long">
+    SELECT count(*) FROM entities WHERE kb_id = #{kbId}
+  </select>
+
+  <select id="countFacts" resultType="_long">
+    SELECT count(*) FROM facts WHERE kb_id = #{kbId}
+  </select>
+
+  <delete id="deleteFactConflicts">
+    DELETE FROM fact_conflicts WHERE kb_id = #{kbId}
+  </delete>
+
+  <delete id="deleteResolutionReviews">
+    DELETE FROM resolution_reviews WHERE kb_id = #{kbId}
+  </delete>
+
+  <delete id="deleteEntityMerges">
+    DELETE FROM entity_merges WHERE kb_id = #{kbId}
+  </delete>
+
+  <update id="clearSupersedes">
+    UPDATE facts SET supersedes = NULL WHERE kb_id = #{kbId}
+  </update>
+
+  <delete id="deleteFactEvidenceInKb">
+    DELETE FROM fact_evidence WHERE fact_id IN (SELECT id FROM facts WHERE kb_id = #{kbId})
+  </delete>
+
+  <delete id="deleteFactsInKb">
+    DELETE FROM facts WHERE kb_id = #{kbId}
+  </delete>
+
+  <update id="clearMergedInto">
+    UPDATE entities SET merged_into = NULL WHERE kb_id = #{kbId}
+  </update>
+
+  <delete id="deleteEntitiesInKb">
+    DELETE FROM entities WHERE kb_id = #{kbId}
+  </delete>
+
+  <delete id="deleteOntologyMisses">
+    DELETE FROM ontology_misses WHERE kb_id = #{kbId}
+  </delete>
+</mapper>

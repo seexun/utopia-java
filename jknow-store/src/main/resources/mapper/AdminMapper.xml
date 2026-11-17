@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 管理面部署配置读 SQL（逐字搬迁自旧仓库 utopia-store/src/access.rs 部署配置节、model_limits.rs）。 -->
+<mapper namespace="tech.seexun.jknow.store.mapper.AdminMapper">
+
+  <resultMap id="modelLimit" type="tech.seexun.jknow.store.entity.ModelLimitRow">
+    <constructor>
+      <arg column="base_url" javaType="java.lang.String"/>
+      <arg column="model" javaType="java.lang.String"/>
+      <arg column="max_concurrent" javaType="java.lang.Integer"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="inUseModel" type="tech.seexun.jknow.store.mapper.AdminMapper$InUseModel">
+    <constructor>
+      <arg column="base_url" javaType="java.lang.String"/>
+      <arg column="model" javaType="java.lang.String"/>
+      <arg column="kind" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <!-- access.rs:203-210（default_ontology_lang：缺省 'en'——缺省在 service 侧给） -->
+  <select id="selectDefaultOntologyLang" resultType="java.lang.String">
+    SELECT default_ontology_lang FROM deployment_settings LIMIT 1
+  </select>
+
+  <!-- access.rs:223-232（worker_concurrency：缺省 64 在 service 侧给，与列缺省一致） -->
+  <select id="selectWorkerConcurrency" resultType="java.lang.Integer">
+    SELECT worker_concurrency FROM deployment_settings LIMIT 1
+  </select>
+
+  <!-- model_limits.rs list 第一段（按模型的并发限额行） -->
+  <select id="selectModelLimits" resultMap="modelLimit">
+    SELECT base_url, model, max_concurrent FROM model_concurrency ORDER BY base_url, model
+  </select>
+
+  <!-- model_limits.rs list 第二段（缺省并发；缺省 10 在 service 侧给） -->
+  <select id="selectDefaultModelConcurrency" resultType="java.lang.Integer">
+    SELECT default_model_concurrency FROM deployment_settings LIMIT 1
+  </select>
+
+  <!-- model_limits.rs models_in_use（chat 与 embed 两路 UNION 去重）。Rust 元组按位取列；
+       MyBatis 按名映射，补 AS base_url/model/kind（命名差异，token 流等价） -->
+  <select id="selectModelsInUse" resultMap="inUseModel">
+    SELECT DISTINCT chat_base_url AS base_url, chat_model AS model, 'chat' AS kind FROM llm_settings
+          WHERE chat_base_url IS NOT NULL AND chat_model IS NOT NULL
+         UNION
+         SELECT DISTINCT embed_base_url AS base_url, embed_model AS model, 'embed' AS kind FROM llm_settings
+          WHERE embed_base_url IS NOT NULL AND embed_model IS NOT NULL
+  </select>
+</mapper>

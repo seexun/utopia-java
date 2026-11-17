@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>tech.seexun</groupId>
+    <artifactId>jknow</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>jknow-store</artifactId>
+  <name>jknow-store</name>
+  <description>账本/仓储层（对应旧 utopia-store crate，读侧先行、写侧后置）</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>tech.seexun</groupId>
+      <artifactId>jknow-common</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <!-- 认领式分块吃 ChunkPiece（对等旧仓库 utopia-store→utopia-ingest 依赖，
+         documents.rs:7 use utopia_ingest::ChunkPiece）。 -->
+    <dependency>
+      <groupId>tech.seexun</groupId>
+      <artifactId>jknow-ingest</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <!-- mapper 层。mybatis-spring-boot-starter 传递引入 spring-boot-starter-jdbc
+         （DataSource/事务自动配置，@Transactional 的 DataSourceTransactionManager 即来自这里）；
+         版本经根 POM dependencyManagement 属性 mybatis-spring-boot.version(4.1.0) 收口。 -->
+    <dependency>
+      <groupId>org.mybatis.spring.boot</groupId>
+      <artifactId>mybatis-spring-boot-starter</artifactId>
+    </dependency>
+    <!-- jsonb 列 ↔ JsonNode（kb.data_questions / fact_qualifiers.value / chunks.anchor）。
+         版本经 Boot BOM（jackson-2-bom）托管，不另写。 -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+    <!-- 公理检查的纯逻辑层（utopia-reason crate 对等）——store 的
+         reasoning 落库侧消费 AxiomChecks/Ontology/check_all 的产出 -->
+    <dependency>
+      <groupId>tech.seexun</groupId>
+      <artifactId>jknow-reason</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <!-- SecretsBox 纯单元测试（junit 版本经 Boot BOM 托管） -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

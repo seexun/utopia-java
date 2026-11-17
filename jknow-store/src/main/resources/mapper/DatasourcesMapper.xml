@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  问数数据源读 SQL（逐字搬迁自旧仓库 utopia-0.1.0-rc9/crates/utopia-store/src/datasources.rs）。
+  连接串→摘要的换算不在 SQL 里（row_to_view/conn_summary 在 service；凭据只进不出）。
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.DatasourcesMapper">
+
+  <resultMap id="dataSourceRow" type="tech.seexun.jknow.store.mapper.DatasourcesMapper$DataSourceRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="name" javaType="java.lang.String"/>
+      <arg column="engine" javaType="java.lang.String"/>
+      <arg column="conn_string" javaType="java.lang.String"/>
+      <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="last_test_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="last_test_ok" javaType="java.lang.Boolean"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="workspaceGrant" type="tech.seexun.jknow.store.mapper.DatasourcesMapper$WorkspaceGrant">
+    <constructor>
+      <arg column="id" javaType="java.util.UUID"/>
+      <arg column="name" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <!-- datasources.rs:163-175（mounted：kb_data_sources 联表，name 序） -->
+  <select id="selectMounted" resultMap="dataSourceRow">
+    SELECT d.id, d.name, d.engine, d.conn_string, d.created_at,
+                    d.last_test_at, d.last_test_ok
+             FROM kb_data_sources m JOIN data_sources d ON d.id = m.data_source_id
+             WHERE m.kb_id = #{kbId} ORDER BY d.name
+  </select>
+
+  <!-- datasources.rs:192-207（granted_to_workspace：授给工作区的；admin available 面） -->
+  <select id="selectGrantedToWorkspace" resultMap="dataSourceRow">
+    SELECT d.id, d.name, d.engine, d.conn_string, d.created_at,
+                d.last_test_at, d.last_test_ok
+           FROM data_source_grants g JOIN data_sources d ON d.id = g.data_source_id
+          WHERE g.workspace_id = #{workspaceId} ORDER BY d.name
+  </select>
+
+  <!-- datasources.rs:61-68（list：全部署每一个源，不过滤；admin 面） -->
+  <select id="selectAll" resultMap="dataSourceRow">
+    SELECT id, name, engine, conn_string, created_at, last_test_at, last_test_ok
+             FROM data_sources ORDER BY name
+  </select>
+
+  <!-- datasources.rs:209-222（grants_for_source：一个源授给了哪些工作区，name 序） -->
+  <select id="selectGrantsForSource" resultMap="workspaceGrant">
+    SELECT w.id, w.name FROM data_source_grants g
+           JOIN workspaces w ON w.id = g.workspace_id
+          WHERE g.data_source_id = #{dataSourceId} ORDER BY w.name
+  </select>
+
+
+  <!-- ============ 授权写面（datasources.rs:223-283；store 层，HTTP 路由属 M4） ============ -->
+
+  <!-- datasources.rs:230-233：授权一个工作区用这个源。幂等。 -->
+  <insert id="insertGrant">
+    INSERT INTO data_source_grants (data_source_id, workspace_id, granted_by)
+     VALUES (#{dataSourceId}, #{workspaceId}, #{grantedBy}) ON CONFLICT DO NOTHING
+  </insert>
+
+  <!-- datasources.rs:251-257：收回授权时先卸该工作区里的挂载——mounted 与问数读的
+       都是 kb_data_sources，留着挂载=撤销不生效（0014）。 -->
+  <delete id="deleteMountsInWorkspace">
+    DELETE FROM kb_data_sources
+      WHERE data_source_id = #{dataSourceId}
+        AND kb_id IN (SELECT id FROM knowledge_bases WHERE workspace_id = #{workspaceId})
+  </delete>
+
+  <delete id="deleteGrant">
+    DELETE FROM data_source_grants WHERE data_source_id = #{dataSourceId}
+     AND workspace_id = #{workspaceId}
+  </delete>
+
+  <!-- datasources.rs:273-277：挂载前必查——守卫不能只在列表侧：列表过滤挡「看得见」，
+       挂载端点是照着 id 调的，谁都能自己拼一个。 -->
+  <select id="selectGranted" resultType="java.lang.Integer">
+    SELECT 1 FROM data_source_grants g
+      JOIN knowledge_bases kb ON kb.workspace_id = g.workspace_id
+     WHERE kb.id = #{kbId} AND g.data_source_id = #{dataSourceId}
+  </select>
+
+  <!-- datasources.rs:142-146 mount。 -->
+  <insert id="insertMount">
+    INSERT INTO kb_data_sources (kb_id, data_source_id) VALUES (#{kbId}, #{dataSourceId})
+     ON CONFLICT DO NOTHING
+  </insert>
+
+  <!-- ============ 注册写面（datasources.rs:71-140、152-160、177-190；M5 任务 3） ============ -->
+
+  <!-- datasources.rs:98-103 create：连接串以封印形态入库（service 侧 seal）。 -->
+  <insert id="insertDataSource">
+    INSERT INTO data_sources (id, name, engine, conn_string, created_by)
+     VALUES (#{id}, #{name}, #{engine}, #{conn}, #{createdBy})
+  </insert>
+
+  <!-- datasources.rs:107-117 delete：0 行 → NotFound（service 判 rows）。 -->
+  <delete id="deleteDataSource">
+    DELETE FROM data_sources WHERE id = #{id}
+  </delete>
+
+  <!-- datasources.rs:129-139 record_test：测试结果落行（/{id}/test 端点）。 -->
+  <update id="updateTestResult">
+    UPDATE data_sources SET last_test_at = now(), last_test_ok = #{ok} WHERE id = #{id}
+  </update>
+
+  <!-- datasources.rs:177-190 engine_and_conn：连接串只在服务端内部流转（测试/查询/拉
+       schema 用）。封印开封在 service（secrets::open 对位）。 -->
+  <select id="selectEngineAndConn" resultMap="engineAndConn">
+    SELECT engine, conn_string FROM data_sources WHERE id = #{id}
+  </select>
+
+  <resultMap id="engineAndConn" type="tech.seexun.jknow.store.mapper.DatasourcesMapper$EngineAndConn">
+    <constructor>
+      <arg column="engine" javaType="java.lang.String"/>
+      <arg column="conn_string" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <!-- datasources.rs:154-160 unmount：幂等（0 行也是 ok）。 -->
+  <delete id="deleteMount">
+    DELETE FROM kb_data_sources WHERE kb_id = #{kbId} AND data_source_id = #{dataSourceId}
+  </delete>
+
+</mapper>

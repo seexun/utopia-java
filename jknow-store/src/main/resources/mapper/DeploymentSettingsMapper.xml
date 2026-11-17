@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 部署设置 SQL（逐字搬迁自旧仓库 utopia-store/src/access.rs，占位符 $1→#{param} 外一字不动）。 -->
+<mapper namespace="tech.seexun.jknow.store.mapper.DeploymentSettingsMapper">
+
+  <!-- access.rs:248-262（ensure_jwt_secret）：UPDATE ... SET jwt_secret = COALESCE(jwt_secret, $1)
+       RETURNING——并发收敛：谁先写谁赢，后来者拿回库里已有那条；两步「先读再写」做不到这一点。 -->
+  <select id="ensureJwtSecret" resultType="java.lang.String">
+    UPDATE deployment_settings SET jwt_secret = COALESCE(jwt_secret, #{generated})
+         RETURNING jwt_secret
+  </select>
+
+  <!-- access.rs:183-188（open_registration）：LIMIT 1；无行→null（Service 按 Rust 语义回落） -->
+  <select id="selectOpenRegistration" resultType="java.lang.Boolean">
+    SELECT open_registration FROM deployment_settings LIMIT 1
+  </select>
+
+  <!-- access.rs:223-231（worker_concurrency）：与列缺省（迁移 0011 的 64）分开写——
+       无行/null 由调用方兜底 64，函数自身报错（DB 不可达）也兜 64（main.rs:172-178 降级语义）。 -->
+  <select id="selectWorkerConcurrency" resultType="java.lang.Integer">
+    SELECT worker_concurrency FROM deployment_settings LIMIT 1
+  </select>
+  <!-- access.rs:245-248（set_worker_concurrency 的 UPDATE 落点；范围校验在接口 default 方法） -->
+  <update id="doUpdateWorkerConcurrency">
+    UPDATE deployment_settings SET worker_concurrency = #{value}
+  </update>
+</mapper>

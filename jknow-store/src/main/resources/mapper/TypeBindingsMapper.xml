@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.seexun.jknow.store.mapper.TypeBindingsMapper">
+
+    <!-- 类别词绑定 SQL（type_bindings.rs 逐字搬迁）。类别词归一（:26-39）：
+         lower(btrim(regexp_replace(col,'\s+',' ','g')))。 -->
+
+    <resultMap id="kindWordSignature"
+               type="tech.seexun.jknow.store.mapper.TypeBindingsMapper$KindWordSignature">
+        <constructor>
+            <arg column="kind_word" javaType="java.lang.String"/>
+            <arg column="words" javaType="java.util.List"
+                 typeHandler="tech.seexun.jknow.store.typehandler.TextArrayTypeHandler"/>
+            <arg column="count" javaType="_long"/>
+            <arg column="examples" javaType="java.util.List"
+                 typeHandler="tech.seexun.jknow.store.typehandler.TextArrayTypeHandler"/>
+            <arg column="phrases" javaType="java.util.List"
+                 typeHandler="tech.seexun.jknow.store.typehandler.TextArrayTypeHandler"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="binding" type="tech.seexun.jknow.store.mapper.TypeBindingsMapper$Binding">
+        <constructor>
+            <arg column="kind_word" javaType="java.lang.String"/>
+            <arg column="type_id" javaType="java.util.UUID"/>
+            <arg column="status" javaType="java.lang.String"/>
+            <arg column="decided_at" javaType="java.time.OffsetDateTime"/>
+            <arg column="decided_by" javaType="java.lang.String"/>
+            <arg column="basis" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="classRow" type="tech.seexun.jknow.store.mapper.TypeBindingsMapper$ClassRow">
+        <constructor>
+            <arg column="id" javaType="java.util.UUID"/>
+            <arg column="updated_at" javaType="java.time.OffsetDateTime"/>
+            <arg column="parents" javaType="java.util.List"
+                 typeHandler="tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="boundRow" type="tech.seexun.jknow.store.mapper.TypeBindingsMapper$BoundRow">
+        <constructor>
+            <arg column="kind_word" javaType="java.lang.String"/>
+            <arg column="type_id" javaType="java.util.UUID"/>
+        </constructor>
+    </resultMap>
+
+    <!-- type_bindings.rs:62-107 signatures：写法、例名、关系短语的前 3 个各在一趟里聚出来
+         （#1096：从前每个词各跑三个关联子查询，耗时随库的大小平方增长）。 -->
+    <select id="selectSignatures" parameterType="java.util.UUID" resultMap="kindWordSignature">
+        WITH live AS (
+             SELECT e.id, e.canonical_name, e.description, e.created_at,
+                    btrim(regexp_replace(e.specific_type, '\s+', ' ', 'g')) AS spelling,
+                    lower(btrim(regexp_replace(e.specific_type, '\s+', ' ', 'g'))) AS kind_word
+             FROM entities e
+             WHERE e.kb_id = #{kbId} AND e.merged_into IS NULL
+               AND e.specific_type IS NOT NULL AND btrim(e.specific_type) &lt;&gt; ''
+         ),
+         grouped AS (
+             SELECT kind_word, count(*) AS count,
+                    (array_agg(canonical_name ORDER BY (description IS NOT NULL), created_at, id))[1:3] AS examples
+             FROM live GROUP BY kind_word
+         ),
+         spellings AS (
+             SELECT kind_word, spelling,
+                    row_number() OVER (PARTITION BY kind_word ORDER BY count(*) DESC, spelling) AS rn
+             FROM live GROUP BY kind_word, spelling
+         ),
+         words AS (
+             SELECT kind_word, array_agg(spelling ORDER BY rn) AS words
+             FROM spellings WHERE rn &lt;= 3 GROUP BY kind_word
+         ),
+         phrase_counts AS (
+             SELECT l.kind_word, f.phrase,
+                    row_number() OVER (PARTITION BY l.kind_word ORDER BY count(*) DESC, f.phrase) AS rn
+             FROM facts f JOIN live l ON l.id = f.subject_id
+             WHERE f.kb_id = #{kbId} AND f.layer = 'open' AND f.invalidated_at IS NULL
+               AND f.phrase IS NOT NULL
+             GROUP BY l.kind_word, f.phrase
+         ),
+         phrases AS (
+             SELECT kind_word, array_agg(phrase ORDER BY rn) AS phrases
+             FROM phrase_counts WHERE rn &lt;= 3 GROUP BY kind_word
+         )
+         SELECT g.kind_word,
+                g.count,
+                coalesce(w.words, '{}') AS words,
+                g.examples,
+                coalesce(p.phrases, '{}') AS phrases
+         FROM grouped g
+         LEFT JOIN words w ON w.kind_word = g.kind_word
+         LEFT JOIN phrases p ON p.kind_word = g.kind_word
+         ORDER BY g.count DESC, g.kind_word
+    </select>
+
+    <select id="selectBindings" parameterType="java.util.UUID" resultMap="binding">
+        SELECT kind_word, type_id, status, decided_at, decided_by, basis
+         FROM type_bindings WHERE kb_id = #{kbId} ORDER BY kind_word
+    </select>
+
+    <!-- type_bindings.rs:157-160 class_snapshot：每个类的 updated_at 与直接父类 -->
+    <select id="selectClassSnapshot" parameterType="java.util.UUID"
+            resultMap="classRow">
+        SELECT t.id, t.updated_at,
+                ARRAY(SELECT p.parent_id FROM entity_type_parents p WHERE p.child_id = t.id) AS parents
+         FROM entity_types t WHERE t.kb_id = #{kbId}
+    </select>
+
+    <select id="selectStale" parameterType="java.util.UUID" resultType="java.lang.String">
+        SELECT b.kind_word
+         FROM type_bindings b
+         LEFT JOIN entity_types t ON t.id = b.type_id
+         WHERE b.kb_id = #{kbId}
+           AND ((b.status = 'bound' AND t.updated_at &gt; b.decided_at)
+                OR (b.status IN ('none', 'undecided')
+                    AND b.decided_at &lt; (SELECT max(updated_at) FROM entity_types
+                                        WHERE kb_id = #{kbId})))
+         ORDER BY b.kind_word
+    </select>
+
+    <!-- type_bindings.rs:301-326 decide_with_basis upsert：words 空保留已有写法；
+         人的判定不被代理覆盖。 -->
+    <insert id="upsertDecision">
+        INSERT INTO type_bindings
+             (id, kb_id, kind_word, words, type_id, status, votes, decided_at, decided_by, basis)
+         VALUES (#{id}, #{kbId}, #{kindWord},
+                 #{words,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler},
+                 #{typeId}, #{status},
+                 #{votes,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler},
+                 now(), #{decidedBy}, #{basis})
+         ON CONFLICT (kb_id, kind_word) DO UPDATE
+            SET words = CASE WHEN cardinality(EXCLUDED.words) = 0
+                             THEN type_bindings.words ELSE EXCLUDED.words END,
+                type_id = EXCLUDED.type_id,
+                status = EXCLUDED.status,
+                votes = EXCLUDED.votes,
+                decided_at = now(),
+                decided_by = EXCLUDED.decided_by,
+                basis = EXCLUDED.basis
+          WHERE NOT (type_bindings.decided_by = 'person' AND EXCLUDED.decided_by = 'agent')
+    </insert>
+
+    <!-- type_bindings.rs:390-394 候选类 FOR SHARE：类删先拿类行再级联到绑定，同一顺序不会死锁 -->
+    <select id="lockCandidatesForShare" resultType="java.util.UUID">
+        SELECT id FROM entity_types WHERE kb_id = #{kbId}
+          AND id = ANY(#{candidates,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[])
+         ORDER BY id FOR SHARE
+    </select>
+
+    <!-- type_bindings.rs:438-439 人定词的那次点击：等锁可以但不许钉死一条连接 -->
+    <update id="setTimeout2s">
+        SET LOCAL lock_timeout = '2s'
+    </update>
+
+    <!-- type_bindings.rs:540-547 apply：有了类，「建议加类」就不再是建议 -->
+    <update id="applyToEntities">
+        UPDATE entities
+            SET type_id = #{typeId}, type_source = 'aligned', proposed_type = NULL, updated_at = now()
+          WHERE kb_id = #{kbId} AND merged_into IS NULL AND type_source &lt;&gt; 'human'
+            AND specific_type IS NOT NULL
+            AND lower(btrim(regexp_replace(specific_type, '\s+', ' ', 'g'))) = #{kindWord}
+            AND type_id IS DISTINCT FROM #{typeId}
+    </update>
+
+    <!-- type_bindings.rs:564-570 unapply：只动 aligned 的行（抽取判的、引擎猜的、人拍的不是这条绑定给的） -->
+    <update id="unapplyFromEntities">
+        UPDATE entities
+            SET type_id = NULL, type_source = 'extracted', updated_at = now()
+          WHERE kb_id = #{kbId} AND merged_into IS NULL AND type_source = 'aligned'
+            AND specific_type IS NOT NULL
+            AND lower(btrim(regexp_replace(specific_type, '\s+', ' ', 'g'))) = #{kindWord}
+    </update>
+
+    <select id="selectBoundMap" parameterType="java.util.UUID"
+            resultMap="boundRow">
+        SELECT kind_word, type_id FROM type_bindings
+         WHERE kb_id = #{kbId} AND status = 'bound' AND type_id IS NOT NULL
+    </select>
+
+    <!-- type_bindings.rs:608-612 propose：只写第一次、最长 60 字 -->
+    <update id="proposeType">
+        UPDATE entities SET proposed_type = left(#{spelling}, 60)
+          WHERE kb_id = #{kbId} AND merged_into IS NULL AND type_id IS NULL
+            AND type_source &lt;&gt; 'human' AND proposed_type IS NULL
+            AND specific_type IS NOT NULL
+            AND lower(btrim(regexp_replace(specific_type, '\s+', ' ', 'g'))) = #{kindWord}
+    </update>
+</mapper>

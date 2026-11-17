@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  权限判定链两条查询（逐字搬迁自旧仓库 utopia-0.1.0-rc9/crates/utopia-store/src/access.rs:12-37 kb_role；
+  占位符 $1/$2 改写 #{kbId}/#{userId} 外一字不动，每条注明 file:line）。
+  链序（KbAccess 对等实现）：is_admin→Owner 全通；kb_members 矩阵有记录→矩阵角色；
+  open 库→memberships 有行=Viewer；restricted 无记录→不可见（404 不泄露存在性）。
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.AccessMapper">
+
+  <!-- access.rs:17（kb_members 矩阵角色；矩阵优先于 open，有记录就不再看 visibility） -->
+  <select id="selectKbMemberRole" resultType="java.lang.String">
+    SELECT role FROM kb_members WHERE kb_id = #{kbId} AND user_id = #{userId}
+  </select>
+
+  <!-- access.rs:29（open 库的部署侧可见性：workspace membership 有行即 Viewer） -->
+  <select id="selectWorkspaceRole" resultType="java.lang.String">
+    SELECT role FROM memberships WHERE workspace_id = #{workspaceId} AND user_id = #{userId}
+  </select>
+
+  <!-- access.rs:124-129（set_kb_member 的 UPSERT；源内行注释是 PG 语法成员原样保留） -->
+  <insert id="insertKbMember">
+    INSERT INTO kb_members (kb_id, user_id, role, added_by) VALUES (#{kbId}, #{userId}, #{role}, #{addedBy})
+    ON CONFLICT (kb_id, user_id)
+    DO UPDATE SET role = #{role}, added_by = COALESCE(kb_members.added_by, #{addedBy})
+  </insert>
+</mapper>

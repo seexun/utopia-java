@@ -1,0 +1,769 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  消解与合并 SQL（逐字搬迁自旧仓库 utopia-0.1.0-rc9/crates/utopia-store/src/resolution.rs；
+  铁律：占位符 $1..$n 改写 #{param}（多处出现同名）外 token 流一字不动，禁止顺手优化，
+  每条注明 file:line）。Rust format! 的片段（not_a_name/has_name_in）按 names.rs 原文展开
+  内联——$kb/$names 占位改写为同值 #{kbId}/#{keys}（展开对照见 NamesService 片段生成器）。
+
+  向量列口径：profile_embedding 以 ::text 读出、#{...}::vector 字面量写入
+  （与 DocumentsWriteMapper.setEmbeddings 同一套，语义同 Rust pgvector::Vector）。
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.ResolutionMapper">
+
+  <resultMap id="candidate" type="tech.seexun.jknow.store.mapper.ResolutionMapper$Candidate">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="canonical_name" javaType="java.lang.String"/>
+      <arg column="profile_embedding" javaType="java.lang.String"/>
+      <arg column="profile_n" javaType="_int"/>
+      <arg column="degree" javaType="_long"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="crossCandidate" type="tech.seexun.jknow.store.mapper.ResolutionMapper$CrossCandidate">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="canonical_name" javaType="java.lang.String"/>
+      <arg column="type_key" javaType="java.lang.String"/>
+      <arg column="type_id" javaType="java.util.UUID"/>
+      <arg column="type_source" javaType="java.lang.String"/>
+      <arg column="profile_embedding" javaType="java.lang.String"/>
+      <arg column="profile_n" javaType="_int"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="containRow" type="tech.seexun.jknow.store.mapper.ResolutionMapper$ContainRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="canonical_name" javaType="java.lang.String"/>
+      <arg column="key" javaType="java.lang.String"/>
+      <arg column="type_id" javaType="java.util.UUID"/>
+      <arg column="profile_embedding" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="corroboratingRow" type="tech.seexun.jknow.store.mapper.ResolutionMapper$CorroboratingRow">
+    <constructor>
+      <arg column="subject_id" javaType="java.util.UUID"/>
+      <arg column="name" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="mergeRow" type="tech.seexun.jknow.store.mapper.ResolutionMapper$MergeRow">
+    <constructor>
+      <arg column="source_id" javaType="java.util.UUID"/>
+      <arg column="target_id" javaType="java.util.UUID"/>
+      <arg column="moved_subject_facts" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler"/>
+      <arg column="moved_object_facts" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler"/>
+      <arg column="invalidated_facts" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler"/>
+      <arg column="target_profile_before" javaType="java.lang.String"/>
+      <arg column="target_profile_n_before" javaType="_int"/>
+      <arg column="target_type_before" javaType="java.util.UUID"/>
+      <arg column="reverted_at" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="entityFull" type="tech.seexun.jknow.store.mapper.ResolutionMapper$EntityFull">
+    <constructor>
+      <arg column="type_id" javaType="java.util.UUID"/>
+      <arg column="canonical_name" javaType="java.lang.String"/>
+      <arg column="profile_embedding" javaType="java.lang.String"/>
+      <arg column="profile_n" javaType="_int"/>
+      <arg column="merged_into" javaType="java.util.UUID"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="reviewRow" type="tech.seexun.jknow.store.mapper.ReviewMapper$ReviewRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="left_id" javaType="java.util.UUID"/>
+      <arg column="right_id" javaType="java.util.UUID"/>
+      <arg column="score" javaType="_float"/>
+      <arg column="reason" javaType="java.lang.String"/>
+      <arg column="stage" javaType="java.lang.String"/>
+      <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <!-- ==================================================================== -->
+  <!-- 通道 1：候选召回（resolution.rs:381-397）。名字召回读名字事实（0041 决定 1）：
+       本名、简称、曾用名都是 known_as 上的一条；度数不数名字事实——名字不是一条
+       「关于它的事」，数进去每个实体都凭空多一。 -->
+
+  <select id="selectCandidates" resultMap="candidate">
+    SELECT e.id, e.canonical_name, e.profile_embedding::text AS profile_embedding, e.profile_n,
+           (SELECT count(*) FROM facts f
+            WHERE f.kb_id = e.kb_id AND (f.subject_id = e.id OR f.object_id = e.id)
+              AND f.invalidated_at IS NULL AND NOT EXISTS (SELECT 1 FROM relation_types nr
+                              WHERE nr.id = f.predicate_id AND nr.builtin AND nr.key = 'known_as')) AS degree
+    FROM entities e
+    <!-- IS NOT DISTINCT FROM 而不是 =（0009 的那个陷阱）：开放图谱里的实体都没有类
+         （类由对齐来定），type_id = NULL 永远不成立，同名的它就永远撞不上
+         —— 实测一个库里 Securities and Exchange Commission 与它的全大写写法成了两个实体 -->
+    WHERE e.kb_id = #{kbId} AND e.type_id IS NOT DISTINCT FROM #{typeId} AND e.merged_into IS NULL
+      <!-- 被描述的东西没有名字（0044）：它的 canonical_name 只是显示用的描述，
+           不是召回的桥——两篇文档里描述得一样的两个东西不能因此接到一起 -->
+      AND e.description IS NULL
+      AND (lower(e.canonical_name) = ANY(#{keys,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler})
+           OR e.id IN (SELECT nf.subject_id FROM facts nf
+                         JOIN relation_types nr ON nr.id = nf.predicate_id
+                        WHERE nf.kb_id = #{kbId} AND nr.kb_id = #{kbId} AND nr.builtin AND nr.key = 'known_as'
+                          AND nf.invalidated_at IS NULL AND nf.object_value IS NOT NULL
+                          AND lower(nf.object_value->>'value') = ANY(#{keys,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler})))
+  </select>
+
+  <!-- 跨类型同名（resolution.rs:961-971）：IS DISTINCT FROM 而不是 <>——后者遇 NULL
+       返回 NULL 被 WHERE 当假，未分类实体会被整个漏掉（0009） -->
+  <select id="selectCrossCandidates" resultMap="crossCandidate">
+    SELECT e.id, e.canonical_name, t.key AS type_key, e.type_id, e.type_source,
+           e.profile_embedding::text AS profile_embedding, e.profile_n
+    FROM entities e LEFT JOIN entity_types t ON t.id = e.type_id
+    WHERE e.kb_id = #{kbId} AND e.type_id IS DISTINCT FROM #{typeId} AND e.merged_into IS NULL
+      AND e.description IS NULL
+      AND (lower(e.canonical_name) = ANY(#{keys,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler})
+           OR e.id IN (SELECT nf.subject_id FROM facts nf
+                         JOIN relation_types nr ON nr.id = nf.predicate_id
+                        WHERE nf.kb_id = #{kbId} AND nr.kb_id = #{kbId} AND nr.builtin AND nr.key = 'known_as'
+                          AND nf.invalidated_at IS NULL AND nf.object_value IS NOT NULL
+                          AND lower(nf.object_value->>'value') = ANY(#{keys,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler})))
+  </select>
+
+  <!-- resolution.rs:281-283 kept_apart_from：判过「不是一个」的对不再重提（#1104） -->
+  <select id="selectKeptApart" resultType="java.util.UUID">
+    SELECT CASE WHEN left_id = #{entityId} THEN right_id ELSE left_id END
+      FROM resolution_reviews
+     WHERE kb_id = #{kbId} AND status = 'kept' AND (left_id = #{entityId} OR right_id = #{entityId})
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- 事实旁证（resolution.rs:620-642，逐字）。LEFT JOIN relation_types（0044）：
+       开放陈述没有谓词、只有照抄的短语，它指着的宾语一样是这个候选的画像——
+       「收购了 Beta」不因为本体没接住「收购了」就不算佐证。排序里关系的三个布尔位
+       对开放行是 NULL，COALESCE 成 false 排在类型化行之后：类型化行之间的次序一字不变。
+       同名同伴也指着的宾语没有分辨力，排除（NOT EXISTS）。 -->
+
+  <select id="selectCorroboratingObjects" resultMap="corroboratingRow">
+    SELECT s.subject_id, s.name FROM (
+      SELECT f.subject_id, o.canonical_name AS name,
+             row_number() OVER (
+               PARTITION BY f.subject_id
+               ORDER BY EXISTS (SELECT 1 FROM relation_type_ranges rr
+                                 WHERE rr.relation_type_id = r.id) DESC,
+                        COALESCE(r.temporal = 'state', FALSE) DESC,
+                        COALESCE(r.functional, FALSE) DESC,
+                        f.confidence DESC, f.recorded_at DESC
+             ) AS rn
+      FROM facts f
+      LEFT JOIN relation_types r ON r.id = f.predicate_id
+      JOIN entities o ON o.id = f.object_id
+      WHERE f.kb_id = #{kbId} AND f.subject_id = ANY(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler})
+        AND f.invalidated_at IS NULL AND f.object_id IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM facts g
+                         WHERE g.kb_id = #{kbId} AND g.subject_id = ANY(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler})
+                           AND g.subject_id &lt;&gt; f.subject_id
+                           AND g.object_id = f.object_id
+                           AND g.invalidated_at IS NULL)
+    ) s WHERE s.rn &lt;= #{limit}
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- 包含关系扫描（resolution.rs:746-776，逐字）。不按类型过滤：简称经常掉进
+       concept 兜底而全称是具体类型，按类型相等去查一个都捞不到（实测）。别名也参与
+       ——合并把名字事实搬到存活者身上后桥会断（Holmes 案例），合并越成功漏得越多。 -->
+
+  <select id="selectContainRows" resultMap="containRow">
+    SELECT e.id, e.canonical_name, t.key, e.type_id, e.profile_embedding::text AS profile_embedding
+    FROM entities e LEFT JOIN entity_types t ON t.id = e.type_id
+    WHERE e.kb_id = #{kbId} AND e.merged_into IS NULL
+      AND e.id &lt;&gt; #{newId}
+      AND lower(e.canonical_name) &lt;&gt; #{lower}
+      AND (
+        (char_length(e.canonical_name) &gt;= #{minChars}
+         AND (lower(e.canonical_name) LIKE '%' || #{lower} || '%'
+              OR #{lower} LIKE '%' || lower(e.canonical_name) || '%'))
+        OR EXISTS (
+          SELECT 1 FROM facts nf
+            JOIN relation_types nr ON nr.id = nf.predicate_id
+           WHERE nf.subject_id = e.id AND nf.kb_id = #{kbId}
+             AND nr.builtin AND nr.key = 'known_as'
+             AND nf.invalidated_at IS NULL
+             AND char_length(nf.object_value->>'value') &gt;= #{minChars}
+             AND (lower(nf.object_value->>'value') LIKE '%' || #{lower} || '%'
+                  OR #{lower} LIKE '%' || lower(nf.object_value->>'value') || '%')))
+    ORDER BY char_length(e.canonical_name)
+    LIMIT #{limit}
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- 类型面 -->
+
+  <select id="selectTypeKey" resultType="java.lang.String">
+    SELECT key FROM entity_types WHERE id = #{typeId}
+  </select>
+
+  <select id="selectTypeLabel" resultType="java.lang.String">
+    SELECT label FROM entity_types WHERE id = #{typeId}
+  </select>
+
+  <!-- resolution.rs:858-871 逐字：互斥是继承的——先沿父链收祖先，取它们声明的互斥
+       对象，再沿子链往下展开（表里两个方向各存一行，问一个方向就够） -->
+  <select id="selectDeclaredDisjointFrom" resultType="java.util.UUID">
+    WITH RECURSIVE up(id) AS (
+         SELECT #{typeId}::uuid
+         UNION
+         SELECT p.parent_id FROM entity_type_parents p JOIN up ON p.child_id = up.id
+     ), hit(id) AS (
+         SELECT d.b_id FROM entity_type_disjoint d JOIN up ON d.a_id = up.id
+          WHERE d.kb_id = #{kbId}
+     ), down(id) AS (
+         SELECT id FROM hit
+         UNION
+         SELECT p.child_id FROM entity_type_parents p JOIN down ON p.parent_id = down.id
+     )
+     SELECT id FROM down
+  </select>
+
+  <!-- resolution.rs:891-905 逐字：一方是另一方的祖先，或共有一个不是根的祖先
+       （根不算：schema.org 万物皆 Thing，算上它 Person 与 Organization 也成了一家） -->
+  <select id="selectTypesAreKin" resultType="java.lang.Boolean">
+    WITH RECURSIVE up_a(id) AS (
+         SELECT #{a}::uuid
+         UNION
+         SELECT p.parent_id FROM entity_type_parents p JOIN up_a ON p.child_id = up_a.id
+     ), up_b(id) AS (
+         SELECT #{b}::uuid
+         UNION
+         SELECT p.parent_id FROM entity_type_parents p JOIN up_b ON p.child_id = up_b.id
+     )
+     SELECT EXISTS (SELECT 1 FROM up_a WHERE id = #{b})
+         OR EXISTS (SELECT 1 FROM up_b WHERE id = #{a})
+         OR EXISTS (SELECT 1 FROM up_a JOIN up_b USING (id)
+                     WHERE EXISTS (SELECT 1 FROM entity_type_parents p
+                                    WHERE p.child_id = up_a.id))
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- 建实体（resolution.rs:1107-1176） -->
+
+  <update id="lockNameCreation">
+    SELECT pg_advisory_xact_lock(hashtext(#{kb}), hashtext(#{name}))
+  </update>
+
+  <!-- 锁内回捞（resolution.rs:1133-1136 逐字）：被描述的东西不算「同名的它」（0044）；
+       id <> ALL(weighed) 排除调用方刚掂量过并决定不并的——不给名单，这把锁会替人
+       把 mention 归到它刚拒绝的候选身上（#270 禁的事） -->
+  <select id="selectExistingNameEntity" resultType="java.util.UUID">
+    SELECT id FROM entities
+     WHERE kb_id = #{kbId} AND canonical_name = #{name} AND type_id IS NOT DISTINCT FROM #{typeId}
+       AND merged_into IS NULL AND description IS NULL AND id &lt;&gt; ALL(#{weighed,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler})
+     ORDER BY id LIMIT 1
+  </select>
+
+  <insert id="insertEntity">
+    INSERT INTO entities (id, kb_id, type_id, canonical_name, profile_embedding, profile_n)
+     VALUES (#{id}, #{kbId}, #{typeId}, #{name}, #{profile}::vector, #{profileN})
+  </insert>
+
+  <insert id="insertNameFact">
+    INSERT INTO facts (id, kb_id, subject_id, predicate_id, object_value)
+     VALUES (#{id}, #{kbId}, #{entityId}, #{knownAs}, jsonb_build_object('value', #{name}::text))
+  </insert>
+
+  <!-- resolution.rs:1205-1208 create_described（0044：description 是身份，canonical_name
+       仅为显示，kind 词落 specific_type 截 80，type_id 留空） -->
+  <insert id="insertDescribed">
+    INSERT INTO entities (id, kb_id, type_id, canonical_name, description, specific_type)
+     VALUES (#{id}, #{kbId}, NULL, #{description}, #{description}, left(#{kindWord}, 80))
+  </insert>
+
+  <update id="touchEntity">
+    UPDATE entities SET updated_at = now() WHERE id = #{id}
+  </update>
+
+  <!-- resolution.rs:1027-1030 逐字：候选无类型而本次抽取判出来了 → 升格（不是合并，
+       不入 entity_merges；本体页可手工改回）。type_source != 'human' 由调用方先判定 -->
+  <update id="upgradeEntityType">
+    UPDATE entities
+     SET type_id = #{typeId}, type_source = 'extracted', updated_at = now()
+     WHERE id = #{id}
+  </update>
+
+  <!-- ==================================================================== -->
+  <!-- retype（resolution.rs:2903-2982）：类型消解的落库。actor 是 null = 引擎自动
+       裁决（inferred），有 actor = 人点的批准（human，受保护不再被重判）。 -->
+
+  <resultMap id="retypeRow" type="tech.seexun.jknow.store.mapper.ResolutionMapper$RetypeRow">
+    <constructor>
+      <arg column="from_type" javaType="java.util.UUID"/>
+      <arg column="name" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <!-- resolution.rs:2933-2955 逐字（$4::uuid 的 cast 保留——null 参数也要能判 IS NULL）：
+       旧类型从 before CTE 里读，条件（还在/没被合并/确实要变）一并放进 CTE。 -->
+  <select id="retypeOne" resultMap="retypeRow">
+    WITH before AS (
+         SELECT id, type_id, canonical_name FROM entities
+         WHERE id = #{entityId} AND kb_id = #{kbId} AND merged_into IS NULL
+           AND type_id IS DISTINCT FROM #{typeId}
+    )
+    UPDATE entities e SET type_id = #{typeId}, updated_at = now(),
+           type_source = CASE WHEN #{actor}::uuid IS NULL THEN 'inferred' ELSE 'human' END
+    FROM before
+    WHERE e.id = before.id
+    RETURNING before.type_id AS from_type, before.canonical_name AS name
+  </select>
+
+  <!-- resolution.rs:2962-2968 entity_retypes 账本（撤销按 batch 回放）。 -->
+  <insert id="insertEntityRetype">
+    INSERT INTO entity_retypes
+        (batch_id, kb_id, entity_id, from_type_id, to_type_id, actor_id)
+     VALUES (#{batchId}, #{kbId}, #{entityId}, #{fromTypeId}, #{toTypeId}, #{actorId})
+  </insert>
+
+  <!-- ==================================================================== -->
+  <!-- 画像与消歧后缀 -->
+
+  <select id="selectProfileEmbedding" resultType="java.lang.String">
+    SELECT profile_embedding::text FROM entities WHERE id = #{id}
+  </select>
+
+  <update id="updateProfile">
+    UPDATE entities SET profile_embedding = #{profile}::vector, profile_n = #{profileN}, updated_at = now()
+     WHERE id = #{id}
+  </update>
+
+  <select id="selectDisambiguatorGroup" resultType="java.util.UUID">
+    SELECT id FROM entities
+     WHERE kb_id = #{kbId} AND merged_into IS NULL AND lower(canonical_name) = lower(#{name})
+  </select>
+
+  <update id="clearDisambiguator">
+    UPDATE entities SET disambiguator = NULL WHERE id = #{id}
+  </update>
+
+  <!-- resolution.rs:1342-1358 逐字（#299：排序理由来自本体自己的声明，不认手写词表；
+       LEFT JOIN 让开放陈述的宾语也能当后缀） -->
+  <select id="selectDisambiguatingLabel" resultType="java.lang.String">
+    SELECT o.canonical_name FROM facts f
+     LEFT JOIN relation_types r ON r.id = f.predicate_id
+     JOIN entities o ON o.id = f.object_id
+     WHERE f.kb_id = #{kbId} AND f.subject_id = #{id}
+       AND f.invalidated_at IS NULL AND f.object_id IS NOT NULL
+     ORDER BY
+       (NOT EXISTS (SELECT 1 FROM facts g
+                     WHERE g.kb_id = #{kbId} AND g.subject_id = ANY(#{peers,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler})
+                       AND g.subject_id &lt;&gt; #{id} AND g.object_id = f.object_id
+                       AND g.invalidated_at IS NULL)) DESC,
+       EXISTS (SELECT 1 FROM relation_type_ranges rr
+                WHERE rr.relation_type_id = r.id) DESC,
+       COALESCE(r.temporal = 'state', FALSE) DESC,
+       COALESCE(r.functional, FALSE) DESC,
+       f.confidence DESC, f.recorded_at DESC
+     LIMIT 1
+  </select>
+
+  <select id="selectTypeLabelOfEntity" resultType="java.lang.String">
+    SELECT t.label FROM entities e JOIN entity_types t ON t.id = e.type_id
+     WHERE e.id = #{id}
+  </select>
+
+  <update id="setDisambiguator">
+    UPDATE entities SET disambiguator = #{value} WHERE id = #{id}
+  </update>
+
+  <!-- resolution.rs:1297-1306 existing_by_name（#559：库里有没有叫这个名字的实体，
+       不问类型、并掉的不算；多个同名取事实最多的那个——只回答「有没有」） -->
+  <select id="selectExistingByName" resultType="java.util.UUID">
+    SELECT e.id FROM entities e
+      WHERE e.kb_id = #{kbId} AND e.merged_into IS NULL
+        AND e.description IS NULL
+        AND (lower(e.canonical_name) = ANY(#{keys,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler})
+             OR e.id IN (SELECT nf.subject_id FROM facts nf
+                           JOIN relation_types nr ON nr.id = nf.predicate_id
+                          WHERE nf.kb_id = #{kbId} AND nr.kb_id = #{kbId} AND nr.builtin AND nr.key = 'known_as'
+                            AND nf.invalidated_at IS NULL AND nf.object_value IS NOT NULL
+                            AND lower(nf.object_value->>'value') = ANY(#{keys,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler})))
+      ORDER BY (SELECT count(*) FROM facts f
+                 WHERE f.kb_id = e.kb_id AND (f.subject_id = e.id OR f.object_id = e.id)
+                   AND f.invalidated_at IS NULL
+                   AND NOT EXISTS (SELECT 1 FROM relation_types nr
+                                   WHERE nr.id = f.predicate_id AND nr.builtin AND nr.key = 'known_as')) DESC,
+               e.created_at
+      LIMIT 1
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- 审核队列写面 -->
+
+  <!-- resolution.rs:1402-1409 逐字：唯一索引只管 pending 的对——同一对再撞（阶段升
+       human）才走 DO UPDATE -->
+  <insert id="insertResolutionReview">
+    INSERT INTO resolution_reviews AS existing
+         (id, kb_id, left_id, right_id, score, reason, stage)
+     VALUES (#{id}, #{kbId}, #{leftId}, #{rightId}, #{score}, #{reason}, #{stage})
+     ON CONFLICT (kb_id, least(left_id, right_id), greatest(left_id, right_id))
+         WHERE status = 'pending'
+     DO UPDATE SET stage = 'human', reason = EXCLUDED.reason
+       WHERE EXCLUDED.stage = 'human' AND existing.stage = 'adjudicating'
+  </insert>
+
+  <update id="escalateReview">
+    UPDATE resolution_reviews SET stage = 'human', reason = #{reason}
+     WHERE id = #{reviewId} AND status = 'pending'
+  </update>
+
+  <update id="closeReviewAuto">
+    UPDATE resolution_reviews SET status = #{status}, reason = #{reason}, decided_at = now()
+     WHERE id = #{reviewId} AND status = 'pending'
+  </update>
+
+  <select id="selectPendingAdjudications" resultMap="reviewRow">
+    SELECT id, left_id, right_id, score, reason, stage, created_at
+     FROM resolution_reviews
+     WHERE kb_id = #{kbId} AND status = 'pending' AND stage = 'adjudicating'
+     ORDER BY created_at LIMIT #{limit}
+  </select>
+
+  <select id="selectPendingReview" resultMap="reviewRow">
+    SELECT id, left_id, right_id, score, reason, stage, created_at
+     FROM resolution_reviews WHERE id = #{reviewId} AND kb_id = #{kbId} AND status = 'pending'
+  </select>
+
+  <update id="markReviewMerged">
+    UPDATE resolution_reviews
+     SET status = 'merged', decided_at = now(), decided_by = #{userId}, rationale = #{rationale}
+     WHERE id = #{reviewId}
+  </update>
+
+  <update id="markReviewKept">
+    UPDATE resolution_reviews
+     SET status = 'kept', decided_at = now(), decided_by = #{userId}, rationale = #{rationale}
+     WHERE id = #{reviewId}
+  </update>
+
+  <!-- ==================================================================== -->
+  <!-- LLM 裁决缓存（resolution.rs:2386-2415） -->
+
+  <resultMap id="verdictRow" type="tech.seexun.jknow.store.mapper.ResolutionMapper$VerdictRow">
+    <constructor>
+      <arg column="same" javaType="java.lang.Boolean"/>
+      <arg column="confidence" javaType="_float"/>
+    </constructor>
+  </resultMap>
+
+  <!-- resolution.rs:2391-2392 逐字 -->
+  <select id="selectVerdict" resultMap="verdictRow">
+    SELECT same, confidence FROM resolution_verdicts
+     WHERE kb_id = #{kbId} AND pair_key = #{pairKey}
+  </select>
+
+  <!-- resolution.rs:2399-2412 逐字：UPSERT 同键重写（先例进键——人又裁了一笔键就变，
+       旧答案自然作废，不必去清） -->
+  <insert id="upsertVerdict">
+    INSERT INTO resolution_verdicts (kb_id, pair_key, same, confidence, model)
+     VALUES (#{kbId}, #{pairKey}, #{same}, #{confidence}, #{model})
+     ON CONFLICT (kb_id, pair_key)
+     DO UPDATE SET same = #{same}, confidence = #{confidence}, model = #{model},
+                   created_at = now()
+  </insert>
+
+  <!-- ==================================================================== -->
+  <!-- survivor / merge_direction（resolution.rs:1855-1898） -->
+
+  <select id="selectMergedInto" resultType="java.util.UUID">
+    SELECT merged_into FROM entities WHERE id = #{id} AND kb_id = #{kbId}
+  </select>
+  <!-- 返回形状说明：单行可能为 NULL（活着）——空列表=行不存在（survivor 报 NotFound）、
+       [null]=活着、[id]=还要再走，对齐 Rust Option<Option<Uuid>> 的三态 -->
+
+  <!-- resolution.rs:1877-1879 逐字：kb 用标量子查询取（PG16 上直接 JOIN 可能只按
+       kb_id 扫整库）。注意这里不排除名字事实——合并里名字一样要搬 -->
+  <select id="selectFactDegree" resultType="java.lang.Long">
+    SELECT count(*) FROM facts
+     WHERE kb_id = (SELECT kb_id FROM entities WHERE id = #{entityId})
+       AND (subject_id = #{entityId} OR object_id = #{entityId}) AND invalidated_at IS NULL
+  </select>
+
+  <select id="selectEntityFull" resultMap="entityFull">
+    SELECT type_id, canonical_name, profile_embedding::text AS profile_embedding, profile_n, merged_into
+     FROM entities WHERE kb_id = #{kbId} AND id = #{id}
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- merge_entities 事务（resolution.rs:1955-2149） -->
+
+  <select id="selectMovingFacts" resultType="java.util.UUID">
+    SELECT id FROM facts WHERE kb_id = #{kbId} AND (subject_id = #{sourceId} OR object_id = #{sourceId})
+  </select>
+
+  <!-- 互指事实（合并后变自环）→ 作废 -->
+  <select id="invalidateCrossFacts" resultType="java.util.UUID">
+    UPDATE facts SET invalidated_at = now()
+     WHERE kb_id = #{kbId} AND invalidated_at IS NULL
+       AND ((subject_id = #{sourceId} AND object_id = #{targetId}) OR (subject_id = #{targetId} AND object_id = #{sourceId}))
+    RETURNING id
+  </select>
+
+  <select id="moveSubjectFacts" resultType="java.util.UUID">
+    UPDATE facts SET subject_id = #{targetId} WHERE kb_id = #{kbId} AND subject_id = #{sourceId} RETURNING id
+  </select>
+
+  <select id="moveObjectFacts" resultType="java.util.UUID">
+    UPDATE facts SET object_id = #{targetId} WHERE kb_id = #{kbId} AND object_id = #{sourceId} RETURNING id
+  </select>
+
+  <!-- resolution.rs:2010-2015 逐字：合并后 SPO+valid_from 重复的 live 事实留最早
+       recorded_at 的一条。宾语两侧都要分组——字面值事实 object_id 全 NULL，只按它分组
+       等于把同主同谓下的所有值当成一条断言，同谓词多个值只活最早那一个。
+       Rust 侧 fetch 每组的 uuid[] 再 flat_map；JDBC 形态用 unnest(...) 展开同一分组
+       SQL（组间无序本就未定义，随后的 ANY() 单条 UPDATE 与次序无关） -->
+  <select id="selectDuplicateFactIds" resultType="java.util.UUID">
+    SELECT unnest((array_agg(id ORDER BY recorded_at))[2:]) FROM facts
+     WHERE kb_id = #{kbId} AND invalidated_at IS NULL
+       AND (subject_id = #{targetId} OR object_id = #{targetId})
+     GROUP BY subject_id, predicate_id, object_id, object_value, valid_from
+     HAVING count(*) &gt; 1
+  </select>
+
+  <update id="invalidateFactIds">
+    UPDATE facts SET invalidated_at = now() WHERE id = ANY(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler})
+  </update>
+
+  <update id="updateMergedEntity">
+    UPDATE entities SET profile_embedding = #{profile}::vector, profile_n = #{profileN},
+            type_id = #{typeId}, updated_at = now() WHERE id = #{targetId}
+  </update>
+
+  <update id="markMergedInto">
+    UPDATE entities SET merged_into = #{targetId}, updated_at = now() WHERE id = #{sourceId}
+  </update>
+
+  <!-- resolution.rs:2087-2103 逐字：先关掉两类真正过时的（重定向自环、目标对已在
+       队列）。其余的改指不关掉——「关掉就是永远关掉」：包含召回只在新建时跑一次，
+       这些实体不会再被新建，没有「后续 mention 重提」可言（Mr. Holmes 案例） -->
+  <update id="supersedeObsoleteReviews">
+    UPDATE resolution_reviews AS r
+     SET status = 'kept', reason = 'superseded by merge', decided_at = now()
+     WHERE r.kb_id = #{kbId} AND r.status = 'pending'
+       AND (r.left_id = #{sourceId} OR r.right_id = #{sourceId})
+       AND NOT (least(r.left_id, r.right_id) = least(#{sourceId}, #{targetId})
+                AND greatest(r.left_id, r.right_id) = greatest(#{sourceId}, #{targetId}))
+       AND (
+         (CASE WHEN r.left_id = #{sourceId} THEN r.right_id ELSE r.left_id END) = #{targetId}
+         OR EXISTS (
+           SELECT 1 FROM resolution_reviews d
+           WHERE d.kb_id = #{kbId} AND d.status = 'pending' AND d.id &lt;&gt; r.id
+             AND least(d.left_id, d.right_id)
+                 = least(#{targetId}, CASE WHEN r.left_id = #{sourceId} THEN r.right_id ELSE r.left_id END)
+             AND greatest(d.left_id, d.right_id)
+                 = greatest(#{targetId}, CASE WHEN r.left_id = #{sourceId} THEN r.right_id ELSE r.left_id END))
+       )
+  </update>
+
+  <!-- resolution.rs:2113-2120 逐字：剩下的改指到目标，问题继续挂在队列上等裁决；
+       (source, target) 这一对本身除外——它是本次合并的裁决对象，由调用方标记 merged -->
+  <update id="redirectReviews">
+    UPDATE resolution_reviews
+     SET left_id = CASE WHEN left_id = #{sourceId} THEN #{targetId} ELSE left_id END,
+         right_id = CASE WHEN right_id = #{sourceId} THEN #{targetId} ELSE right_id END,
+         reason = reason || '|redirected'
+     WHERE kb_id = #{kbId} AND status = 'pending' AND (left_id = #{sourceId} OR right_id = #{sourceId})
+       AND NOT (least(left_id, right_id) = least(#{sourceId}, #{targetId})
+                AND greatest(left_id, right_id) = greatest(#{sourceId}, #{targetId}))
+  </update>
+
+  <insert id="insertEntityMerge">
+    INSERT INTO entity_merges (id, kb_id, source_id, target_id,
+            moved_subject_facts, moved_object_facts, invalidated_facts,
+            target_profile_before, target_profile_n_before, target_type_before,
+            merged_by, reason)
+     VALUES (#{id}, #{kbId}, #{sourceId}, #{targetId},
+             #{movedSubject,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler},
+             #{movedObject,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler},
+             #{invalidated,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler},
+             #{profileBefore}::vector, #{profileNBefore}, #{typeBefore}, #{mergedBy}, #{reason})
+  </insert>
+
+  <update id="setMergeCorrections">
+    UPDATE entity_merges SET temporal_corrections = #{corrections,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler} WHERE id = #{id}
+  </update>
+
+  <!-- ==================================================================== -->
+  <!-- revert_merge（resolution.rs:2218-2350） -->
+
+  <select id="selectMergeRow" resultMap="mergeRow">
+    SELECT source_id, target_id, moved_subject_facts, moved_object_facts,
+           invalidated_facts, target_profile_before::text AS target_profile_before,
+           target_profile_n_before, target_type_before, reverted_at
+     FROM entity_merges WHERE id = #{mergeId} AND kb_id = #{kbId}
+  </select>
+
+  <!-- resolution.rs:2264-2269 逐字：事实此刻挂在谁身上——目标，或目标后来又并进的
+       实体（连环合并撤头一环仍能搬回，#679 第四轮评审） -->
+  <select id="selectHolderChain" resultType="java.util.UUID">
+    WITH RECURSIVE chain(id) AS (
+         SELECT #{targetId}::uuid
+         UNION SELECT e.merged_into FROM entities e JOIN chain ON e.id = chain.id
+          WHERE e.merged_into IS NOT NULL)
+     SELECT id FROM chain
+  </select>
+
+  <select id="selectWithRewrites" resultType="java.util.UUID">
+    WITH RECURSIVE chain(id) AS (
+         SELECT unnest(#{roots,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[])
+         UNION
+         SELECT f.id FROM facts f JOIN chain c ON f.supersedes = c.id
+     )
+     SELECT id FROM chain
+  </select>
+
+  <update id="revertSubjectFacts">
+    UPDATE facts SET subject_id = #{sourceId} WHERE id = ANY(#{movedSubject,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}) AND subject_id = ANY(#{holders,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler})
+  </update>
+
+  <update id="revertObjectFacts">
+    UPDATE facts SET object_id = #{sourceId} WHERE id = ANY(#{movedObject,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}) AND object_id = ANY(#{holders,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler})
+  </update>
+
+  <select id="selectLiveRewriteSubjects" resultType="java.util.UUID">
+    SELECT id FROM facts
+      WHERE id = ANY(#{rows,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}) AND id &lt;&gt; ALL(#{ledger,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}) AND invalidated_at IS NULL AND subject_id = ANY(#{holders,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler})
+  </select>
+
+  <select id="selectLiveRewriteObjects" resultType="java.util.UUID">
+    SELECT id FROM facts
+      WHERE id = ANY(#{rows,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}) AND id &lt;&gt; ALL(#{ledger,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}) AND invalidated_at IS NULL AND object_id = ANY(#{holders,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler})
+  </select>
+
+  <update id="reviveFacts">
+    UPDATE facts SET invalidated_at = NULL WHERE id = ANY(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler})
+  </update>
+
+  <!-- resolution.rs:2331-2334 逐字：target 画像/类型恢复快照（coalesce($4, type_id)
+       ——撤回之后人又改过类型的话保人的） -->
+  <update id="restoreTargetEntity">
+    UPDATE entities SET
+        profile_embedding = #{profile}::vector, profile_n = #{profileN},
+        type_id = coalesce(#{typeId}, type_id), updated_at = now()
+     WHERE id = #{targetId}
+  </update>
+
+  <update id="reviveSource">
+    UPDATE entities SET merged_into = NULL, updated_at = now() WHERE id = #{sourceId}
+  </update>
+
+  <update id="markMergeReverted">
+    UPDATE entity_merges SET reverted_at = now() WHERE id = #{mergeId}
+  </update>
+
+  <!-- resolution.rs:2736-2740 set_specific_type 逐字：首写不覆盖。 -->
+  <update id="setSpecificType">
+    UPDATE entities SET specific_type = left(#{value}, 80)
+     WHERE id = #{entityId} AND specific_type IS NULL
+  </update>
+
+  <!-- ==================================================================== -->
+  <!-- 类型消解候选与近邻（resolution.rs:2575-2896；M4 任务 1 随治理测试移植。
+       角色子查询写**名字**不写类型 key——写 key 是自毁：查询里出现 organization 这些词，
+       检索的目标正是这些类自己，候选就成了画像自己（原文实测注释）。 -->
+
+  <resultMap id="typeCandidateSubject"
+             type="tech.seexun.jknow.store.mapper.ResolutionMapper$TypeCandidateSubject">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="canonical_name" javaType="java.lang.String"/>
+      <arg column="other_names" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.TextArrayTypeHandler"/>
+      <arg column="coarse_key" javaType="java.lang.String"/>
+      <arg column="coarse_id" javaType="java.util.UUID"/>
+      <arg column="coarse_description" javaType="java.lang.String"/>
+      <arg column="proposed_type" javaType="java.lang.String"/>
+      <arg column="specific_type" javaType="java.lang.String"/>
+      <arg column="roles" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.TextArrayTypeHandler"/>
+      <arg column="quotes" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.TextArrayTypeHandler"/>
+      <arg column="fact_count" javaType="_long"/>
+    </constructor>
+  </resultMap>
+
+  <select id="selectTypeCandidates" resultMap="typeCandidateSubject">
+    SELECT e.id, e.canonical_name,
+           ARRAY(SELECT DISTINCT nf.object_value->>'value' FROM facts nf
+                   JOIN relation_types nr ON nr.id = nf.predicate_id
+                  WHERE nf.subject_id = e.id AND nr.builtin AND nr.key = 'known_as'
+                    AND nf.invalidated_at IS NULL
+                    AND lower(nf.object_value->>'value') &lt;&gt; lower(e.canonical_name)) AS other_names,
+           t.key AS coarse_key, t.id AS coarse_id,
+           t.description AS coarse_description,
+           e.proposed_type, e.specific_type,
+           ARRAY(
+             SELECT DISTINCT COALESCE(rt.key, fact_surface_predicate(f.id))
+                             || CASE WHEN f.subject_id = e.id THEN ' ' ELSE ' by ' END
+                             || coalesce(oe.canonical_name, 'a value')
+             FROM facts f
+             LEFT JOIN relation_types rt ON rt.id = f.predicate_id
+             LEFT JOIN entities oe ON oe.id = CASE WHEN f.subject_id = e.id
+                                              THEN f.object_id ELSE f.subject_id END
+             WHERE f.kb_id = #{kbId} AND f.invalidated_at IS NULL
+               AND (f.subject_id = e.id OR f.object_id = e.id)
+               AND COALESCE(rt.key, fact_surface_predicate(f.id)) IS NOT NULL
+               AND NOT coalesce(rt.builtin AND rt.key = 'known_as', false)
+             LIMIT 12
+           ) AS roles,
+           ARRAY(
+             SELECT DISTINCT ev.quote FROM fact_evidence ev
+             JOIN facts f2 ON f2.id = ev.fact_id
+             LEFT JOIN relation_types rt2 ON rt2.id = f2.predicate_id
+             WHERE f2.kb_id = #{kbId} AND f2.invalidated_at IS NULL
+               AND f2.subject_id = e.id
+               AND ev.quote IS NOT NULL
+               AND NOT coalesce(rt2.builtin AND rt2.key = 'known_as', false)
+             LIMIT 3
+           ) AS quotes,
+           (SELECT count(*) FROM facts f3
+            LEFT JOIN relation_types rt3 ON rt3.id = f3.predicate_id
+            WHERE f3.kb_id = #{kbId} AND f3.invalidated_at IS NULL
+              AND (f3.subject_id = e.id OR f3.object_id = e.id)
+              AND NOT coalesce(rt3.builtin AND rt3.key = 'known_as', false)) AS fact_count
+     FROM entities e
+     LEFT JOIN entity_types t ON t.id = e.type_id
+     WHERE e.kb_id = #{kbId} AND e.merged_into IS NULL
+       AND e.type_source &lt;&gt; 'human'
+       AND (e.type_id IS NULL OR e.proposed_type IS NOT NULL OR e.specific_type IS NOT NULL
+            OR EXISTS (SELECT 1 FROM entity_type_parents p WHERE p.parent_id = t.id))
+       AND (NOT #{unattended}::bool OR e.type_resolved_at IS NULL)
+     ORDER BY fact_count DESC, e.created_at
+     LIMIT #{limit}
+  </select>
+
+  <update id="markTypeJudged">
+    UPDATE entities SET type_resolved_at = now()
+     WHERE kb_id = #{kbId} AND id = ANY(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler})
+  </update>
+
+  <select id="selectDescendants" resultType="java.util.UUID">
+    WITH RECURSIVE d(id) AS (
+         SELECT #{root}::uuid
+         UNION
+         SELECT p.child_id FROM entity_type_parents p JOIN d ON d.id = p.parent_id
+     )
+     SELECT d.id FROM d JOIN entity_types t ON t.id = d.id WHERE t.kb_id = #{kbId}
+  </select>
+
+  <select id="selectProfileEmbeddingInKb" resultType="java.lang.String">
+    SELECT profile_embedding::text FROM entities WHERE id = #{entityId} AND kb_id = #{kbId}
+  </select>
+<!-- resolution.rs:2985-2995 approved_refinements 逐字（跨轴分档要它：同一对人认可过
+       就不再进人工——第二个城市不该再问一遍）。 -->
+  <select id="selectApprovedRefinements"
+          resultType="tech.seexun.jknow.store.mapper.ResolutionMapper$ApprovedPair">
+    SELECT from_type_id AS "fromTypeId", to_type_id AS "toTypeId"
+      FROM type_refinement_pairs WHERE kb_id = #{kbId}
+  </select>
+</mapper>

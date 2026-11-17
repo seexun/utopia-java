@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 成员写 SQL（逐字搬迁自旧仓库 utopia-store/src/members.rs:33-91 与 access.rs:167-177；
+     M5 任务 6 切流演练落位）。 -->
+<mapper namespace="tech.seexun.jknow.store.mapper.MembersWriteMapper">
+
+  <!-- members.rs:61-66（在职用户；停用账号加进工作空间会成为成员列表里看不见的授权） -->
+  <select id="selectActiveUser" resultType="java.util.UUID">
+    SELECT id FROM users WHERE id = #{id} AND deactivated_at IS NULL
+  </select>
+
+  <!-- members.rs:68-76（set_role：UPSERT） -->
+  <insert id="upsertMembership">
+    INSERT INTO memberships (user_id, workspace_id, role) VALUES (#{userId}, #{workspaceId}, #{role})
+    ON CONFLICT (user_id, workspace_id) DO UPDATE SET role = EXCLUDED.role
+  </insert>
+
+  <!-- members.rs:81-91（remove） -->
+  <delete id="deleteMembership">
+    DELETE FROM memberships WHERE workspace_id = #{workspaceId} AND user_id = #{userId}
+  </delete>
+
+  <!-- members.rs:33-41（owner_count） -->
+  <select id="countOwners" resultType="_long">
+    SELECT count(*) FROM memberships WHERE workspace_id = #{workspaceId} AND role = 'owner'
+  </select>
+
+  <!-- access.rs:167-177（remove_kb_member） -->
+  <delete id="deleteKbMember">
+    DELETE FROM kb_members WHERE kb_id = #{kbId} AND user_id = #{userId}
+  </delete>
+</mapper>

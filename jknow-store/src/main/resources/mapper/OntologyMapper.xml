@@ -1,0 +1,817 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  ontology 读路径 SQL（逐字搬迁自旧仓库 utopia-0.1.0-rc9/crates/utopia-store/src/ontology.rs；
+  铁律：占位符 $1..$n 改写 #{param} 外 token 流一字不动，每条注明 file:line）。
+  M1 任务 4 范围：两视图 + instances（m1-recon §4.2）。
+
+  排版说明：Rust 源为 raw 字符串常量（无 format! 展开位），换行缩进按源照搬；
+  XML 转义仅 &lt; &gt; &amp;（token 流不变）。
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.OntologyMapper">
+
+  <resultMap id="entityTypeView" type="tech.seexun.jknow.store.entity.EntityTypeView">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="key" javaType="java.lang.String"/>
+      <arg column="label" javaType="java.lang.String"/>
+      <arg column="color" javaType="java.lang.String"/>
+      <arg column="shape" javaType="java.lang.String"/>
+      <arg column="builtin" javaType="_boolean"/>
+      <arg column="parents" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler"/>
+      <arg column="primary_parent" javaType="java.util.UUID"/>
+      <arg column="disjoint" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler"/>
+      <arg column="description" javaType="java.lang.String"/>
+      <arg column="usage" javaType="_long"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="relationTypeView" type="tech.seexun.jknow.store.entity.RelationTypeView">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="key" javaType="java.lang.String"/>
+      <arg column="label" javaType="java.lang.String"/>
+      <arg column="temporal" javaType="java.lang.String"/>
+      <arg column="functional" javaType="_boolean"/>
+      <arg column="inverse_functional" javaType="_boolean"/>
+      <arg column="is_transitive" javaType="_boolean"/>
+      <arg column="is_symmetric" javaType="_boolean"/>
+      <arg column="is_asymmetric" javaType="_boolean"/>
+      <arg column="is_irreflexive" javaType="_boolean"/>
+      <arg column="inverse_of" javaType="java.util.UUID"/>
+      <arg column="sub_property_of" javaType="java.util.UUID"/>
+      <arg column="builtin" javaType="_boolean"/>
+      <arg column="description" javaType="java.lang.String"/>
+      <arg column="kind" javaType="java.lang.String"/>
+      <arg column="domains" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler"/>
+      <arg column="ranges" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler"/>
+      <arg column="qualifiers" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler"/>
+      <arg column="datatype" javaType="java.lang.String"/>
+      <arg column="unit" javaType="java.lang.String"/>
+      <arg column="usage" javaType="_long"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="entityInstance" type="tech.seexun.jknow.store.entity.EntityInstance">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="name" javaType="java.lang.String"/>
+      <arg column="fact_count" javaType="_long"/>
+    </constructor>
+  </resultMap>
+
+  <!-- ==================================================================== -->
+  <!-- 类视图（ontology.rs:13-35 entity_type_views）：全部父类/主父/互斥类三个数组子查询
+       + usage 左联聚合（在世且已判类的实体计数，merged_into IS NULL AND type_id IS NOT NULL），
+       ORDER BY lower(t.label)。 -->
+
+  <select id="selectEntityTypeViews" resultMap="entityTypeView">
+    SELECT t.id, t.key, t.label, t.color, t.shape, t.builtin, t.description,
+           ARRAY(SELECT p.parent_id FROM entity_type_parents p
+                 WHERE p.child_id = t.id) AS parents,
+           (SELECT p.parent_id FROM entity_type_parents p
+             WHERE p.child_id = t.id AND p.is_primary) AS primary_parent,
+           ARRAY(SELECT d.b_id FROM entity_type_disjoint d
+                 WHERE d.kb_id = t.kb_id AND d.a_id = t.id) AS disjoint,
+           COALESCE(u.usage, 0) AS usage
+    FROM entity_types t
+    LEFT JOIN (
+        SELECT type_id, count(*)::bigint AS usage
+        FROM entities
+        WHERE kb_id = #{kbId} AND merged_into IS NULL AND type_id IS NOT NULL
+        GROUP BY type_id
+    ) u ON u.type_id = t.id
+    WHERE t.kb_id = #{kbId} ORDER BY lower(t.label)
+  </select>
+
+  <!-- 关系视图（ontology.rs:82-108 relation_type_views）：domains/ranges/qualifiers 三个数组子查询
+       + usage 左联聚合（活事实计数，predicate_id 非空），ORDER BY lower(r.label)。 -->
+
+  <select id="selectRelationTypeViews" resultMap="relationTypeView">
+    SELECT r.id, r.key, r.label, r.temporal, r.functional, r.inverse_functional,
+           r.is_transitive, r.is_symmetric, r.is_asymmetric, r.is_irreflexive,
+           r.inverse_of, r.sub_property_of,
+           r.builtin, r.description,
+           r.kind, r.datatype, r.unit,
+           ARRAY(SELECT d.entity_type_id FROM relation_type_domains d
+                 WHERE d.relation_type_id = r.id) AS domains,
+           ARRAY(SELECT g.entity_type_id FROM relation_type_ranges g
+                 WHERE g.relation_type_id = r.id) AS ranges,
+           ARRAY(SELECT q.qualifier_type_id FROM relation_type_qualifiers q
+                 WHERE q.relation_type_id = r.id) AS qualifiers,
+           COALESCE(u.usage, 0) AS usage
+    FROM relation_types r
+    LEFT JOIN (
+        SELECT predicate_id, count(*)::bigint AS usage
+        FROM facts
+        WHERE kb_id = #{kbId} AND invalidated_at IS NULL AND predicate_id IS NOT NULL
+        GROUP BY predicate_id
+    ) u ON u.predicate_id = r.id
+    WHERE r.kb_id = #{kbId} ORDER BY lower(r.label)
+  </select>
+
+  <!-- 某类下实例一页（ontology.rs:45-55 entity_instances：fact_count=触达的活事实数，
+       不排 known_as——这里的「事实数」就是面板上的度数口径本体版） -->
+
+  <select id="selectEntityInstances" resultMap="entityInstance">
+    SELECT e.id, e.canonical_name AS name,
+           (SELECT count(*) FROM facts f
+             WHERE f.kb_id = e.kb_id
+               AND (f.subject_id = e.id OR f.object_id = e.id)
+               AND f.invalidated_at IS NULL) AS fact_count
+    FROM entities e
+    WHERE e.kb_id = #{kbId} AND e.type_id = #{typeId} AND e.merged_into IS NULL
+    ORDER BY lower(e.canonical_name), e.id
+    LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <!-- 实例总数（ontology.rs:62-65，同一 WHERE 无 ORDER/LIMIT） -->
+  <select id="countEntityInstances" resultType="_long">
+    SELECT count(*) FROM entities e
+    WHERE e.kb_id = #{kbId} AND e.type_id = #{typeId} AND e.merged_into IS NULL
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- 抽取未匹配（misses / dismissed_misses 两键）——**形态考古，非源逐字**：
+       参照实例二进制（utopia-0.1.0-rc9 镜像）的 GET /ontology 回四键，而旧仓库当前
+       main 的 get（ontology_routes.rs:25-39）已只剩两视图、未匹配改走 uncovered()
+       计数（ontology.rs:2042-2053，open 图谱不再写 ontology_misses 表）——源比二进制
+       新，与 regressions 路由缺失（源有路由、二进制无）同一批 rc9 漂移，方向相反。
+       契约权威是参照实例（M0 纪律），故按二进制实测形态重建：
+       · 行形状 {kind, key, example, count}（ontology_misses 表列）；
+       · misses=dismissed_at IS NULL，dismissed_misses=dismissed_at IS NOT NULL；
+       · 排序实测 count DESC, key ASC（tie 按 key，与 updated_at 无关；
+         2026-11-11 对 1516 探测：9/2/1 计数序 + aaa<bbb 同计数序）。
+       探测记录见 task-4 报告；M5 升级参照实例后按新源重核。 -->
+
+  <resultMap id="ontologyMiss" type="tech.seexun.jknow.store.mapper.OntologyMapper$OntologyMiss">
+    <constructor>
+      <arg column="kind" javaType="java.lang.String"/>
+      <arg column="key" javaType="java.lang.String"/>
+      <arg column="example" javaType="java.lang.String"/>
+      <arg column="count" javaType="_int"/>
+    </constructor>
+  </resultMap>
+
+  <select id="selectOntologyMisses" resultMap="ontologyMiss">
+    SELECT kind, key, example, count
+    FROM ontology_misses
+    WHERE kb_id = #{kbId} AND dismissed_at IS NULL
+    ORDER BY count DESC, key
+  </select>
+
+  <select id="selectDismissedOntologyMisses" resultMap="ontologyMiss">
+    SELECT kind, key, example, count
+    FROM ontology_misses
+    WHERE kb_id = #{kbId} AND dismissed_at IS NOT NULL
+    ORDER BY count DESC, key
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- create_relation_type（ontology.rs:458-525 逐字；任务 2 只为 temporal 测试的
+       造数路径搬：RelationAxioms 默认全假、无 inverse_of/sub_property_of）。
+       属性不带 domain/range 链接（validate_attribute_fields 已拦）。 -->
+
+  <insert id="insertRelationType">
+    INSERT INTO relation_types (id, kb_id, key, label, temporal,
+                                     functional, inverse_functional, description,
+                                     kind, datatype, unit,
+                                     is_transitive, is_symmetric,
+                                     is_asymmetric, is_irreflexive,
+                                     inverse_of, sub_property_of)
+     VALUES (#{id}, #{kbId}, #{key}, #{label}, #{temporal},
+             #{functional}, #{inverseFunctional}, #{description},
+             #{kind}, #{datatype}, #{unit},
+             #{transitive}, #{symmetric}, #{asymmetric}, #{irreflexive},
+             #{inverseOf}, #{subPropertyOf})
+  </insert>
+
+  <!-- set_domains_ranges（ontology.rs:533-558）：覆盖式——先删后插，新建/重导入同一形状。 -->
+  <delete id="deleteDomains">
+    DELETE FROM relation_type_domains WHERE relation_type_id = #{id}
+  </delete>
+
+  <insert id="insertDomains">
+    INSERT INTO relation_type_domains (relation_type_id, entity_type_id)
+     SELECT #{id}, x FROM unnest(#{typeIds,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[]) AS x
+     ON CONFLICT DO NOTHING
+  </insert>
+
+  <delete id="deleteRanges">
+    DELETE FROM relation_type_ranges WHERE relation_type_id = #{id}
+  </delete>
+
+  <insert id="insertRanges">
+    INSERT INTO relation_type_ranges (relation_type_id, entity_type_id)
+     SELECT #{id}, x FROM unnest(#{typeIds,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[]) AS x
+     ON CONFLICT DO NOTHING
+  </insert>
+
+  <!-- ==================================================================== -->
+  <!-- validate_property_links 三查的取数（ontology.rs:429-434）：目标在不在本库。
+       不区分「不存在」与「在别的库」——能问出哪个 UUID 存在于别处，本身就是一点
+       不该给的信息。 -->
+
+  <select id="selectRelationKind" resultType="java.lang.String">
+    SELECT kind FROM relation_types WHERE id = #{id} AND kb_id = #{kbId}
+  </select>
+
+  <!-- update_relation_type（ontology.rs:658-822）写前两查 -->
+
+  <!-- 名字属性是内建的（0041）：改成 functional 会让每个第二个名字都成一条冲突 -->
+  <select id="selectBuiltinNameAttribute" resultType="_boolean">
+    SELECT builtin AND key = 'known_as' FROM relation_types WHERE id = #{id} AND kb_id = #{kbId}
+  </select>
+
+  <!-- 旧判据快照（ontology.rs:706-714 OldCriteria：跟「哪些违规成立」有关的列；
+       label/description/datatype/unit 不在——它们不动判据） -->
+  <select id="selectOldCriteria" resultMap="oldCriteria">
+    SELECT kind, temporal, functional, inverse_functional, is_transitive,
+           is_symmetric, is_asymmetric, is_irreflexive, inverse_of, sub_property_of
+      FROM relation_types WHERE id = #{id} AND kb_id = #{kbId}
+  </select>
+
+  <!-- ontology.rs:779-800 UPDATE：两条链跟着六位公理一起覆盖式写——缺省 = 清空，不是
+       「不动」。与 is_transitive 那几位同一条规矩：同一个表单里同时提交的一组声明，
+       一半覆盖一半保留才是真正会出事的语义。#{datatype}/#{unit} 补 ::text——sqlx 绑
+       参带类型，JDBC 的裸 NULL 需要显式定型（JDBC 方言差异，token 流不动）。 -->
+  <update id="updateRelationType">
+    UPDATE relation_types
+       SET label = #{label}, temporal = #{temporal},
+           functional = #{functional}, inverse_functional = #{inverseFunctional}, description = #{description},
+           datatype = CASE WHEN kind = 'attribute' AND #{datatype}::text IS NOT NULL THEN #{datatype}::text ELSE datatype END,
+           unit = CASE WHEN kind = 'attribute' THEN #{unit}::text ELSE unit END,
+           is_transitive = #{transitive}, is_symmetric = #{symmetric},
+           is_asymmetric = #{asymmetric}, is_irreflexive = #{irreflexive},
+           inverse_of = #{inverseOf}, sub_property_of = #{subPropertyOf}, updated_at = now()
+     WHERE id = #{id} AND kb_id = #{kbId}
+  </update>
+
+  <!-- 签名改没改（ontology.rs:735-743）：domain/range 是签名不是身份 -->
+  <select id="selectOldDomains" resultType="java.util.UUID">
+    SELECT entity_type_id FROM relation_type_domains WHERE relation_type_id = #{id}
+  </select>
+
+  <select id="selectOldRanges" resultType="java.util.UUID">
+    SELECT entity_type_id FROM relation_type_ranges WHERE relation_type_id = #{id}
+  </select>
+
+  <resultMap id="oldCriteria" type="tech.seexun.jknow.store.mapper.OntologyMapper$OldCriteria">
+    <constructor>
+      <arg column="kind" javaType="java.lang.String"/>
+      <arg column="temporal" javaType="java.lang.String"/>
+      <arg column="functional" javaType="_boolean"/>
+      <arg column="inverse_functional" javaType="_boolean"/>
+      <arg column="is_transitive" javaType="_boolean"/>
+      <arg column="is_symmetric" javaType="_boolean"/>
+      <arg column="is_asymmetric" javaType="_boolean"/>
+      <arg column="is_irreflexive" javaType="_boolean"/>
+      <arg column="inverse_of" javaType="java.util.UUID"/>
+      <arg column="sub_property_of" javaType="java.util.UUID"/>
+    </constructor>
+  </resultMap>
+
+  <!-- ==================================================================== -->
+  <!-- 边上的属性声明（ontology.rs:569-652 set/add_relation_qualifiers）：只有本库的
+       属性能当限定项；关系不能把自己声明成自己的属性。 -->
+
+  <select id="countAttributeQualifiers" resultType="_long">
+    SELECT count(*) FROM relation_types
+     WHERE kb_id = #{kbId} AND kind = 'attribute' AND id = ANY(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler})
+  </select>
+
+  <select id="countAttributeQualifier" resultType="_long">
+    SELECT count(*) FROM relation_types
+     WHERE kb_id = #{kbId} AND kind = 'attribute' AND id = #{id}
+  </select>
+
+  <delete id="deleteRelationQualifiers">
+    DELETE FROM relation_type_qualifiers WHERE relation_type_id = #{id}
+  </delete>
+
+  <insert id="insertRelationQualifiers">
+    INSERT INTO relation_type_qualifiers (relation_type_id, qualifier_type_id)
+     SELECT #{id}, x FROM unnest(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[]) AS x
+     ON CONFLICT DO NOTHING
+  </insert>
+
+  <insert id="insertRelationQualifier">
+    INSERT INTO relation_type_qualifiers (relation_type_id, qualifier_type_id)
+     VALUES (#{id}, #{qualifierTypeId}) ON CONFLICT DO NOTHING
+  </insert>
+
+  <!-- ==================================================================== -->
+  <!-- create_entity_type（ontology.rs:156-192）+ set_parents（ontology.rs:252-295） -->
+
+  <insert id="insertEntityType">
+    INSERT INTO entity_types (id, kb_id, key, label, color, shape, description)
+     VALUES (#{id}, #{kbId}, #{key}, #{label}, #{color}, #{shape}, #{description})
+  </insert>
+
+  <!-- set_parents 的成环检查（ontology.rs:263-271）：候选父类的全部祖先里出现 child -->
+  <select id="countParentCycle" resultType="_long">
+    WITH RECURSIVE up(id) AS (
+        SELECT unnest(#{parents,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[])
+        UNION
+        SELECT p.parent_id FROM entity_type_parents p JOIN up ON p.child_id = up.id
+    )
+    SELECT count(*) FROM up WHERE id = #{childId}
+  </select>
+
+  <delete id="deleteParents">
+    DELETE FROM entity_type_parents WHERE child_id = #{id}
+  </delete>
+
+  <!-- 第一个当主父（ontology.rs:283-286）：界面上说明了「画在第一个下面」，不再多一个控件 -->
+  <insert id="insertParent">
+    INSERT INTO entity_type_parents (child_id, parent_id, is_primary)
+     VALUES (#{childId}, #{parentId}, #{primary}) ON CONFLICT DO NOTHING
+  </insert>
+
+  <!-- ==================================================================== -->
+  <!-- update_entity_type / delete_entity_type / delete_relation_type
+       （ontology.rs:195-363 / 823-875，M3 任务 5）：本体 CRUD 的判据对账钩子
+       （detection_keys 写前 / reconcile_ontology 写后）在服务层。 -->
+
+  <select id="selectParentIds" resultType="java.util.UUID">
+    SELECT parent_id FROM entity_type_parents WHERE child_id = #{childId}
+  </select>
+
+  <update id="updateEntityType">
+    UPDATE entity_types SET label = #{label}, color = COALESCE(#{color}, color), shape = #{shape},
+            description = #{description}, updated_at = now()
+     WHERE id = #{id} AND kb_id = #{kbId}
+  </update>
+
+  <select id="countEntitiesOfType" resultType="_long">
+    SELECT count(*) FROM entities WHERE type_id = #{typeId}
+  </select>
+
+  <select id="selectTypeAffectsCriteria" resultType="boolean">
+    SELECT EXISTS(SELECT 1 FROM entity_type_parents WHERE parent_id = #{typeId})
+        OR EXISTS(SELECT 1 FROM relation_type_domains WHERE entity_type_id = #{typeId})
+        OR EXISTS(SELECT 1 FROM relation_type_ranges WHERE entity_type_id = #{typeId})
+  </select>
+
+  <!-- 只剩这一个 domain 的属性随类一起走：属性必须挂在类上，留一个没有 domain 的属性
+       等于留一个不会出现在任何地方的死行。还挂在别的类上的则只掉一条关联（外键
+       CASCADE 负责）。连带效果（0070 的 FK CASCADE）：属性没了 → 用它做谓词的事实
+       没了 → 指向那些事实的违规行也被物理删掉——这些行不走 criterion_changed：
+       它们的判据没换，是事实本身没了，与 run 对消失事实的清陈同一条规矩 -->
+  <delete id="deleteAttributesOnlyOnType">
+    DELETE FROM relation_types r
+     WHERE r.kind = 'attribute' AND r.kb_id = #{kbId}
+       AND EXISTS (SELECT 1 FROM relation_type_domains d
+                   WHERE d.relation_type_id = r.id AND d.entity_type_id = #{typeId})
+       AND NOT EXISTS (SELECT 1 FROM relation_type_domains d
+                       WHERE d.relation_type_id = r.id AND d.entity_type_id &lt;&gt; #{typeId})
+  </delete>
+
+  <delete id="deleteEntityType">
+    DELETE FROM entity_types WHERE id = #{id} AND kb_id = #{kbId} AND NOT builtin
+  </delete>
+
+  <select id="countFactsOfPredicate" resultType="_long">
+    SELECT count(*) FROM facts WHERE predicate_id = #{predicateId}
+  </select>
+
+  <!-- 0070 把这两条外键建成 DEFERRABLE 的 SET NULL——级联动作提交时才落地，
+       而对账检测要看见改完的判据，所以先在事务里显式断链 -->
+  <update id="unlinkInverseOf">
+    UPDATE relation_types SET inverse_of = NULL WHERE inverse_of = #{id}
+  </update>
+
+  <update id="unlinkSubPropertyOf">
+    UPDATE relation_types SET sub_property_of = NULL WHERE sub_property_of = #{id}
+  </update>
+
+  <delete id="deleteRelationTypeRow">
+    DELETE FROM relation_types WHERE id = #{id} AND kb_id = #{kbId} AND NOT builtin
+  </delete>
+
+  <!-- ==================================================================== -->
+  <!-- create_relation_types_bulk（ontology.rs:1587-1604，SQL 逐字）：一次插完一批
+       关系或属性。functional/inverse_functional 与四位 OWL 公理必须照词汇表写下去
+       ——写错方向（SQL 里硬编码 FALSE）的那种既有缺陷，只有把一行真的写进去再读
+       回来才看得见。 -->
+
+  <resultMap id="idKey" type="tech.seexun.jknow.store.mapper.OntologyMapper$IdKey">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="key" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <select id="insertRelationTypesBulk" resultMap="idKey">
+    INSERT INTO relation_types
+         (id, kb_id, key, label, temporal, functional, inverse_functional,
+          description, kind, datatype, iri,
+          is_transitive, is_symmetric, is_asymmetric, is_irreflexive)
+     SELECT gen_random_uuid(), #{kbId}, k, l, 'state', fu, iv, d, kind, dt, i,
+            tr, sy, asym, irr
+     FROM UNNEST(#{keys,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler}::text[],
+                 #{labels,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler}::text[],
+                 #{descs,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler}::text[],
+                 #{iris,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler}::text[],
+                 #{kinds,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler}::text[],
+                 #{datatypes,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler}::text[],
+                 #{functional,typeHandler=tech.seexun.jknow.store.typehandler.BooleanArrayTypeHandler}::bool[],
+                 #{inverseFunctional,typeHandler=tech.seexun.jknow.store.typehandler.BooleanArrayTypeHandler}::bool[],
+                 #{transitive,typeHandler=tech.seexun.jknow.store.typehandler.BooleanArrayTypeHandler}::bool[],
+                 #{symmetric,typeHandler=tech.seexun.jknow.store.typehandler.BooleanArrayTypeHandler}::bool[],
+                 #{asymmetric,typeHandler=tech.seexun.jknow.store.typehandler.BooleanArrayTypeHandler}::bool[],
+                 #{irreflexive,typeHandler=tech.seexun.jknow.store.typehandler.BooleanArrayTypeHandler}::bool[])
+          AS t(k, l, d, i, kind, dt, fu, iv, tr, sy, asym, irr)
+     ON CONFLICT (kb_id, key) DO NOTHING
+     RETURNING id, key
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- set_disjoint_for（ontology.rs:1715-1738，SQL 逐字）：把 others 设成这个类的
+       全部互斥对象（不在其中的解除）。编辑必须能取消——否则界面上取消勾选没有
+       任何效果，而用户会以为自己改了。两个方向各写一行，与导入侧一致。 -->
+
+  <delete id="deleteDisjointFor">
+    DELETE FROM entity_type_disjoint
+      WHERE kb_id = #{kbId} AND (a_id = #{classId} OR b_id = #{classId})
+  </delete>
+
+  <insert id="insertDisjointPair">
+    INSERT INTO entity_type_disjoint (kb_id, a_id, b_id)
+     VALUES (#{kbId}, #{a}, #{b}), (#{kbId}, #{b}, #{a})
+     ON CONFLICT DO NOTHING
+  </insert>
+  <!-- ontology.rs:1432-1449 nearest_relation_type_ids 逐字（向量以文本形态传） -->
+  <select id="nearestRelationTypeIds" resultType="java.util.UUID">
+    SELECT id FROM relation_types
+     WHERE kb_id = #{kbId} AND embedding IS NOT NULL
+       AND (#{onlyKind}::text IS NULL OR kind = #{onlyKind})
+     ORDER BY embedding &lt;=&gt; #{vector}::vector
+     LIMIT #{limit}
+  </select>
+
+  <!-- ontology.rs:1461-1471 has_relation_type_vectors 逐字 -->
+  <select id="hasRelationTypeVectors" resultType="boolean">
+    SELECT EXISTS (SELECT 1 FROM relation_types
+                    WHERE kb_id = #{kbId} AND embedding IS NOT NULL
+                      AND (#{onlyKind}::text IS NULL OR kind = #{onlyKind}))
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- 本体向量（ontology.rs:1078-1297；M3 任务 10 随 embed_ontology job 落地）。
+       判陈在 Java 侧用生成原文的同一个函数（embedText）比（#672），不在 SQL 里
+       用 btrim 重拼——trim 与 btrim 去的字符集不一样，schema.org 的描述结尾
+       "\n      " 会让 SQL 拼出来的永远不等，于是每轮都判成陈的。 -->
+
+  <resultMap id="storedEmbedding" type="tech.seexun.jknow.store.mapper.OntologyMapper$StoredEmbedding">
+    <constructor>
+      <arg column="id" javaType="java.util.UUID"/>
+      <arg column="label" javaType="java.lang.String"/>
+      <arg column="description" javaType="java.lang.String"/>
+      <arg column="embedded" javaType="_boolean"/>
+      <arg column="embedded_model" javaType="java.lang.String"/>
+      <arg column="embedded_text" javaType="java.lang.String"/>
+      <arg column="label_embedded" javaType="_boolean"/>
+      <arg column="label_embedded_model" javaType="java.lang.String"/>
+      <arg column="label_embedded_text" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <!-- ontology.rs:1139-1148 逐字：类的两份向量现状（整段 + 只有 label 那份）。 -->
+  <select id="selectEntityTypeEmbeddingRows" resultMap="storedEmbedding">
+    SELECT id, label, coalesce(description, '') AS description,
+           embedding IS NOT NULL AS embedded, embedded_model, embedded_text,
+           label_embedding IS NOT NULL AS label_embedded, label_embedded_model, label_embedded_text
+      FROM entity_types
+     WHERE kb_id = #{kbId}
+  </select>
+
+  <!-- ontology.rs:1204-1214 逐字：关系/属性现状（label 三列补空）；名字属性不嵌（0041）。 -->
+  <select id="selectRelationTypeEmbeddingRows" resultMap="storedEmbedding">
+    SELECT id, label, coalesce(description, '') AS description,
+           embedding IS NOT NULL AS embedded, embedded_model, embedded_text,
+           false AS label_embedded, NULL::text AS label_embedded_model,
+           NULL::text AS label_embedded_text
+      FROM relation_types
+     WHERE kb_id = #{kbId} AND NOT (builtin AND key = 'known_as')
+  </select>
+
+  <!-- ontology.rs:1284-1293（set_type_embeddings）逐字：向量连同「嵌的是哪段字、用的哪个
+       模型」同一次写入——只写向量不写来源，下一轮就会认为它还是陈的，从此每轮重嵌。
+       Rust 侧 table/列名动态拼，Java 拆成三条固定语句，文本一一对应。 -->
+  <update id="updateEntityTypeEmbeddingFull">
+    UPDATE entity_types SET embedding = #{vector}::vector, embedded_text = #{text}, embedded_model = #{model}
+     WHERE id = #{id}
+  </update>
+
+  <update id="updateEntityTypeEmbeddingLabel">
+    UPDATE entity_types SET label_embedding = #{vector}::vector, label_embedded_text = #{text}, label_embedded_model = #{model}
+     WHERE id = #{id}
+  </update>
+
+  <update id="updateRelationTypeEmbeddingFull">
+    UPDATE relation_types SET embedding = #{vector}::vector, embedded_text = #{text}, embedded_model = #{model}
+     WHERE id = #{id}
+  </update>
+
+  <!-- ontology.rs:1913-1920 ancestors_of 逐字：递归项里 UNION 去重，菱形继承不会把
+       同一个祖先展开两次。空输入在服务层短路（不扫全表）。 -->
+  <select id="selectAncestorsOf" resultType="java.util.UUID">
+    WITH RECURSIVE up(id) AS (
+         SELECT unnest(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[])
+         UNION
+         SELECT p.parent_id FROM entity_type_parents p JOIN up ON p.child_id = up.id
+     )
+     SELECT id FROM up WHERE id &lt;&gt; ALL(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[])
+  </select>
+
+  <!-- ontology.rs:2043-2047 uncovered 逐字：没绑上的（判成 none 的和两票不一致的）都算。 -->
+  <resultMap id="uncovered" type="tech.seexun.jknow.store.mapper.OntologyMapper$Uncovered">
+    <constructor>
+      <arg column="kind_words" javaType="_long"/>
+      <arg column="phrases" javaType="_long"/>
+    </constructor>
+  </resultMap>
+  <select id="selectUncovered" resultMap="uncovered">
+    SELECT (SELECT count(*) FROM type_bindings
+              WHERE kb_id = #{kbId} AND status &lt;&gt; 'bound') AS kind_words,
+            (SELECT count(*) FROM phrase_bindings
+              WHERE kb_id = #{kbId} AND status &lt;&gt; 'bound') AS phrases
+  </select>
+
+  <!-- ==================== 本体扩展读族（M4 任务 6；ontology.rs 逐字） ==================== -->
+
+  <!-- ontology.rs:1863-1870 open_proposals：还等着人看的提案，新的排前面。 -->
+  <resultMap id="storedProposal"
+             type="tech.seexun.jknow.store.mapper.OntologyMapper$StoredProposalRow">
+    <constructor>
+      <arg column="section" javaType="java.lang.String"/>
+      <arg column="key" javaType="java.lang.String"/>
+      <arg column="payload" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="proposed_by" javaType="java.lang.String"/>
+      <arg column="serves" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler"/>
+      <arg column="signatures" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+    </constructor>
+  </resultMap>
+  <select id="selectOpenProposals" resultMap="storedProposal">
+    SELECT section, key, payload, proposed_by, serves, signatures FROM ontology_proposals
+    WHERE kb_id = #{kbId} AND status = 'open'
+    ORDER BY created_at DESC, key
+  </select>
+
+  <!-- ontology.rs:1063-1073 list_imports：导入历史（带导入人显示名；删号后为 NULL）。 -->
+  <resultMap id="ontologyImport"
+             type="tech.seexun.jknow.store.mapper.OntologyMapper$ImportViewRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="filename" javaType="java.lang.String"/>
+      <arg column="format" javaType="java.lang.String"/>
+      <arg column="byte_size" javaType="_long"/>
+      <arg column="summary" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="imported_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="imported_by_name" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+  <select id="selectOntologyImports" resultMap="ontologyImport">
+    SELECT i.id, i.filename, i.format, i.byte_size, i.summary, i.imported_at,
+           u.display_name AS imported_by_name
+    FROM ontology_imports i
+    LEFT JOIN users u ON u.id = i.imported_by
+    WHERE i.kb_id = #{kbId} ORDER BY i.imported_at DESC LIMIT 50
+  </select>
+
+  <!-- ontology.rs:2053-2062 agent_proposal_report：代理提案的四格计数（changed_share 的
+       分子分母由服务层按 Rust 同式聚合）。 -->
+  <resultMap id="agentProposalReport"
+             type="tech.seexun.jknow.store.mapper.OntologyMapper$AgentProposalReportRow">
+    <constructor>
+      <arg column="open" javaType="_long"/>
+      <arg column="adopted" javaType="_long"/>
+      <arg column="adopted_edited" javaType="_long"/>
+      <arg column="rejected" javaType="_long"/>
+    </constructor>
+  </resultMap>
+  <select id="selectAgentProposalReport" resultMap="agentProposalReport">
+    SELECT count(*) FILTER (WHERE status = 'open') AS open,
+           count(*) FILTER (WHERE status = 'adopted') AS adopted,
+           count(*) FILTER (WHERE status = 'adopted' AND edited) AS adopted_edited,
+           count(*) FILTER (WHERE status = 'rejected') AS rejected
+      FROM ontology_proposals WHERE kb_id = #{kbId} AND proposed_by = 'agent'
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- M5 任务 5：OWL 导入写路径（owl_import.rs 依赖的 ontology.rs store 面）与
+       本体代理提案写面。批量 UNNEST 的存在理由是 fsync：逐条 execute 各自提交，
+       schema.org 量级（968 类 + ~1500 属性）是五千次 fsync——实测 45 秒；同样行数
+       放进一条语句 536 毫秒。差的不是往返，是提交。 -->
+
+  <!-- owl_import.rs:188-199 现有本体索引（类）。 -->
+  <select id="selectEntityTypesWithIri"
+          resultType="tech.seexun.jknow.store.mapper.OntologyMapper$IdKeyIri">
+    SELECT id, key, iri FROM entity_types WHERE kb_id = #{kbId} ORDER BY key
+  </select>
+
+  <!-- owl_import.rs:188-199 现有本体索引（关系/属性）。 -->
+  <select id="selectRelationTypesWithIri"
+          resultType="tech.seexun.jknow.store.mapper.OntologyMapper$IdKeyIri">
+    SELECT id, key, iri FROM relation_types WHERE kb_id = #{kbId} ORDER BY key
+  </select>
+
+  <!-- ontology.rs:1487-1558 create_entity_types_bulk 逐字。ON CONFLICT DO NOTHING：
+       撞 key 的处置在计划阶段已经判过了，这里只是把计划落地，撞上说明计划与库
+       不同步，跳过并让调用方从返回的 map 里发现少了谁。颜色/形状在 Java 侧按
+       key/iri 算好跟着 UNNEST 一起进去。 -->
+  <select id="insertEntityTypesBulk" resultMap="idKey">
+    INSERT INTO entity_types (id, kb_id, key, label, color, shape, description, iri)
+    SELECT gen_random_uuid(), #{kbId}, k, l, c, s, d, i
+    FROM UNNEST(#{keys,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler}::text[], #{labels,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler}::text[], #{descs,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler}::text[], #{iris,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler}::text[],
+                #{colors,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler}::text[], #{shapes,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler}::text[])
+         AS t(k, l, d, i, c, s)
+    ON CONFLICT (kb_id, key) DO NOTHING
+    RETURNING id, key
+  </select>
+
+  <!-- ontology.rs:925-950 update_type_from_import 逐字：key 不动（可能已被引用），
+       空描述不覆盖（人按语料调过的那份比空值有价值）。 -->
+  <select id="updateTypeFromImport" resultType="java.util.UUID">
+    UPDATE entity_types
+       SET label = #{label},
+           description = CASE WHEN #{description} = '' THEN description ELSE #{description} END,
+           updated_at = now()
+     WHERE kb_id = #{kbId} AND iri = #{iri} RETURNING id
+  </select>
+
+  <!-- ontology.rs:1413-1426 adopt_iri_onto_key 逐字：形状跟着改（方=词表声明的），
+       颜色不动（颜色是身份）。只在 iri IS NULL 时写——重复导入幂等。 -->
+  <select id="adoptIriOntoKey" resultType="java.util.UUID">
+    UPDATE entity_types SET iri = #{iri}, shape = 'square', updated_at = now()
+     WHERE kb_id = #{kbId} AND key = #{key} AND iri IS NULL
+    RETURNING id
+  </select>
+
+  <!-- ontology.rs:1657-1681 set_parents_bulk 逐字：不查环（环是上游词汇表的问题，
+       单条版对环的处置本来也只是跳过那一条）。 -->
+  <insert id="insertParentsBulk">
+    INSERT INTO entity_type_parents (child_id, parent_id)
+    SELECT c, p FROM UNNEST(#{children,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[], #{parents,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[]) AS x(c, p)
+    WHERE c &lt;&gt; p
+    ON CONFLICT DO NOTHING
+  </insert>
+
+  <!-- ontology.rs:1684-1713 set_disjoint_bulk 逐字：两方向已由投影侧展开，a&lt;&gt;b
+       挡自指（约束是最后一道，过滤在这里防一条脏数据掀翻一整批）。 -->
+  <insert id="insertDisjointBulk">
+    INSERT INTO entity_type_disjoint (kb_id, a_id, b_id)
+    SELECT #{kbId}, x, y FROM UNNEST(#{a,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[], #{b,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[]) AS t(x, y)
+    WHERE x &lt;&gt; y
+    ON CONFLICT DO NOTHING
+  </insert>
+
+  <!-- ontology.rs:1002-1031 update_relation_from_import 逐字。 -->
+  <select id="updateRelationFromImport" resultType="java.util.UUID">
+    UPDATE relation_types
+       SET label = #{label},
+           description = CASE WHEN #{description} = '' THEN description ELSE #{description} END
+     WHERE kb_id = #{kbId} AND iri = #{iri}
+    RETURNING id
+  </select>
+
+  <delete id="deleteDomainsOf">
+    DELETE FROM relation_type_domains WHERE relation_type_id = #{id}
+  </delete>
+
+  <delete id="deleteRangesOf">
+    DELETE FROM relation_type_ranges WHERE relation_type_id = #{id}
+  </delete>
+
+  <!-- ontology.rs:1624-1655 link_domains_ranges_bulk 逐字：不 DELETE（调用方是
+       刚建出来的新关系，关联表上不可能有旧行）。 -->
+  <insert id="insertDomainsBulk">
+    INSERT INTO relation_type_domains (relation_type_id, entity_type_id)
+    SELECT r, t FROM UNNEST(#{rels,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[], #{types,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[]) AS x(r, t)
+    ON CONFLICT DO NOTHING
+  </insert>
+
+  <insert id="insertRangesBulk">
+    INSERT INTO relation_type_ranges (relation_type_id, entity_type_id)
+    SELECT r, t FROM UNNEST(#{rels,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[], #{types,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[]) AS x(r, t)
+    ON CONFLICT DO NOTHING
+  </insert>
+
+  <!-- ontology.rs:1934-2034 link_property_axioms_bulk 逐字（一支一条语句）。目标
+       IRI 在这个库里找不到就跳过——部分导入是常态。 -->
+  <update id="linkInverseOfBulk">
+    UPDATE relation_types r SET inverse_of = t.id
+      FROM UNNEST(#{src,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler}::text[], #{dst,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler}::text[]) AS p(src, dst)
+      JOIN relation_types t ON t.kb_id = #{kbId} AND t.iri = p.dst
+     WHERE r.kb_id = #{kbId} AND r.iri = p.src AND r.id &lt;&gt; t.id
+  </update>
+
+  <update id="linkSubPropertyOfBulk">
+    UPDATE relation_types r SET sub_property_of = t.id
+      FROM UNNEST(#{src,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler}::text[], #{dst,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler}::text[]) AS p(src, dst)
+      JOIN relation_types t ON t.kb_id = #{kbId} AND t.iri = p.dst
+     WHERE r.kb_id = #{kbId} AND r.iri = p.src AND r.id &lt;&gt; t.id
+  </update>
+
+  <!-- ontology.rs:1033-1061 record_import 逐字。 -->
+  <insert id="insertImport">
+    INSERT INTO ontology_imports
+        (id, kb_id, sha256, filename, format, byte_size, summary, imported_by)
+    VALUES (#{id}, #{kbId}, #{sha256}, #{filename}, #{format}, #{byteSize}, #{summary}, #{actor})
+  </insert>
+
+  <!-- ontology.rs:1778-1805 save_agent_proposals 逐字：WHERE 挡住时 RETURNING 空，
+       只刷 open 的行（决定的还在）。 -->
+  <insert id="upsertAgentProposal">
+    INSERT INTO ontology_proposals
+        (id, kb_id, section, key, payload, proposed_by, serves, signatures)
+    VALUES (#{id}, #{kbId}, #{section}, #{key}, #{payload}, 'agent', #{serves,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}, #{signatures})
+    ON CONFLICT (kb_id, section, key) DO UPDATE
+      SET payload = EXCLUDED.payload, proposed_by = 'agent',
+          serves = EXCLUDED.serves, signatures = EXCLUDED.signatures,
+          created_at = now()
+    WHERE ontology_proposals.status = 'open'
+  </insert>
+
+  <!-- ontology.rs:1808-1816 signatures_already_proposed 逐字。 -->
+  <select id="selectAgentProposalSignatures" resultType="com.fasterxml.jackson.databind.JsonNode">
+    SELECT signatures FROM ontology_proposals WHERE kb_id = #{kbId} AND proposed_by = 'agent'
+  </select>
+
+  <!-- ontology.rs:1829-1843 open_proposal 逐字。 -->
+  <select id="selectOpenProposal" resultMap="storedProposal">
+    SELECT section, key, payload, proposed_by, serves, signatures FROM ontology_proposals
+    WHERE kb_id = #{kbId} AND section = #{section} AND key = #{key} AND status = 'open'
+  </select>
+
+  <!-- ontology.rs:1879-1898 decide_proposal 逐字：改状态不删行。 -->
+  <update id="decideProposal">
+    UPDATE ontology_proposals
+       SET status = #{status}, decided_by = #{actor}, decided_at = now()
+     WHERE kb_id = #{kbId} AND section = #{section} AND key = #{key} AND status = 'open'
+  </update>
+
+  <!-- ontology.rs:1821-1843 reject_proposal 逐字（比 decide 多写 reason）。 -->
+  <update id="rejectProposal">
+    UPDATE ontology_proposals
+       SET status = 'rejected', reason = #{reason}, decided_by = #{actor}, decided_at = now()
+     WHERE kb_id = #{kbId} AND section = #{section} AND key = #{key} AND status = 'open'
+  </update>
+
+  <update id="markProposalEdited">
+    UPDATE ontology_proposals SET edited = TRUE
+     WHERE kb_id = #{kbId} AND section = #{section} AND key = #{key}
+  </update>
+
+  <!-- agent_reviews.rs:22-28 list 逐字。 -->
+  <select id="selectAgentReviews"
+          resultType="tech.seexun.jknow.store.mapper.OntologyMapper$AgentReviewRow">
+    SELECT kind, shape, outcome, target, basis FROM ontology_agent_reviews WHERE kb_id = #{kbId}
+  </select>
+
+  <!-- agent_reviews.rs:31-45 record 逐字：同一形状再看是刷新。 -->
+  <insert id="upsertAgentReview">
+    INSERT INTO ontology_agent_reviews (kb_id, kind, shape, outcome, target, basis)
+    VALUES (#{kbId}, #{kind}, #{shape}, #{outcome}, #{target}, #{basis})
+    ON CONFLICT (kb_id, kind, shape) DO UPDATE
+      SET outcome = EXCLUDED.outcome, target = EXCLUDED.target,
+          basis = EXCLUDED.basis, reviewed_at = now()
+  </insert>
+
+  <!-- ontology.rs:1314-1356 nearest_entity_types 逐字（列名经 ${column} 注入——
+       只有 embedding/label_embedding 两个白名单值，由服务层选）。 -->
+  <select id="selectNearestEntityTypes"
+          resultType="tech.seexun.jknow.store.mapper.OntologyMapper$TypeCandidateRow">
+    SELECT id, key, label, coalesce(description, '') AS description,
+           NULL AS kind, (${column} &lt;=&gt; #{vector}::vector)::float8 AS distance
+    FROM entity_types t
+    WHERE t.kb_id = #{kbId} AND t.${column} IS NOT NULL
+      AND (coalesce(btrim(t.description), '') &lt;&gt; ''
+           OR EXISTS (SELECT 1 FROM entity_type_parents p
+                      WHERE p.child_id = t.id OR p.parent_id = t.id))
+    ORDER BY ${column} &lt;=&gt; #{vector}::vector
+    LIMIT #{limit}
+  </select>
+
+  <!-- ontology.rs:1360-1390 nearest_relation_types 的整行版（词表近邻要 label/描述）。 -->
+  <select id="selectNearestRelationTypes"
+          resultType="tech.seexun.jknow.store.mapper.OntologyMapper$TypeCandidateRow">
+    SELECT id, key, label, coalesce(description, '') AS description, kind,
+           (embedding &lt;=&gt; #{vector}::vector)::float8 AS distance
+    FROM relation_types
+    WHERE kb_id = #{kbId} AND embedding IS NOT NULL
+      AND (#{onlyKind}::text IS NULL OR kind = #{onlyKind})
+    ORDER BY embedding &lt;=&gt; #{vector}::vector
+    LIMIT #{limit}
+  </select>
+</mapper>

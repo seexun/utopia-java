@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  来源域 SQL（逐字搬迁自旧仓库 utopia-0.1.0-rc9/crates/utopia-store/src/sources.rs，
+  引文另注 rss_full_content.rs / alerts.rs——行号以旧仓库 main 为准）。
+  铁律同 M1/任务 3：占位符 $1..$n 改写 #{param} 外 token 流一字不动，每条注明 file:line。
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.SourcesMapper">
+
+  <resultMap id="sourceRow" type="tech.seexun.jknow.store.entity.SourceRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="kb_id" javaType="java.util.UUID"/>
+      <arg column="kind" javaType="java.lang.String"/>
+      <arg column="name" javaType="java.lang.String"/>
+      <arg column="config" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="icon" javaType="java.lang.String"/>
+      <arg column="sync_interval_minutes" javaType="java.lang.Integer"/>
+      <arg column="sync_cron" javaType="java.lang.String"/>
+      <arg column="last_sync_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="last_sync_status" javaType="java.lang.String"/>
+      <arg column="last_sync_error" javaType="java.lang.String"/>
+      <arg column="last_sync_added" javaType="_int"/>
+      <arg column="ingest_token" javaType="java.lang.String"/>
+      <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="sourceView" type="tech.seexun.jknow.store.entity.SourceView">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="kind" javaType="java.lang.String"/>
+      <arg column="name" javaType="java.lang.String"/>
+      <arg column="config" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="icon" javaType="java.lang.String"/>
+      <arg column="sync_interval_minutes" javaType="java.lang.Integer"/>
+      <arg column="sync_cron" javaType="java.lang.String"/>
+      <arg column="last_sync_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="last_sync_status" javaType="java.lang.String"/>
+      <arg column="last_sync_error" javaType="java.lang.String"/>
+      <arg column="last_sync_added" javaType="_int"/>
+      <arg column="doc_count" javaType="_long"/>
+      <arg column="missing_count" javaType="_long"/>
+      <arg column="rss_full_content" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="syncRunView" type="tech.seexun.jknow.store.entity.SyncRunView">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="started_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="finished_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="status" javaType="java.lang.String"/>
+      <arg column="created_docs" javaType="_int"/>
+      <arg column="updated_docs" javaType="_int"/>
+      <arg column="error" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="syncFinishRow" type="tech.seexun.jknow.store.mapper.SourcesMapper$SyncFinishRow">
+    <constructor>
+      <arg column="kb_id" javaType="java.util.UUID"/>
+      <arg column="name" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <!-- ============ 读（sources.rs:147-159 opened / get） ============ -->
+
+  <!-- sources.rs:154 逐字。出库的封印由 SourcesService.opened 统一开封
+       （sources.rs:147-151：config 凭据键 + ingest_token）。 -->
+  <select id="selectById" resultMap="sourceRow">
+    SELECT * FROM sources WHERE id = #{id}
+  </select>
+
+  <!-- sources.rs:263 逐字：更新事务里的现值行锁。 -->
+  <select id="selectByIdForUpdate" resultMap="sourceRow">
+    SELECT * FROM sources WHERE id = #{id} FOR UPDATE
+  </select>
+
+  <!-- ============ create / update / delete（sources.rs:161-320） ============ -->
+
+  <!-- sources.rs:202-204 逐字（RETURNING *）。 -->
+  <select id="insertSource" resultMap="sourceRow">
+    INSERT INTO sources (id, kb_id, kind, name, config, icon, sync_interval_minutes, sync_cron)
+     VALUES (#{id}, #{kbId}, #{kind}, #{name}, #{config}, #{icon}, #{syncIntervalMinutes}, #{syncCron})
+     RETURNING *
+  </select>
+
+  <!-- sources.rs:285-291 逐字：keep_secrets 合并与 config 规范化在服务层做，SQL 只认
+       「COALESCE 覆盖 + schedule 两列同开关 CASE WHEN $5」——schedule 字段出现即整体覆盖
+       （interval 与 cron 互斥；两者皆 null = 关闭定时）。 -->
+  <select id="updateSource" resultMap="sourceRow">
+    UPDATE sources SET
+        name = COALESCE(#{name}, name),
+        config = COALESCE(#{config}, config),
+        icon = COALESCE(#{icon}, icon),
+        sync_interval_minutes = CASE WHEN #{scheduleTouched} THEN #{syncIntervalMinutes} ELSE sync_interval_minutes END,
+        sync_cron = CASE WHEN #{scheduleTouched} THEN #{syncCron} ELSE sync_cron END
+     WHERE id = #{id} RETURNING *
+  </select>
+
+  <!-- sources.rs:312 逐字：其文档保留（source_id 置 NULL，落回 Uploads 组）。 -->
+  <delete id="deleteSource">
+    DELETE FROM sources WHERE id = #{id}
+  </delete>
+
+  <!-- ============ list（sources.rs:83-143；凭据键剔除 Java 侧等价） ============ -->
+
+  <!-- sources.rs:89-135 逐字（format! 的 {} 处内联 rss_full_content.rs:237-267 ENTRY_SELECT）。
+       **唯一偏差**：Rust 的 `listed_source.config - $2::text[]`（SQL 侧剔凭据键）在 Java 侧
+       等价实现——列表查出原始 config 后由 SourcesService 剔除 SOURCE_SECRET_KEYS（键集同
+       SourceSecretKeys.KEYS，剔除是整键删除，开封与否结果相同；列表本就不该碰密文）。
+       外层别名 listed_source 不能与 ENTRY_SELECT 的来源别名重名；来源和当前代谓词必须留在
+       投影内部，否则 PostgreSQL 会先计算部署中的全部 observation，再丢弃与当前来源无关的行。
+       rss_full_content 块（0026 / #417）：不是 RSS 的来源这一格就是 NULL——「不适用」在块
+       之外写作 NULL，计数在块里 COALESCE 成 0（这时候它真是「这一档现在没有」）。 -->
+  <select id="selectViewsForKb" resultMap="sourceView">
+    SELECT listed_source.id, listed_source.kind, listed_source.name,
+           listed_source.config AS config, listed_source.icon,
+           listed_source.sync_interval_minutes, listed_source.sync_cron,
+           listed_source.last_sync_at, listed_source.last_sync_status,
+           listed_source.last_sync_error, listed_source.last_sync_added,
+           (SELECT count(*) FROM documents d
+            WHERE d.source_id = listed_source.id AND d.deleted_at IS NULL) AS doc_count,
+           (SELECT count(*) FROM documents d
+            WHERE d.source_id = listed_source.id AND d.missing_since IS NOT NULL
+              AND d.deleted_at IS NULL) AS missing_count,
+           CASE WHEN listed_source.kind = 'rss' THEN jsonb_build_object(
+               'state', CASE
+                   WHEN listed_source.config->>'content_mode' IS DISTINCT FROM 'full_new_items'
+                       THEN 'disabled'
+                   WHEN listed_source.rss_baselined_at IS NULL THEN 'pending'
+                   ELSE 'active' END,
+               'pending', COALESCE(hydration.pending, 0),
+               'queued', COALESCE(hydration.queued, 0),
+               'retrying', COALESCE(hydration.retrying, 0),
+               'complete', COALESCE(hydration.complete, 0),
+               'terminal', COALESCE(hydration.terminal, 0)
+           ) END AS rss_full_content
+    FROM sources listed_source
+    LEFT JOIN LATERAL (
+        SELECT
+            (count(*) FILTER (WHERE projected.state = 'baseline'))::int AS baseline_count,
+            count(*) FILTER (WHERE projected.state = 'pending') AS pending,
+            count(*) FILTER (WHERE projected.state IN ('queued', 'hydrating')) AS queued,
+            count(*) FILTER (WHERE projected.state = 'retry_wait') AS retrying,
+            count(*) FILTER (WHERE projected.state = 'complete') AS complete,
+            count(*) FILTER (WHERE projected.state IN ('terminal', 'deleted', 'superseded')) AS terminal
+        FROM (
+            SELECT e.id, e.source_id, e.activation_generation, e.external_key, e.title,
+             e.article_url, e.summary, e.embedded_html, e.doc_time,
+             CASE
+             WHEN s.rss_generation &lt;&gt; e.activation_generation OR s.config->>'content_mode' IS DISTINCT FROM 'full_new_items' THEN 'superseded'
+             WHEN e.entry_kind='baseline' THEN 'baseline'
+             WHEN d.id IS NOT NULL AND d.deleted_at IS NULL THEN 'complete'
+             WHEN EXISTS (SELECT 1 FROM document_deletions dd JOIN documents old ON old.id=dd.document_id
+               WHERE old.source_id=e.source_id AND dd.external_key=e.external_key
+               AND GREATEST(dd.created_at,old.purged_at)>=COALESCE((j.payload->>'observed_at')::timestamptz,e.observed_at)) THEN 'deleted'
+             WHEN e.entry_kind='no_source' THEN 'terminal'
+             WHEN j.status='running' THEN 'hydrating'
+             WHEN j.status='queued' AND j.attempts>0 THEN 'retry_wait'
+             WHEN j.status='queued' THEN 'queued'
+             WHEN j.status='failed' THEN 'terminal'
+             WHEN j.status='done' THEN 'superseded'
+             ELSE 'pending' END AS state,
+             e.current_job_id AS hydration_job_id, COALESCE(j.attempts,0) AS attempt_count,
+             d.id AS document_id,
+             CASE WHEN d.id IS NOT NULL AND d.deleted_at IS NULL THEN NULL
+                  WHEN e.entry_kind='no_source' THEN 'no_usable_content_source'
+                  WHEN j.status='failed' THEN 'acquisition_failed' END AS error_code,
+             CASE WHEN d.id IS NOT NULL AND d.deleted_at IS NULL THEN NULL
+                  WHEN e.entry_kind='no_source' THEN 'No usable content source was observed'
+                  WHEN j.status='failed' THEN 'Full-content acquisition failed; retry is available' END AS error_detail,
+             e.first_seen_at, GREATEST(e.updated_at,j.updated_at,d.updated_at) AS updated_at,
+             CASE WHEN j.status='done' AND d.deleted_at IS NULL THEN j.updated_at END AS completed_at
+            FROM rss_full_content_entries e JOIN sources s ON s.id=e.source_id
+            LEFT JOIN jobs j ON j.id=e.current_job_id
+            LEFT JOIN documents d ON d.source_id=e.source_id AND d.external_key=e.external_key AND d.purged_at IS NULL
+            WHERE listed_source.kind = 'rss'
+              AND e.source_id = listed_source.id
+              AND e.activation_generation = listed_source.rss_generation
+        ) projected
+    ) hydration ON listed_source.kind = 'rss'
+    WHERE listed_source.kb_id = #{kbId} ORDER BY listed_source.created_at
+  </select>
+
+  <!-- ============ 推送密钥（sources.rs:222-233） ============ -->
+
+  <!-- sources.rs:224 逐字：封印后的密文由调用方传入（set 时 seal，读时 open）。 -->
+  <update id="setIngestToken">
+    UPDATE sources SET ingest_token = #{token} WHERE id = #{id}
+  </update>
+
+  <!-- ============ 调度（sources.rs:322-364/421-429） ============ -->
+
+  <!-- sources.rs:326-331 逐字（调度器 60s tick）：interval 型在 SQL 里判定到期；
+       cron 型取回后由服务层求下一次触发时刻再过滤（基准=上次同步时刻，没同步过取创建时刻）。 -->
+  <select id="selectDueSources" resultMap="sourceRow">
+    SELECT * FROM sources
+     WHERE last_sync_status NOT IN ('queued', 'running')
+       AND ((sync_interval_minutes IS NOT NULL
+             AND (last_sync_at IS NULL
+                  OR last_sync_at + make_interval(mins => sync_interval_minutes) &lt;= now()))
+            OR sync_cron IS NOT NULL)
+  </select>
+
+  <!-- sources.rs:357-359 逐字：幂等标记（已在队列/运行中则 0 行，避免重复入队）。 -->
+  <update id="markQueued">
+    UPDATE sources SET last_sync_status = 'queued'
+     WHERE id = #{id} AND last_sync_status NOT IN ('queued', 'running')
+  </update>
+
+  <!-- sources.rs:367 逐字。 -->
+  <update id="markRunning">
+    UPDATE sources SET last_sync_status = 'running' WHERE id = #{id}
+  </update>
+
+  <!-- sources.rs:385-388 逐字：一次同步收尾（失败记告警由服务层跟 sources.rs:402-418
+       alerts::raise——「现在好了没有」不是告警中心该回答的问题，成功时什么都不做）。 -->
+  <select id="finishSync" resultMap="syncFinishRow">
+    UPDATE sources SET last_sync_status = #{status}, last_sync_error = #{error},
+            last_sync_added = #{added}, last_sync_at = now()
+     WHERE id = #{id}
+     RETURNING kb_id, name
+  </select>
+
+  <!-- sources.rs:423 逐字。 -->
+  <update id="touchSyncTime">
+    UPDATE sources SET last_sync_at = #{at} WHERE id = #{id}
+  </update>
+
+  <!-- ============ 运行记录（sources.rs:437-502；每源修剪 50 条） ============ -->
+
+  <!-- sources.rs:441-443 逐字。 -->
+  <select id="selectLastSuccessfulSyncStart" resultType="java.time.OffsetDateTime">
+    SELECT max(started_at) FROM source_sync_runs WHERE source_id = #{sourceId} AND status = 'ok'
+  </select>
+
+  <!-- sources.rs:451 逐字。 -->
+  <insert id="startRun">
+    INSERT INTO source_sync_runs (id, source_id) VALUES (#{id}, #{sourceId})
+  </insert>
+
+  <!-- sources.rs:467-473 逐字。 -->
+  <update id="finishRun">
+    UPDATE source_sync_runs SET finished_at = now(), status = #{status}, error = #{error},
+            created_docs = #{createdDocs}, updated_docs = #{updatedDocs}
+     WHERE id = #{id}
+  </update>
+
+  <!-- sources.rs:480-484 逐字：每来源只留最近 50 条（finish_run 收尾）。 -->
+  <delete id="trimRuns">
+    DELETE FROM source_sync_runs WHERE source_id = #{sourceId} AND id NOT IN
+     (SELECT id FROM source_sync_runs WHERE source_id = #{sourceId}
+      ORDER BY started_at DESC LIMIT 50)
+  </delete>
+
+  <!-- sources.rs:492-495 逐字。 -->
+  <select id="selectRuns" resultMap="syncRunView">
+    SELECT id, started_at, finished_at, status, created_docs, updated_docs, error
+     FROM source_sync_runs WHERE source_id = #{sourceId}
+     ORDER BY started_at DESC LIMIT #{limit}
+  </select>
+
+  <!-- ============ 告警（alerts.rs:89-108 raise 的 INSERT） ============ -->
+
+  <!-- alerts.rs:93-100 逐字（VALUES 列序照搬）：SOURCE_SYNC_FAILED（kind='source.sync_failed'）
+       内容类给 editor 不只给 admin——配这个源的人更需要知道你的东西没进来；
+       名字存一份：源被删之后 subject_id 解析不出名字，而告警该留得住。 -->
+  <insert id="insertAlert">
+    INSERT INTO alerts
+        (id, kb_id, severity, kind, min_role, subject_type, subject_id, detail)
+     VALUES (#{id}, #{kbId}, #{severity}, #{kind}, #{minRole}, #{subjectType}, #{subjectId},
+             #{detail})
+  </insert>
+
+  <!-- ============ RSS 全文补全的代际开关（rss_full_content.rs:175-194） ============ -->
+
+  <!-- rss_full_content.rs:179 逐字：建源即开第一代。 -->
+  <update id="initializeRssGeneration">
+    UPDATE sources SET rss_generation = 1 WHERE id=#{id} AND rss_generation=0
+  </update>
+
+  <!-- rss_full_content.rs:187 逐字：feed_url 换了重新发现（代际自增、基线清空）。 -->
+  <update id="advanceRssGeneration">
+    UPDATE sources SET rss_generation=rss_generation+1, rss_baselined_at=NULL WHERE id=#{id}
+  </update>
+</mapper>

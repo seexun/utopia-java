@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  工作区 LLM 设置写 SQL（逐字搬迁自旧仓库 utopia-0.1.0-rc9/crates/utopia-store/src/settings.rs）。
+  铁律：占位符 $1..$n 改写 #{param} 外 token 流一字不动，每条注明 file:line。
+  api_key 参数是封印后的值（Service 先 seal）；返回行同样带封印串，Service 再 open。
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.SettingsMapper">
+
+  <!-- SELECT * 的列集/序复用 WorkspaceMapper.llmSettings（同一张表同一 FromRow 语义） -->
+  <select id="upsert" resultMap="tech.seexun.jknow.store.mapper.WorkspaceMapper.llmSettings">
+    INSERT INTO llm_settings
+         (workspace_id, chat_base_url, chat_api_key, chat_model,
+          embed_base_url, embed_api_key, embed_model, embed_dim, updated_at)
+     VALUES (#{workspaceId}, #{chatBaseUrl}, #{chatApiKey}, #{chatModel},
+          #{embedBaseUrl}, #{embedApiKey}, #{embedModel}, #{embedDim}, now())
+     ON CONFLICT (workspace_id) DO UPDATE SET
+         chat_base_url  = EXCLUDED.chat_base_url,
+         chat_api_key   = COALESCE(EXCLUDED.chat_api_key, llm_settings.chat_api_key),
+         chat_model     = EXCLUDED.chat_model,
+         embed_base_url = EXCLUDED.embed_base_url,
+         embed_api_key  = COALESCE(EXCLUDED.embed_api_key, llm_settings.embed_api_key),
+         embed_model    = EXCLUDED.embed_model,
+         embed_dim      = EXCLUDED.embed_dim,
+         updated_at     = now()
+     RETURNING *
+  </select>
+
+  <!-- settings.rs:78-84（set_chat_reasoning_effort）。 -->
+  <update id="setChatReasoningEffort">
+    UPDATE llm_settings SET chat_reasoning_effort = #{effort}, updated_at = now()
+     WHERE workspace_id = #{workspaceId}
+  </update>
+
+  <!-- settings.rs:105-119（upsert_ocr）。ocr_api_key 的 CASE：换供应商不保留旧密钥；
+       ocr_model 的 CASE：老客户端不传 provider 时保留未传的模型（$2 IS NULL 分支）。 -->
+  <select id="upsertOcr" resultMap="tech.seexun.jknow.store.mapper.WorkspaceMapper.llmSettings">
+    INSERT INTO llm_settings
+         (workspace_id, ocr_provider, ocr_base_url, ocr_api_key, ocr_backend, ocr_model, updated_at)
+     VALUES (#{workspaceId}, COALESCE(#{provider}, 'mineru'), #{baseUrl}, #{apiKey}, #{backend}, #{model}, now())
+     ON CONFLICT (workspace_id) DO UPDATE SET
+         ocr_provider = COALESCE(#{provider}, llm_settings.ocr_provider),
+         ocr_base_url = EXCLUDED.ocr_base_url,
+         ocr_api_key  = CASE WHEN COALESCE(#{provider}, llm_settings.ocr_provider) &lt;&gt; llm_settings.ocr_provider
+                             THEN EXCLUDED.ocr_api_key
+                             ELSE COALESCE(EXCLUDED.ocr_api_key, llm_settings.ocr_api_key) END,
+         ocr_backend  = EXCLUDED.ocr_backend,
+         ocr_model    = CASE WHEN #{provider}::text IS NULL THEN COALESCE(#{model}, llm_settings.ocr_model)
+                             ELSE EXCLUDED.ocr_model END,
+         updated_at   = now()
+     RETURNING *
+  </select>
+
+  <!-- settings.rs:141-154（upsert_transcribe）。 -->
+  <select id="upsertTranscribe" resultMap="tech.seexun.jknow.store.mapper.WorkspaceMapper.llmSettings">
+    INSERT INTO llm_settings
+         (workspace_id, transcribe_base_url, transcribe_api_key, transcribe_model, updated_at)
+     VALUES (#{workspaceId}, #{baseUrl}, #{apiKey}, #{model}, now())
+     ON CONFLICT (workspace_id) DO UPDATE SET
+         transcribe_base_url = EXCLUDED.transcribe_base_url,
+         transcribe_api_key  = COALESCE(EXCLUDED.transcribe_api_key, llm_settings.transcribe_api_key),
+         transcribe_model    = EXCLUDED.transcribe_model,
+         updated_at          = now()
+     RETURNING *
+  </select>
+</mapper>

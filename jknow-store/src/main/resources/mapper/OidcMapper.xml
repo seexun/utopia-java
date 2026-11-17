@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 单点登录 SQL（逐字搬迁自旧仓库 crates/utopia-server/src/api/oidc_routes.rs；表来自迁移
+     0056（oidc_identities/oidc_flows）与 0103（oidc_exchanges），两侧同库同 schema）。 -->
+<mapper namespace="tech.seexun.jknow.store.mapper.OidcMapper">
+
+  <!-- oidc_routes.rs:328-330（半途弃单扫除） -->
+  <delete id="deleteExpiredFlows">
+    DELETE FROM oidc_flows WHERE expires_at &lt; now()
+  </delete>
+
+  <!-- oidc_routes.rs:331-333（在途计数） -->
+  <select id="countFlows" resultType="_long">
+    SELECT count(*) FROM oidc_flows
+  </select>
+
+  <!-- oidc_routes.rs:343-353（流程状态落库；link_user_id 空=登录流程，非空=绑定流程） -->
+  <insert id="insertFlow">
+    INSERT INTO oidc_flows (state, nonce, verifier, link_user_id, expires_at)
+         VALUES (#{state}, #{nonce}, #{verifier}, #{linkUserId}, now() + make_interval(secs => #{ttlSeconds}))
+  </insert>
+
+  <!-- oidc_routes.rs:630-636（一次性消费：DELETE...RETURNING 以 select 元素承载，
+       语义=「读过即作废」，并发回调只有一个能拿到行） -->
+  <resultMap id="flowRow" type="tech.seexun.jknow.store.mapper.OidcMapper$FlowRow">
+    <constructor>
+      <arg column="nonce" javaType="java.lang.String"/>
+      <arg column="verifier" javaType="java.lang.String"/>
+      <arg column="link_user_id" javaType="java.util.UUID"/>
+    </constructor>
+  </resultMap>
+  <select id="consumeFlow" resultMap="flowRow">
+    DELETE FROM oidc_flows WHERE state = #{state} AND expires_at &gt; now()
+         RETURNING nonce, verifier, link_user_id
+  </select>
+
+  <!-- oidc_routes.rs:719-725 -->
+  <select id="selectIdentityHolder" resultType="java.util.UUID">
+    SELECT user_id FROM oidc_identities WHERE issuer = #{issuer} AND subject = #{subject}
+  </select>
+
+  <!-- oidc_routes.rs:732-737（PK(issuer,subject)/UNIQUE(issuer,user_id) 撞车由调用方分诊） -->
+  <insert id="insertIdentity">
+    INSERT INTO oidc_identities (issuer, subject, user_id) VALUES (#{issuer}, #{subject}, #{userId})
+  </insert>
+
+  <!-- oidc_routes.rs:527-534 / 692-699（登录/换会话共用的映射查询：只认本人绑定+在职账号。
+       绝不按 email 关联、绝不自动开户——那是让身份提供方的一个字段决定「这是哪个账号」） -->
+  <select id="selectLinkedActiveUser" resultType="java.util.UUID">
+    SELECT i.user_id FROM oidc_identities i JOIN users u ON u.id = i.user_id
+      WHERE i.issuer = #{issuer} AND i.subject = #{subject} AND u.deactivated_at IS NULL
+  </select>
+
+  <!-- oidc_routes.rs:769-775 -->
+  <select id="selectSubjectForUser" resultType="java.lang.String">
+    SELECT subject FROM oidc_identities WHERE issuer = #{issuer} AND user_id = #{userId}
+  </select>
+
+  <!-- oidc_routes.rs:784-788 -->
+  <delete id="deleteIdentityForUser">
+    DELETE FROM oidc_identities WHERE issuer = #{issuer} AND user_id = #{userId}
+  </delete>
+
+  <!-- oidc_routes.rs:813-821（管理员视角的绑定列表：user_id/subject/email，按 email 排序） -->
+  <select id="selectIdentities" resultType="java.lang.String">
+    SELECT jsonb_build_object('user_id', i.user_id, 'subject', i.subject, 'email', u.email)::text
+           FROM oidc_identities i JOIN users u ON u.id = i.user_id
+          WHERE i.issuer = #{issuer} AND u.org_id = #{orgId} ORDER BY u.email
+  </select>
+
+  <!-- oidc_routes.rs:838-846（管理员解绑限本组织成员） -->
+  <delete id="deleteIdentityInOrg">
+    DELETE FROM oidc_identities WHERE issuer = #{issuer} AND user_id = #{userId}
+          AND user_id IN (SELECT id FROM users WHERE org_id = #{orgId})
+  </delete>
+
+  <!-- oidc_routes.rs:504-506（一次性记账的过期扫除：行只活到令牌本身不再被接受的那一刻） -->
+  <delete id="deleteExpiredExchanges">
+    DELETE FROM oidc_exchanges WHERE expires_at &lt; now()
+  </delete>
+
+  <!-- oidc_routes.rs:508-520（token 的 SHA-256 hex；ON CONFLICT DO NOTHING → 0 行=换过了） -->
+  <insert id="insertExchange">
+    INSERT INTO oidc_exchanges (token_hash, expires_at) VALUES (#{tokenHash}, to_timestamp(#{expiresAtSeconds}))
+         ON CONFLICT DO NOTHING
+  </insert>
+</mapper>

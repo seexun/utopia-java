@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  审核队列写面编排快照 SQL（逐字搬迁自旧仓库 utopia-0.1.0-rc9/crates/utopia-server/src/
+  api/review_routes.rs 的路由内联 SQL；铁律：占位符 $1..$n 改写 #{param}（多处出现同名）
+  外 token 流一字不动，每条注明 file:line）。Rust 侧这些查询写在路由文件里（:27-1200
+  一带），Java 归 mapper——语义等价点只有 manual_merge 的单列拼串照抄、拆在 Java 侧。
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.ReviewWriteMapper">
+
+  <resultMap id="factSnapshotRow" type="tech.seexun.jknow.store.mapper.ReviewWriteMapper$FactSnapshotRow">
+    <constructor>
+      <arg column="subject" javaType="java.lang.String"/>
+      <arg column="predicate" javaType="java.lang.String"/>
+      <arg column="object" javaType="java.lang.String"/>
+      <arg column="confidence" javaType="_float"/>
+    </constructor>
+  </resultMap>
+
+  <!-- review_routes.rs:33-48 fact_snapshot：宾语可能是实体或字面值；结构化字面值优先取
+       summary（与队列卡片同一显示口径）。object_value #>> '{}' 把 JSON 折成文本。 -->
+  <select id="selectFactSnapshot" resultMap="factSnapshotRow">
+    SELECT s.canonical_name AS "subject", COALESCE(r.label, fact_surface_predicate(f.id)) AS "predicate",
+           COALESCE(o.canonical_name, f.object_value -&gt;&gt; 'summary',
+                    f.object_value #&gt;&gt; '{}') AS "object", f.confidence AS "confidence"
+     FROM facts f
+     JOIN entities s ON s.id = f.subject_id
+     LEFT JOIN relation_types r ON r.id = f.predicate_id
+     LEFT JOIN entities o ON o.id = f.object_id
+     WHERE f.id = #{factId} AND f.kb_id = #{kbId}
+  </select>
+
+  <resultMap id="decideSnapshotRow" type="tech.seexun.jknow.store.mapper.ReviewWriteMapper$DecideSnapshotRow">
+    <constructor>
+      <arg column="left" javaType="java.lang.String"/>
+      <arg column="right" javaType="java.lang.String"/>
+      <arg column="score" javaType="_float"/>
+    </constructor>
+  </resultMap>
+
+  <!-- review_routes.rs:320-331 decide 的快照：合并之后 source 一侧的名字已经不在原处。 -->
+  <select id="selectDecideSnapshot" resultMap="decideSnapshotRow">
+    SELECT a.canonical_name AS "left", b.canonical_name AS "right", rr.score AS "score"
+     FROM resolution_reviews rr
+     JOIN entities a ON a.id = rr.left_id
+     JOIN entities b ON b.id = rr.right_id
+     WHERE rr.id = #{reviewId} AND rr.kb_id = #{kbId}
+  </select>
+
+  <resultMap id="decideSnapshotWithIdRow" type="tech.seexun.jknow.store.mapper.ReviewWriteMapper$DecideSnapshotWithIdRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="left" javaType="java.lang.String"/>
+      <arg column="right" javaType="java.lang.String"/>
+      <arg column="score" javaType="_float"/>
+    </constructor>
+  </resultMap>
+
+  <!-- review_routes.rs:531-542 batch 的快照（一批）。 -->
+  <select id="selectBatchSnapshots" resultMap="decideSnapshotWithIdRow">
+    SELECT rr.id, a.canonical_name AS "left", b.canonical_name AS "right", rr.score AS "score"
+     FROM resolution_reviews rr
+     JOIN entities a ON a.id = rr.left_id
+     JOIN entities b ON b.id = rr.right_id
+     WHERE rr.kb_id = #{kbId} AND rr.id = ANY(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler})
+  </select>
+
+  <resultMap id="conflictSnapshotRow" type="tech.seexun.jknow.store.mapper.ReviewWriteMapper$ConflictSnapshotRow">
+    <constructor>
+      <arg column="old_subject" javaType="java.lang.String"/>
+      <arg column="old_object" javaType="java.lang.String"/>
+      <arg column="new_subject" javaType="java.lang.String"/>
+      <arg column="new_object" javaType="java.lang.String"/>
+      <arg column="predicate" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <!-- review_routes.rs:248-262 resolve_conflict 的快照：冲突双方三元组（宾语侧可 NULL）。 -->
+  <select id="selectConflictSnapshot" resultMap="conflictSnapshotRow">
+    SELECT os.canonical_name AS "old_subject", oo.canonical_name AS "old_object",
+           ns.canonical_name AS "new_subject", no_.canonical_name AS "new_object",
+           r.label AS "predicate"
+     FROM fact_conflicts c
+     JOIN facts fo ON fo.id = c.old_fact_id
+     JOIN facts fn_ ON fn_.id = c.new_fact_id
+     JOIN entities os ON os.id = fo.subject_id
+     LEFT JOIN entities oo ON oo.id = fo.object_id
+     JOIN entities ns ON ns.id = fn_.subject_id
+     LEFT JOIN entities no_ ON no_.id = fn_.object_id
+     JOIN relation_types r ON r.id = fo.predicate_id
+     WHERE c.id = #{conflictId} AND c.kb_id = #{kbId}
+  </select>
+
+  <resultMap id="mergeSnapshotRow" type="tech.seexun.jknow.store.mapper.ReviewWriteMapper$MergeSnapshotRow">
+    <constructor>
+      <arg column="source" javaType="java.lang.String"/>
+      <arg column="target" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <!-- review_routes.rs:644-654 revert_merge 的快照。 -->
+  <select id="selectMergeSnapshot" resultMap="mergeSnapshotRow">
+    SELECT s.canonical_name AS "source", t.canonical_name AS "target"
+     FROM entity_merges m
+     JOIN entities s ON s.id = m.source_id
+     JOIN entities t ON t.id = m.target_id
+     WHERE m.id = #{mergeId} AND m.kb_id = #{kbId}
+  </select>
+
+  <!-- review_routes.rs:693-702 manual_merge 的快照：单列 'a → b' 拼串（拆在 Java 侧）。 -->
+  <select id="selectManualMergePair" resultType="java.lang.String">
+    SELECT s.canonical_name || ' → ' || t.canonical_name
+     FROM entities s, entities t WHERE s.id = #{sourceId} AND t.id = #{targetId}
+  </select>
+
+  <!-- review_routes.rs:193-201 close_fact 的归属与状态校验（有行才可闭合）。 -->
+  <select id="selectClosableFact" resultType="java.util.UUID">
+    SELECT id FROM facts
+     WHERE id = #{factId} AND kb_id = #{kbId} AND invalidated_at IS NULL AND valid_to IS NULL
+  </select>
+
+  <resultMap id="violationRow" type="tech.seexun.jknow.store.mapper.ReviewWriteMapper$ViolationRow">
+    <constructor>
+      <arg column="kind" javaType="java.lang.String"/>
+      <arg column="left_fact" javaType="java.util.UUID"/>
+      <arg column="right_fact" javaType="java.util.UUID"/>
+      <arg column="path" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler"/>
+    </constructor>
+  </resultMap>
+
+  <!-- review_routes.rs:854-858 decide_violation 的开场：open 的违规行。 -->
+  <select id="selectOpenViolation" resultMap="violationRow">
+    SELECT kind, left_fact, right_fact, path FROM axiom_violations
+      WHERE id = #{violationId} AND kb_id = #{kbId} AND status = 'open'
+  </select>
+
+  <!-- review_routes.rs:911-916 decide_violation 的 fact_closed 支：旧断言是否还开放。 -->
+  <select id="selectOpenFactForClose" resultType="java.util.UUID">
+    SELECT id FROM facts
+      WHERE id = #{factId} AND invalidated_at IS NULL AND valid_to IS NULL
+  </select>
+
+  <resultMap id="reviewPairRow" type="tech.seexun.jknow.store.mapper.ReviewWriteMapper$ReviewPairRow">
+    <constructor>
+      <arg column="left_id" javaType="java.util.UUID"/>
+      <arg column="right_id" javaType="java.util.UUID"/>
+    </constructor>
+  </resultMap>
+
+  <!-- review_routes.rs:449-456 agent_answer 的 applied+merge 支。 -->
+  <select id="selectReviewPair" resultMap="reviewPairRow">
+    SELECT left_id, right_id FROM resolution_reviews WHERE id = #{reviewId} AND kb_id = #{kbId}
+  </select>
+
+  <!-- review_routes.rs:1178-1181 run_inference 的开关读取。 -->
+  <select id="selectMaterializeInferences" resultType="java.lang.Boolean">
+    SELECT materialize_inferences FROM knowledge_bases WHERE id = #{kbId}
+  </select>
+</mapper>

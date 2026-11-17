@@ -1,0 +1,336 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  documents 读族 SQL（逐字搬迁自旧仓库 utopia-0.1.0-rc9/crates/utopia-store/src：
+  documents.rs / graph.rs / extraction_drops.rs / jobs.rs）。
+
+  Rust format! 片段：
+  · page 的 WHERE（documents.rs:437-444，「参数为空就不生效」一条 SQL 覆盖全部组合；
+    $2=来源作用域哨兵 'any'/'none'/uuid 文本——两个哨兵串而不是可空参数，NULL 有歧义）：
+    WHERE kb_id = $1
+           AND (($5::bool AND deleted_at IS NOT NULL AND purged_at IS NULL)
+                OR (NOT $5::bool AND deleted_at IS NULL))
+           AND ($2 = 'any'
+                OR ($2 = 'none' AND source_id IS NULL)
+                OR source_id::text = $2)
+           AND ($3::text IS NULL OR filename ILIKE '%' || $3 || '%')
+           AND ($4::text IS NULL OR graph_status = $4)
+  · KB_SCOPE（jobs.rs:266-274，库内任务的 payload 三路归属判定）：
+    ((j.payload ?? 'kb_id' AND j.payload->>'kb_id' = $KB::text)
+    OR (j.payload ?? 'document_id' AND EXISTS (
+            SELECT 1 FROM documents d
+             WHERE d.id::text = j.payload->>'document_id' AND d.kb_id = $KB))
+    OR (j.payload ?? 'source_id' AND EXISTS (
+            SELECT 1 FROM sources s
+             WHERE s.id::text = j.payload->>'source_id' AND s.kb_id = $KB)))
+    （failed_count 的 $KB=$1；status_in_kb 的 $KB=$2——两语句各自整段展开）
+
+  占位符改写：$1→#{kbId} 等；XML 内 &lt; 表示 '<'。
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.DocumentsMapper">
+
+  <resultMap id="documentRow" type="tech.seexun.jknow.store.entity.DocumentRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="kb_id" javaType="java.util.UUID"/>
+      <arg column="source_id" javaType="java.util.UUID"/>
+      <arg column="filename" javaType="java.lang.String"/>
+      <arg column="mime" javaType="java.lang.String"/>
+      <arg column="size_bytes" javaType="_long"/>
+      <arg column="sha256" javaType="java.lang.String"/>
+      <arg column="status" javaType="java.lang.String"/>
+      <arg column="error" javaType="java.lang.String"/>
+      <arg column="doc_time" javaType="java.time.OffsetDateTime"/>
+      <arg column="doc_time_source" javaType="java.lang.String"/>
+      <arg column="time_context" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="time_context_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="graph_status" javaType="java.lang.String"/>
+      <arg column="graph_error" javaType="java.lang.String"/>
+      <arg column="text_len" javaType="_int"/>
+      <arg column="chunk_count" javaType="_int"/>
+      <arg column="tags" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.TextArrayTypeHandler"/>
+      <arg column="external_key" javaType="java.lang.String"/>
+      <arg column="missing_since" javaType="java.time.OffsetDateTime"/>
+      <arg column="deleted_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="purged_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="reader_needed" javaType="java.lang.String"/>
+      <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="updated_at" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="documentVersion" type="tech.seexun.jknow.store.entity.DocumentVersion">
+    <constructor>
+      <arg column="version" javaType="_int"/>
+      <arg column="sha256" javaType="java.lang.String"/>
+      <arg column="size_bytes" javaType="_long"/>
+      <arg column="ingested_at" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="chunkFull" type="tech.seexun.jknow.store.entity.ChunkFull">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="seq" javaType="_int"/>
+      <arg column="text" javaType="java.lang.String"/>
+      <arg column="origin" javaType="java.lang.String"/>
+      <arg column="origin_model" javaType="java.lang.String"/>
+      <arg column="anchor" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="chunkFactView" type="tech.seexun.jknow.store.entity.ChunkFactView">
+    <constructor>
+      <arg column="chunk_id" javaType="java.util.UUID"/>
+      <arg column="fact_id" javaType="java.util.UUID"/>
+      <arg column="subject_id" javaType="java.util.UUID"/>
+      <arg column="subject" javaType="java.lang.String"/>
+      <arg column="predicate" javaType="java.lang.String"/>
+      <arg column="inferred" javaType="_boolean"/>
+      <arg column="is_open_statement" javaType="_boolean"/>
+      <arg column="object_id" javaType="java.util.UUID"/>
+      <arg column="object" javaType="java.lang.String"/>
+      <arg column="valid_from" javaType="java.time.OffsetDateTime"/>
+      <arg column="valid_to" javaType="java.time.OffsetDateTime"/>
+      <arg column="confidence" javaType="_float"/>
+    </constructor>
+  </resultMap>
+
+  <!-- search 域（M1 任务 6）：chunks_by_ids 的行形状（models.rs:441-447 ChunkView） -->
+  <resultMap id="chunkView" type="tech.seexun.jknow.store.entity.ChunkView">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="document_id" javaType="java.util.UUID"/>
+      <arg column="seq" javaType="_int"/>
+      <arg column="text" javaType="java.lang.String"/>
+      <arg column="filename" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <!-- all_chunks_for_index 的行形状（documents.rs:1843 元组 (kb_id, document_id, id, text)） -->
+  <resultMap id="indexChunkRow" type="tech.seexun.jknow.store.entity.IndexChunkRow">
+    <constructor>
+      <arg column="kb_id" javaType="java.util.UUID"/>
+      <arg column="document_id" javaType="java.util.UUID"/>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="text" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="extractionDrop" type="tech.seexun.jknow.store.entity.ExtractionDrop">
+    <constructor>
+      <arg column="document_id" javaType="java.util.UUID"/>
+      <arg column="reason" javaType="java.lang.String"/>
+      <arg column="detail" javaType="java.lang.String"/>
+      <arg column="count" javaType="_int"/>
+      <arg column="example" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="docStats" type="tech.seexun.jknow.store.mapper.DocumentsMapper$DocStats">
+    <constructor>
+      <arg column="ready" javaType="_long"/>
+      <arg column="done" javaType="_long"/>
+      <arg column="extracting" javaType="_long"/>
+      <arg column="failed" javaType="_long"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="jobStatus" type="tech.seexun.jknow.store.entity.JobStatus">
+    <constructor>
+      <arg column="id" javaType="_long"/>
+      <arg column="kind" javaType="java.lang.String"/>
+      <arg column="status" javaType="java.lang.String"/>
+      <arg column="attempts" javaType="_int"/>
+      <arg column="max_attempts" javaType="_int"/>
+      <arg column="last_error" javaType="java.lang.String"/>
+      <arg column="run_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="updated_at" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <!-- documents.rs:451-464（page 主体：墓碑视图按 deleted_at 排序，活着按 created_at） -->
+  <select id="selectDocPage" resultMap="documentRow">
+    SELECT * FROM documents WHERE kb_id = #{kbId}
+           AND ((#{deleted}::bool AND deleted_at IS NOT NULL AND purged_at IS NULL)
+                OR (NOT #{deleted}::bool AND deleted_at IS NULL))
+           AND (#{scope} = 'any'
+                OR (#{scope} = 'none' AND source_id IS NULL)
+                OR source_id::text = #{scope})
+           AND (#{q}::text IS NULL OR filename ILIKE '%' || #{q} || '%')
+           AND (#{graphStatus}::text IS NULL OR graph_status = #{graphStatus})
+         ORDER BY (CASE WHEN #{deleted}::bool THEN deleted_at ELSE created_at END) DESC, id DESC
+         LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <!-- documents.rs:466-473（page 总数：同一 WHERE） -->
+  <select id="countDocPage" resultType="_long">
+    SELECT count(*) FROM documents WHERE kb_id = #{kbId}
+           AND ((#{deleted}::bool AND deleted_at IS NOT NULL AND purged_at IS NULL)
+                OR (NOT #{deleted}::bool AND deleted_at IS NULL))
+           AND (#{scope} = 'any'
+                OR (#{scope} = 'none' AND source_id IS NULL)
+                OR source_id::text = #{scope})
+           AND (#{q}::text IS NULL OR filename ILIKE '%' || #{q} || '%')
+           AND (#{graphStatus}::text IS NULL OR graph_status = #{graphStatus})
+  </select>
+
+  <!-- documents.rs:479-494（四列统计：只按来源作用域算——批量按钮的作用范围，与搜索无关） -->
+  <select id="selectDocStats" resultMap="docStats">
+    SELECT
+           count(*) FILTER (WHERE status = 'ready') AS ready,
+           count(*) FILTER (WHERE graph_status = 'done') AS done,
+           count(*) FILTER (WHERE graph_status IN ('queued', 'extracting')) AS extracting,
+           count(*) FILTER (WHERE graph_status = 'failed') AS failed
+         FROM documents
+         WHERE kb_id = #{kbId} AND deleted_at IS NULL
+           AND (#{scope} = 'any'
+                OR (#{scope} = 'none' AND source_id IS NULL)
+                OR source_id::text = #{scope})
+  </select>
+
+  <!-- documents.rs:497-503（整库墓碑数：左栏那一行不随作用域变） -->
+  <select id="countDeletedDocs" resultType="_long">
+    SELECT count(*) FROM documents
+          WHERE kb_id = #{kbId} AND deleted_at IS NOT NULL AND purged_at IS NULL
+  </select>
+
+  <!-- documents.rs:540-546（get） -->
+  <select id="selectDocumentById" resultMap="documentRow">
+    SELECT * FROM documents WHERE id = #{id}
+  </select>
+
+  <!-- documents_routes.rs:175（content 的行锁快照：FOR NO KEY UPDATE 贯穿 blob 读） -->
+  <select id="selectDocumentByIdForUpdate" resultMap="documentRow">
+    SELECT * FROM documents WHERE id = #{id} FOR NO KEY UPDATE
+  </select>
+
+  <!-- documents_routes.rs:183-191（requested 版本号的台账行） -->
+  <select id="selectVersionByNumber" resultMap="documentVersion">
+    SELECT version, sha256, size_bytes, ingested_at
+               FROM document_versions WHERE document_id = #{id} AND version = #{version}
+  </select>
+
+  <!-- documents_routes.rs:192-200（当前 sha256 的最新台账行） -->
+  <select id="selectVersionByCurrentSha" resultMap="documentVersion">
+    SELECT version, sha256, size_bytes, ingested_at
+               FROM document_versions WHERE document_id = #{id} AND sha256 = #{sha256}
+               ORDER BY version DESC LIMIT 1
+  </select>
+
+  <!-- documents.rs:561-569（versions：最老在前，软删文档的字节仍是审计记录的一部分） -->
+  <select id="selectVersions" resultMap="documentVersion">
+    SELECT version, sha256, size_bytes, ingested_at
+               FROM document_versions WHERE document_id = #{id} ORDER BY version
+  </select>
+
+  <!-- documents.rs:1548-1560（chunks_full：现行版本分块，按 seq） -->
+  <select id="selectChunksFull" resultMap="chunkFull">
+    SELECT id, seq, text, origin, origin_model, anchor FROM chunks
+             WHERE document_id = #{documentId} AND superseded_at IS NULL ORDER BY seq
+  </select>
+
+  <!-- documents.rs:1699-1725（chunks_by_ids：按 id 集合取分块带文档名；record_axis.rs:95-105
+       chunk_live_at / 83-93 document_live_at 的 format! 片段按 as_of 有无展开文原位内联——
+       None=「现在」在 SQL 文本上退化成单支 IS NULL（优化器可见，见 record_axis.rs 模块头）；
+       Some($3)=记录轴双支 created_at <= coalesce($3,now()) AND (… IS NULL OR … > coalesce($3,now()))。
+       传出的行序不保证——服务层按传入 ids 顺序（RRF 名次）重排（documents.rs:1721-1724）。 -->
+  <select id="selectChunksByIds" resultMap="chunkView">
+    SELECT c.id, c.document_id, c.seq, c.text, d.filename
+             FROM chunks c JOIN documents d ON d.id = c.document_id
+             WHERE c.kb_id = #{kbId} AND c.id = ANY(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler})
+    <if test="asOf == null">
+               AND c.superseded_at IS NULL AND d.deleted_at IS NULL
+    </if>
+    <if test="asOf != null">
+               AND c.created_at &lt;= coalesce(#{asOf}, now())
+               AND (c.superseded_at IS NULL OR c.superseded_at &gt; coalesce(#{asOf}, now()))
+               AND d.created_at &lt;= coalesce(#{asOf}, now())
+               AND (d.deleted_at IS NULL OR d.deleted_at &gt; coalesce(#{asOf}, now()))
+    </if>
+  </select>
+
+  <!-- documents.rs:1843-1851（all_chunks_for_index：启动/手动全量重建的源；逐字） -->
+  <select id="selectAllChunksForIndex" resultMap="indexChunkRow">
+    SELECT kb_id, document_id, id, text FROM chunks
+             WHERE superseded_at IS NULL
+             ORDER BY document_id, seq
+  </select>
+
+  <!-- 上一条的每库变体（M1 任务 6：ES 每 KB 一索引，ensureFresh 只重建单库——Java 侧
+       ES 设计新增，旧仓库无对应语句；WHERE/ORDER 与全量形逐字同构，仅多 kb_id 过滤） -->
+  <select id="selectKbChunksForIndex" resultMap="indexChunkRow">
+    SELECT kb_id, document_id, id, text FROM chunks
+             WHERE superseded_at IS NULL AND kb_id = #{kbId}
+             ORDER BY document_id, seq
+  </select>
+
+  <!-- documents.rs:1854-1860（live_chunk_count：启动对账「索引空而库里有货」用；逐字） -->
+  <select id="countLiveChunks" resultType="_long">
+    SELECT count(*) FROM chunks WHERE superseded_at IS NULL
+  </select>
+
+  <!-- 同上的每库变体（M1 任务 6：ES 每库计数对账——Java 侧新增，理由同 selectKbChunksForIndex） -->
+  <select id="countKbLiveChunks" resultType="_long">
+    SELECT count(*) FROM chunks WHERE superseded_at IS NULL AND kb_id = #{kbId}
+  </select>
+
+  <!-- graph.rs:2067-2097（document_extractions：反向证据链；源内行注释原样保留） -->
+  <select id="selectExtractions" resultMap="chunkFactView">
+    SELECT fe.chunk_id, f.id AS fact_id,
+                    f.subject_id, s.canonical_name AS subject,
+                    -- 开放陈述的短语在 facts 本身，不依赖旧证据的 proposed_predicate。
+                    CASE WHEN f.layer='open' THEN f.phrase
+                         ELSE COALESCE(r.label, fact_surface_predicate(f.id)) END AS predicate,
+                    r.id IS NULL AS inferred,
+                    (f.layer='open' AND nullif(btrim(f.phrase),'') IS NOT NULL) AS is_open_statement,
+                    -- 宾语是一样东西就用它的名字，是字面值（名字、金额、百分比）就用那个值。
+                    -- 只取 canonical_name 的话，每一条值宾语的陈述在阅读页右栏都是主语加短语、
+                    -- 后面空着一片——「Hugging Face, Inc. known as」后面什么都没有
+                    f.object_id, COALESCE(o.canonical_name, f.object_value #>> '{value}') AS object,
+                    f.valid_from, f.valid_to, f.confidence
+             FROM fact_evidence fe
+             JOIN chunks c ON c.id = fe.chunk_id AND c.document_id = #{documentId}
+                  AND c.superseded_at IS NULL
+             JOIN facts f ON f.id = fe.fact_id AND f.invalidated_at IS NULL
+             JOIN entities s ON s.id = f.subject_id
+             LEFT JOIN relation_types r ON r.id = f.predicate_id
+             LEFT JOIN entities o ON o.id = f.object_id
+             ORDER BY c.seq, f.recorded_at
+  </select>
+
+  <!-- extraction_drops.rs:100-108（for_kb：按 (文档×原因×对象) 聚合的整库信号，上限 2000） -->
+  <select id="selectExtractionDrops" resultMap="extractionDrop">
+    SELECT document_id, reason, detail, count, example FROM extraction_drops
+             WHERE kb_id = #{kbId} ORDER BY count DESC, reason LIMIT 2000
+  </select>
+
+  <!-- jobs.rs:306-311（failed_count：$1=kb_id，KB_SCOPE 的 $KB 展开为 $1） -->
+  <select id="countFailedJobs" resultType="_long">
+    SELECT count(*) FROM jobs j
+          WHERE j.status = 'failed' AND (#{kbId}::uuid IS NULL OR (
+       (j.payload ?? 'kb_id' AND j.payload->>'kb_id' = #{kbId}::text)
+    OR (j.payload ?? 'document_id' AND EXISTS (
+            SELECT 1 FROM documents d
+             WHERE d.id::text = j.payload->>'document_id' AND d.kb_id = #{kbId}))
+    OR (j.payload ?? 'source_id' AND EXISTS (
+            SELECT 1 FROM sources s
+             WHERE s.id::text = j.payload->>'source_id' AND s.kb_id = #{kbId}))))
+  </select>
+
+  <!-- jobs.rs:330-339（status_in_kb：$1=job id、$2=kb_id，KB_SCOPE 的 $KB 展开为 $2） -->
+  <select id="selectJobInKb" resultMap="jobStatus">
+    SELECT j.id, j.kind, j.status, j.attempts, j.max_attempts, j.last_error, j.run_at, j.updated_at
+           FROM jobs j WHERE j.id = #{id} AND (
+       (j.payload ?? 'kb_id' AND j.payload->>'kb_id' = #{kbId}::text)
+    OR (j.payload ?? 'document_id' AND EXISTS (
+            SELECT 1 FROM documents d
+             WHERE d.id::text = j.payload->>'document_id' AND d.kb_id = #{kbId}))
+    OR (j.payload ?? 'source_id' AND EXISTS (
+            SELECT 1 FROM sources s
+             WHERE s.id::text = j.payload->>'source_id' AND s.kb_id = #{kbId})))
+  </select>
+</mapper>

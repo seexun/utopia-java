@@ -1,0 +1,306 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.seexun.jknow.store.mapper.RssFullContentMapper">
+
+  <!-- RSS 全文台账（rss_full_content.rs 逐字，M3 任务 9）。行号以旧仓库 main 为准。
+       台账与 documents 分开：一条 feed 条目可以在拿到可接受内容之前被发现，也必须在
+       离开出版方滑动窗口之后保持可补全。 -->
+
+  <!-- rss_full_content.rs:161 ACTIVATION_STATE -->
+  <sql id="activationState">CASE WHEN config->>'content_mode' IS DISTINCT FROM 'full_new_items' THEN 'disabled' WHEN rss_baselined_at IS NULL THEN 'pending' ELSE 'active' END</sql>
+
+  <!-- record 构造映射（MyBatis 对 record 不做名字自动配对——按构造参数序） -->
+  <resultMap id="activation" type="tech.seexun.jknow.store.mapper.RssFullContentMapper$Activation">
+    <constructor>
+      <idArg column="source_id" javaType="java.util.UUID"/>
+      <arg column="activation_generation" javaType="_int"/>
+      <arg column="activation_state" javaType="java.lang.String"/>
+      <arg column="activation_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="baseline_count" javaType="_int"/>
+      <arg column="last_discovery_at" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="lockState" type="tech.seexun.jknow.store.mapper.RssFullContentMapper$LockState">
+    <constructor>
+      <arg column="activation_state" javaType="java.lang.String"/>
+      <arg column="activation_generation" javaType="_int"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="entry" type="tech.seexun.jknow.store.entity.RssEntries$Entry">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="source_id" javaType="java.util.UUID"/>
+      <arg column="activation_generation" javaType="_int"/>
+      <arg column="external_key" javaType="java.lang.String"/>
+      <arg column="title" javaType="java.lang.String"/>
+      <arg column="article_url" javaType="java.lang.String"/>
+      <arg column="summary" javaType="java.lang.String"/>
+      <arg column="embedded_html" javaType="java.lang.String"/>
+      <arg column="doc_time" javaType="java.time.OffsetDateTime"/>
+      <arg column="state" javaType="java.lang.String"/>
+      <arg column="hydration_job_id" javaType="java.lang.Long"/>
+      <arg column="attempt_count" javaType="_int"/>
+      <arg column="document_id" javaType="java.util.UUID"/>
+      <arg column="error_code" javaType="java.lang.String"/>
+      <arg column="error_detail" javaType="java.lang.String"/>
+      <arg column="first_seen_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="updated_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="completed_at" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="claimRow" type="tech.seexun.jknow.store.entity.RssEntries$ClaimRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="observed_at" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="countsRow" type="tech.seexun.jknow.store.entity.RssEntries$CountsRow">
+    <constructor>
+      <arg column="pending_count" javaType="_long"/>
+      <arg column="queued_count" javaType="_long"/>
+      <arg column="hydrating_count" javaType="_long"/>
+      <arg column="retrying_count" javaType="_long"/>
+      <arg column="complete_count" javaType="_long"/>
+      <arg column="terminal_count" javaType="_long"/>
+    </constructor>
+  </resultMap>
+
+  <!-- rss_full_content.rs:163-173 activation_select -->
+  <select id="selectActivation" resultMap="activation">
+    SELECT s.id AS source_id, rss_generation AS activation_generation,
+        <include refid="activationState"/> AS activation_state, rss_baselined_at AS activation_at,
+        (SELECT count(*)::int FROM rss_full_content_entries e WHERE e.source_id=s.id
+           AND e.activation_generation=s.rss_generation AND e.entry_kind='baseline') AS baseline_count,
+        (SELECT max(observed_at) FROM rss_full_content_entries e WHERE e.source_id=s.id
+           AND e.activation_generation=s.rss_generation) AS last_discovery_at
+        FROM sources s WHERE s.id=#{sourceId} AND s.kind='rss'
+  </select>
+
+  <!-- rss_full_content.rs:213-216 begin_feed_observation 的行锁 config 读 -->
+  <select id="selectConfigForUpdate" resultType="string">
+    SELECT config::text FROM sources WHERE id = #{sourceId} FOR UPDATE
+  </select>
+
+  <select id="clockTimestamp" resultType="java.time.OffsetDateTime">
+    SELECT clock_timestamp()
+  </select>
+
+  <!-- rss_full_content.rs:273-279 lock_activation -->
+  <select id="lockActivation" resultMap="lockState">
+    SELECT <include refid="activationState"/> AS activation_state, rss_generation AS activation_generation
+    FROM sources WHERE id=#{sourceId} FOR UPDATE
+  </select>
+
+  <!-- rss_full_content.rs:295-298 -->
+  <insert id="insertBaseline">
+    INSERT INTO rss_full_content_entries(id,source_id,activation_generation,external_key,title,entry_kind)
+    VALUES(#{id},#{sourceId},#{generation},#{externalKey},#{title},'baseline') ON CONFLICT DO NOTHING
+  </insert>
+
+  <!-- rss_full_content.rs:300-303 -->
+  <update id="markBaselined">
+    UPDATE sources SET rss_baselined_at=clock_timestamp() WHERE id=#{sourceId}
+  </update>
+
+  <!-- rss_full_content.rs:340-345 -->
+  <insert id="insertDiscovered">
+    INSERT INTO rss_full_content_entries
+      (id,source_id,activation_generation,external_key,title,article_url,summary,embedded_html,doc_time,entry_kind,observed_at)
+    VALUES(#{id},#{sourceId},#{generation},#{externalKey},#{title},#{articleUrl},#{summary},#{embeddedHtml},#{docTime},#{kind},#{observedAt}) ON CONFLICT DO NOTHING
+  </insert>
+
+  <!-- rss_full_content.rs:356-363：只有真正更晚的观察才能替换「删除已作废」的断言；
+       运行中的 job 保留它不可变的取前观察时间戳 -->
+  <update id="clearJobIdIfDeletionInvalidated">
+    UPDATE rss_full_content_entries e SET current_job_id=NULL
+    WHERE source_id=#{sourceId} AND activation_generation=#{generation} AND external_key=#{externalKey}
+    AND entry_kind&lt;&gt;'baseline' AND observed_at&lt;=#{observedAt} AND #{hasUsableSource}
+    AND EXISTS(SELECT 1 FROM document_deletions dd JOIN documents d ON d.id=dd.document_id
+      WHERE d.source_id=e.source_id AND dd.external_key=e.external_key
+      AND GREATEST(dd.created_at,d.purged_at)&gt;=COALESCE(
+        (SELECT (payload->>'observed_at')::timestamptz FROM jobs WHERE id=e.current_job_id),e.observed_at))
+  </update>
+
+  <!-- rss_full_content.rs:365-384：纯摘要的刷新不是留存正文的更晚证据——
+       正文与旧时间戳一起留着，否则一次更差的 post-purge 响应可能授权重放 pre-purge 内容 -->
+  <update id="refreshObserved">
+    UPDATE rss_full_content_entries SET title=#{title}, article_url=#{articleUrl}, summary=#{summary},
+    embedded_html=#{embeddedHtml}, doc_time=#{docTime}, observed_at=#{observedAt}, updated_at=clock_timestamp(),
+    entry_kind=CASE WHEN #{hasUsableSource} THEN 'candidate' ELSE entry_kind END
+    WHERE source_id=#{sourceId} AND activation_generation=#{generation} AND external_key=#{externalKey}
+      AND entry_kind&lt;&gt;'baseline' AND observed_at&lt;=#{observedAt}
+      AND (#{hasUsableSource} OR entry_kind='no_source')
+      AND NOT EXISTS(SELECT 1 FROM jobs WHERE id=current_job_id AND status='done')
+  </update>
+
+  <!-- rss_full_content.rs:402-409 -->
+  <select id="countLiveJobs" resultType="long">
+    SELECT count(*) FROM rss_full_content_entries e JOIN jobs j ON j.id=e.current_job_id
+    WHERE source_id=#{sourceId} AND activation_generation=#{generation} AND j.status IN ('queued','running')
+  </select>
+
+  <!-- rss_full_content.rs:411-417 -->
+  <select id="selectClaimable" resultMap="claimRow">
+    SELECT id,observed_at FROM rss_full_content_entries e
+    WHERE source_id=#{sourceId} AND activation_generation=#{generation} AND entry_kind='candidate' AND current_job_id IS NULL
+    AND NOT EXISTS(SELECT 1 FROM document_deletions dd JOIN documents d ON d.id=dd.document_id
+       WHERE d.source_id=e.source_id AND dd.external_key=e.external_key
+       AND GREATEST(dd.created_at,d.purged_at)&gt;=e.observed_at)
+    ORDER BY first_seen_at,id LIMIT #{limit} FOR UPDATE
+  </select>
+
+  <!-- rss_full_content.rs:426-427 -->
+  <update id="setCurrentJob">
+    UPDATE rss_full_content_entries SET current_job_id=#{jobId},updated_at=clock_timestamp() WHERE id=#{id}
+  </update>
+
+  <!-- rss_full_content.rs:237-267 ENTRY_SELECT（一处投影供行诊断/计数/来源摘要；
+       不导出 job 原始错误——队列状态与文档状态仍是权威） -->
+  <sql id="entrySelect">
+    SELECT e.id, e.source_id, e.activation_generation, e.external_key, e.title,
+     e.article_url, e.summary, e.embedded_html, e.doc_time,
+     CASE
+     WHEN s.rss_generation &lt;&gt; e.activation_generation OR s.config->>'content_mode' IS DISTINCT FROM 'full_new_items' THEN 'superseded'
+     WHEN e.entry_kind='baseline' THEN 'baseline'
+     WHEN d.id IS NOT NULL AND d.deleted_at IS NULL THEN 'complete'
+     WHEN EXISTS (SELECT 1 FROM document_deletions dd JOIN documents old ON old.id=dd.document_id
+       WHERE old.source_id=e.source_id AND dd.external_key=e.external_key
+       AND GREATEST(dd.created_at,old.purged_at)&gt;=COALESCE((j.payload->>'observed_at')::timestamptz,e.observed_at)) THEN 'deleted'
+     WHEN e.entry_kind='no_source' THEN 'terminal'
+     WHEN j.status='running' THEN 'hydrating'
+     WHEN j.status='queued' AND j.attempts&gt;0 THEN 'retry_wait'
+     WHEN j.status='queued' THEN 'queued'
+     WHEN j.status='failed' THEN 'terminal'
+     WHEN j.status='done' THEN 'superseded'
+     ELSE 'pending' END AS state,
+     e.current_job_id AS hydration_job_id, COALESCE(j.attempts,0) AS attempt_count,
+     d.id AS document_id,
+     CASE WHEN d.id IS NOT NULL AND d.deleted_at IS NULL THEN NULL
+          WHEN e.entry_kind='no_source' THEN 'no_usable_content_source'
+          WHEN j.status='failed' THEN 'acquisition_failed' END AS error_code,
+     CASE WHEN d.id IS NOT NULL AND d.deleted_at IS NULL THEN NULL
+          WHEN e.entry_kind='no_source' THEN 'No usable content source was observed'
+          WHEN j.status='failed' THEN 'Full-content acquisition failed; retry is available' END AS error_detail,
+     e.first_seen_at, GREATEST(e.updated_at,j.updated_at,d.updated_at) AS updated_at,
+     CASE WHEN j.status='done' AND d.deleted_at IS NULL THEN j.updated_at END AS completed_at
+    FROM rss_full_content_entries e JOIN sources s ON s.id=e.source_id
+    LEFT JOIN jobs j ON j.id=e.current_job_id
+    LEFT JOIN documents d ON d.source_id=e.source_id AND d.external_key=e.external_key AND d.purged_at IS NULL
+  </sql>
+
+  <!-- rss_full_content.rs:434-437 get_entry -->
+  <select id="selectEntry" resultMap="entry">
+    <include refid="entrySelect"/> WHERE e.id=#{id}
+  </select>
+
+  <!-- rss_full_content.rs:442-453 current_attempt：通用队列拥有 attempts 与执行迁移，
+       这里只是一次 claim check，不是第二套持久化状态机 -->
+  <select id="selectCurrentAttempt" resultType="java.lang.Integer">
+    SELECT j.attempts FROM rss_full_content_entries e JOIN jobs j ON j.id=e.current_job_id
+    JOIN sources s ON s.id=e.source_id WHERE e.id=#{id} AND j.id=#{jobId} AND j.status='running'
+    AND e.entry_kind='candidate' AND s.rss_generation=e.activation_generation
+    AND s.rss_baselined_at IS NOT NULL AND s.config->>'content_mode'='full_new_items'
+  </select>
+
+  <!-- rss_full_content.rs:478-497 complete_hydration 的发布闸：源/代际/身份/库/运行中的
+       job 与不可变的删除前置，都在同一个按源串行的发布事务里 -->
+  <select id="selectPublishable" resultType="java.util.UUID">
+    SELECT e.id FROM rss_full_content_entries e
+    JOIN sources s ON s.id=e.source_id JOIN jobs j ON j.id=e.current_job_id
+    WHERE e.id=#{id} AND j.id=#{jobId} AND e.source_id=#{sourceId} AND e.activation_generation=#{generation}
+      AND e.external_key=#{externalKey} AND s.kb_id=#{kbId} AND e.entry_kind='candidate' AND j.status='running'
+      AND j.payload ?? 'observed_at'
+      AND NOT EXISTS(SELECT 1 FROM document_deletions dd JOIN documents d ON d.id=dd.document_id
+         WHERE d.source_id=e.source_id AND dd.external_key=e.external_key
+         AND GREATEST(dd.created_at,d.purged_at)&gt;=(j.payload->>'observed_at')::timestamptz)
+    FOR UPDATE OF e,j
+  </select>
+
+  <!-- rss_full_content.rs:512-514 -->
+  <update id="finishJob">
+    UPDATE jobs SET status='done', last_error=NULL, updated_at=clock_timestamp() WHERE id=#{jobId}
+  </update>
+
+  <!-- rss_full_content.rs:519-520：接受的内容归 documents/blob 存储，不归观察 -->
+  <update id="clearEntryPayload">
+    UPDATE rss_full_content_entries SET summary='',embedded_html=NULL,updated_at=clock_timestamp() WHERE id=#{id}
+  </update>
+
+  <!-- rss_full_content.rs:525-531 list_current_entries -->
+  <select id="selectCurrentEntries" resultMap="entry">
+    <include refid="entrySelect"/> WHERE e.source_id=#{sourceId} AND e.activation_generation=s.rss_generation
+    ORDER BY e.updated_at DESC,e.id DESC LIMIT #{limit}
+  </select>
+
+  <!-- rss_full_content.rs:538-542 counts -->
+  <select id="selectCounts" resultMap="countsRow">
+    WITH projected AS (<include refid="entrySelect"/>)
+    SELECT count(*) FILTER(WHERE state='pending') AS pending_count,
+     count(*) FILTER(WHERE state='queued') AS queued_count,
+     count(*) FILTER(WHERE state='hydrating') AS hydrating_count,
+     count(*) FILTER(WHERE state='retry_wait') AS retrying_count,
+     count(*) FILTER(WHERE state='complete') AS complete_count,
+     count(*) FILTER(WHERE state IN ('terminal','deleted','superseded')) AS terminal_count
+    FROM projected WHERE source_id=#{sourceId} AND activation_generation=#{generation}
+  </select>
+
+  <!-- ============ requeue_failed（rss_full_content.rs:16-93）：RSS 重试与首准入
+       同一套源锁、代际、purge 栅栏与容量上限；通用 requeue 排除 hydrate_rss_entry ============ -->
+
+  <!-- :23-35 -->
+  <select id="selectRequeueSources" resultType="java.util.UUID">
+    SELECT DISTINCT e.source_id FROM rss_full_content_entries e
+     JOIN jobs j ON j.id = e.current_job_id
+     JOIN sources s ON s.id = e.source_id
+     WHERE j.status = 'failed' AND j.kind = 'hydrate_rss_entry'
+       AND (#{kbId}::uuid IS NULL OR s.kb_id = #{kbId})
+       AND (#{failedSince}::timestamptz IS NULL OR j.updated_at &gt;= #{failedSince})
+     ORDER BY e.source_id
+  </select>
+
+  <!-- :38-40 -->
+  <select id="lockSource" resultType="java.util.UUID">
+    SELECT id FROM sources WHERE id = #{sourceId} FOR UPDATE
+  </select>
+
+  <!-- :42-49 -->
+  <select id="selectRequeueGeneration" resultType="java.lang.Integer">
+    SELECT rss_generation FROM sources WHERE id=#{sourceId}
+     AND rss_baselined_at IS NOT NULL AND config->>'content_mode'='full_new_items'
+  </select>
+
+  <!-- :52-61 -->
+  <select id="countLiveRequeueJobs" resultType="long">
+    SELECT count(*) FROM rss_full_content_entries e
+     JOIN jobs j ON j.id = e.current_job_id
+     WHERE e.source_id = #{sourceId} AND e.activation_generation = #{generation}
+       AND j.status IN ('queued', 'running')
+  </select>
+
+  <!-- :63-74 -->
+  <select id="selectRequeueJobs" resultType="long">
+    SELECT j.id FROM rss_full_content_entries e
+     JOIN jobs j ON j.id = e.current_job_id
+     WHERE e.source_id = #{sourceId} AND e.activation_generation = #{generation}
+       AND j.kind = 'hydrate_rss_entry' AND j.status = 'failed'
+       AND (#{failedSince}::timestamptz IS NULL OR j.updated_at &gt;= #{failedSince})
+       AND j.payload ?? 'observed_at'
+       AND NOT EXISTS (
+         SELECT 1 FROM document_deletions dd JOIN documents d ON d.id = dd.document_id
+         WHERE d.source_id = e.source_id AND dd.external_key = e.external_key
+           AND GREATEST(dd.created_at, d.purged_at) &gt;= (j.payload->>'observed_at')::timestamptz)
+     ORDER BY j.id LIMIT #{limit} FOR UPDATE OF e, j
+  </select>
+
+  <!-- :77-85 -->
+  <update id="requeueJobBatch">
+    UPDATE jobs SET status = 'queued', attempts = 0, last_error = NULL,
+     locked_at = NULL, run_at = now(), updated_at = now()
+     WHERE id = ANY(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.LongArrayTypeHandler}::bigint[]) AND status = 'failed'
+  </update>
+</mapper>

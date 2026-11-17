@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.seexun.jknow.store.mapper.MaterializeMapper">
+
+    <resultMap id="dueRow" type="tech.seexun.jknow.store.mapper.MaterializeMapper$DueRow">
+        <constructor>
+            <arg column="statement" javaType="java.util.UUID"/>
+            <arg column="property" javaType="java.util.UUID"/>
+            <arg column="direction" javaType="java.lang.String"/>
+            <arg column="subject_id" javaType="java.util.UUID"/>
+            <arg column="object_id" javaType="java.util.UUID"/>
+            <arg column="object_value" javaType="com.fasterxml.jackson.databind.JsonNode"
+                 typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+            <arg column="valid_from" javaType="java.time.OffsetDateTime"/>
+            <arg column="valid_from_precision" javaType="java.lang.String"/>
+            <arg column="valid_from_grade" javaType="java.lang.String"/>
+            <arg column="valid_to" javaType="java.time.OffsetDateTime"/>
+            <arg column="valid_to_precision" javaType="java.lang.String"/>
+            <arg column="attested_from" javaType="java.time.OffsetDateTime"/>
+            <arg column="confidence" javaType="_float"/>
+            <arg column="marks" javaType="java.lang.String"/>
+            <arg column="temporal" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="impliedRow" type="tech.seexun.jknow.store.mapper.MaterializeMapper$ImpliedRow">
+        <constructor>
+            <arg column="rule" javaType="java.util.UUID"/>
+            <arg column="statement" javaType="java.util.UUID"/>
+            <arg column="entity" javaType="java.util.UUID"/>
+            <arg column="subject_id" javaType="java.util.UUID"/>
+            <arg column="property" javaType="java.util.UUID"/>
+            <arg column="object_id" javaType="java.util.UUID"/>
+            <arg column="object_value" javaType="com.fasterxml.jackson.databind.JsonNode"
+                 typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+            <arg column="valid_from" javaType="java.time.OffsetDateTime"/>
+            <arg column="valid_from_precision" javaType="java.lang.String"/>
+            <arg column="valid_from_grade" javaType="java.lang.String"/>
+            <arg column="valid_to" javaType="java.time.OffsetDateTime"/>
+            <arg column="valid_to_precision" javaType="java.lang.String"/>
+            <arg column="attested_from" javaType="java.time.OffsetDateTime"/>
+            <arg column="confidence" javaType="_float"/>
+        </constructor>
+    </resultMap>
+
+    <!-- 类型化物化 SQL（materialize.rs 逐字搬迁）。MATCH 片段（materialize.rs:29-33）：
+         b.phrase = lower(btrim(regexp_replace(s.phrase,'\s+',' ','g'))) 且两端类型
+         IS NOT DISTINCT FROM 且 b.object_is_value = (s.object_id IS NULL)。
+         MOMENT_UNREAD（materialize.rs:41-45）：起止同值 + 状态属性 + marks 未说。 -->
+
+    <select id="lockMaterialize" resultType="java.lang.Object">
+        SELECT pg_advisory_xact_lock(hashtext('typed_materialize'), hashtext(#{kb}))
+    </select>
+
+    <select id="tryLockMaterialize" resultType="java.lang.Boolean">
+        SELECT pg_try_advisory_xact_lock(hashtext('typed_materialize'), hashtext(#{kb}))
+    </select>
+
+    <!-- materialize.rs:161-175 步骤 0：作废 #966 之前照抄的一刻状态行。只认照抄来的：
+         它有一条来源陈述两端正是这一刻。人改成起止相等的行也带着 from_statement_id、
+         implied 和来源链接（#967、#911），看上去和算出来的一样，但它的来源陈述不是
+         这一刻，不碰：不变量从此挡住新的，旧的由人自己改。 -->
+    <update id="retireMomentStateRows" parameterType="java.util.UUID">
+        UPDATE facts t
+            SET invalidated_at = now()
+          WHERE t.kb_id = #{kbId} AND t.layer = 'typed' AND t.invalidated_at IS NULL
+            AND t.valid_from IS NOT NULL AND t.valid_to = t.valid_from
+            AND (t.from_statement_id IS NOT NULL OR t.implied)
+            AND EXISTS (SELECT 1 FROM relation_types r
+                         WHERE r.id = t.predicate_id AND r.temporal = 'state')
+            AND EXISTS (SELECT 1 FROM facts s
+                         WHERE s.valid_from = t.valid_from AND s.valid_to = t.valid_from
+                           AND (s.id IN (SELECT ts.statement_id FROM typed_fact_sources ts
+                                          WHERE ts.fact_id = t.id)
+                             OR s.id IN (SELECT i.statement_id FROM implied_fact_sources i
+                                          WHERE i.fact_id = t.id)))
+    </update>
+
+    <!-- materialize.rs:182-205 步骤 1：删不再成立的来源。MATCH 片段（:29-33）逐字展开；
+         MOMENT_UNREAD（:41-45）同。每一项都得是真值、不能是 NULL：它在 NOT 后面用。 -->
+    <delete id="deleteBrokenTypedSources" parameterType="java.util.UUID">
+        DELETE FROM typed_fact_sources src
+          USING facts t
+          WHERE src.fact_id = t.id AND t.kb_id = #{kbId}
+            AND NOT EXISTS (
+                SELECT 1
+                  FROM facts s
+                  JOIN entities se ON se.id = s.subject_id
+             LEFT JOIN entities oe ON oe.id = s.object_id
+                  JOIN phrase_bindings b ON b.kb_id = s.kb_id
+       AND b.phrase = lower(btrim(regexp_replace(s.phrase,'\s+',' ','g')))
+       AND b.subject_type_id IS NOT DISTINCT FROM se.type_id
+       AND b.object_is_value = (s.object_id IS NULL)
+       AND (s.object_id IS NULL OR b.object_type_id IS NOT DISTINCT FROM oe.type_id)
+                 WHERE s.id = src.statement_id
+                   AND s.invalidated_at IS NULL
+                   AND t.invalidated_at IS NULL
+                   AND b.status = 'bound'
+                   AND b.relation_type_id = t.predicate_id
+                   AND ((b.direction = 'forward' AND t.subject_id = s.subject_id)
+                     OR (b.direction = 'reverse' AND t.subject_id = s.object_id))
+                   AND NOT EXISTS (SELECT 1 FROM statement_qualifiers q
+                                    WHERE q.fact_id = s.id AND q.role = 'mood')
+                   AND NOT (s.valid_from IS NOT NULL AND s.valid_to IS NOT DISTINCT FROM s.valid_from
+       AND EXISTS (SELECT 1 FROM relation_types rt
+                    WHERE rt.id = b.relation_type_id AND rt.temporal = 'state')
+       AND b.marks IS DISTINCT FROM 'start' AND b.marks IS DISTINCT FROM 'end'))
+    </delete>
+
+    <!-- materialize.rs:209-229 步骤 1b：隐含行的来源对账。RULE_MATCH
+         （implication_rules.rs:249-253，b 换成 r）与 kind_word_sql（materialize.rs:638-640）
+         逐字展开。 -->
+    <delete id="deleteBrokenImpliedSources" parameterType="java.util.UUID">
+        DELETE FROM implied_fact_sources i
+          USING implication_rules r
+          WHERE i.rule_id = r.id AND r.kb_id = #{kbId}
+            AND (r.status &lt;&gt; 'approved'
+                 OR (i.statement_id IS NOT NULL AND NOT EXISTS (
+                        SELECT 1 FROM facts s
+                          JOIN entities se ON se.id = s.subject_id
+                     LEFT JOIN entities oe ON oe.id = s.object_id
+                         WHERE s.id = i.statement_id AND s.layer = 'open' AND s.invalidated_at IS NULL
+                           AND r.trigger = 'phrase'
+                           AND r.phrase = lower(btrim(regexp_replace(s.phrase,'\s+',' ','g')))
+       AND r.subject_type_id IS NOT DISTINCT FROM se.type_id
+       AND r.object_is_value = (s.object_id IS NULL)
+       AND (s.object_id IS NULL OR r.object_type_id IS NOT DISTINCT FROM oe.type_id)))
+                 OR (i.entity_id IS NOT NULL AND NOT EXISTS (
+                        SELECT 1 FROM entities e
+                         WHERE e.id = i.entity_id AND e.merged_into IS NULL
+                           AND r.trigger = 'kind_word'
+                           AND lower(btrim(regexp_replace(e.specific_type, '\s+', ' ', 'g'))) = r.phrase)))
+    </delete>
+
+    <!-- materialize.rs:232-239 步骤 2：作废来源全空的类型化行——只动算出来的行
+         （带 from_statement_id 的、或规则算的），人写的不碰。 -->
+    <update id="retireOrphanTypedRows" parameterType="java.util.UUID">
+        UPDATE facts t
+            SET invalidated_at = now()
+          WHERE t.kb_id = #{kbId} AND t.layer = 'typed' AND t.invalidated_at IS NULL
+            AND (t.from_statement_id IS NOT NULL OR t.implied)
+            AND NOT EXISTS (SELECT 1 FROM typed_fact_sources src WHERE src.fact_id = t.id)
+            AND NOT EXISTS (SELECT 1 FROM implied_fact_sources i WHERE i.fact_id = t.id)
+    </update>
+
+    <!-- materialize.rs:248-273 步骤 3 due 查询：勘误撤过的（陈述, 属性）不再算
+         （0044 决定 7）：撤销要站得住。ORDER BY s.id。 -->
+    <select id="selectDue" parameterType="java.util.UUID" resultMap="dueRow">
+        SELECT s.id AS statement, b.relation_type_id AS property, b.direction,
+                s.subject_id, s.object_id, s.object_value,
+                s.valid_from, s.valid_from_precision, s.valid_from_grade,
+                s.valid_to, s.valid_to_precision,
+                s.attested_from, s.confidence, b.marks,
+                (SELECT rt.temporal FROM relation_types rt WHERE rt.id = b.relation_type_id)
+                    AS temporal
+           FROM facts s
+           JOIN entities se ON se.id = s.subject_id
+      LEFT JOIN entities oe ON oe.id = s.object_id
+           JOIN phrase_bindings b ON b.kb_id = s.kb_id
+       AND b.phrase = lower(btrim(regexp_replace(s.phrase,'\s+',' ','g')))
+       AND b.subject_type_id IS NOT DISTINCT FROM se.type_id
+       AND b.object_is_value = (s.object_id IS NULL)
+       AND (s.object_id IS NULL OR b.object_type_id IS NOT DISTINCT FROM oe.type_id)
+          WHERE s.kb_id = #{kbId} AND s.layer = 'open' AND s.invalidated_at IS NULL
+            AND b.status = 'bound'
+            AND (b.direction = 'forward' OR s.object_id IS NOT NULL)
+            AND NOT (s.valid_from IS NOT NULL AND s.valid_to IS NOT DISTINCT FROM s.valid_from
+       AND EXISTS (SELECT 1 FROM relation_types rt
+                    WHERE rt.id = b.relation_type_id AND rt.temporal = 'state')
+       AND b.marks IS DISTINCT FROM 'start' AND b.marks IS DISTINCT FROM 'end')
+            AND NOT EXISTS (SELECT 1 FROM statement_qualifiers q
+                             WHERE q.fact_id = s.id AND q.role = 'mood')
+            <!-- 勘误撤过的（陈述, 属性）不再算（0044 决定 7）：撤销要站得住 -->
+            AND NOT EXISTS (SELECT 1 FROM errata_actions ea
+                             WHERE ea.statement_id = s.id AND ea.predicate_id = b.relation_type_id
+                               AND ea.status = 'applied' AND ea.action IN ('retract', 'revise'))
+            AND NOT EXISTS (SELECT 1 FROM typed_fact_sources src JOIN facts t ON t.id = src.fact_id
+                             WHERE src.statement_id = s.id AND t.invalidated_at IS NULL
+                               AND t.predicate_id = b.relation_type_id)
+          ORDER BY s.id
+    </select>
+
+    <!-- materialize.rs:357 新行 from_statement_id（只在为空时填）。逐条执行（审查 C-1：
+         改写行携带该列，攒批会改变「第一条陈述」的继承序） -->
+    <update id="setFromStatement">
+        UPDATE facts SET from_statement_id = #{statementId}
+          WHERE id = #{factId} AND from_statement_id IS NULL
+    </update>
+
+    <!-- materialize.rs:393-401 证据抄一份：证据是同一段原文的同一处引文。逐条执行（审查
+         C-1：门的 refine 分支读 fact_evidence 搬被取代行的证据，攒批延迟落库会丢先到证据） -->
+    <insert id="copyEvidenceFromStatement">
+        INSERT INTO fact_evidence (fact_id, chunk_id, quote, document_id, doc_version,
+                                    proposed_predicate, quote_start, quote_end)
+         SELECT #{factId}, chunk_id, quote, document_id, doc_version, proposed_predicate,
+                quote_start, quote_end
+           FROM fact_evidence WHERE fact_id = #{statementId}
+         ON CONFLICT DO NOTHING
+    </insert>
+
+    <!-- materialize.rs:406-413 限定照角色词原样带过去。M4 任务 7 因路径攒批执行：SQL 文本在
+         MaterializeMapper.COPY_QUALIFIERS_FROM_STATEMENT_SQL（单一来源），XML 语句移除。 -->
+
+    <!-- materialize.rs:364-370 新行取代了一条裸行（时间精化，supersedes 链上）：被取代
+         那行的来源跟着搬过来，这一轮就收敛，不等下一轮把旧来源当「不成立」删掉再补 -->
+    <insert id="adoptSupersededSources">
+        INSERT INTO typed_fact_sources (fact_id, statement_id)
+         SELECT #{factId}, src.statement_id
+           FROM facts n JOIN typed_fact_sources src ON src.fact_id = n.supersedes
+          WHERE n.id = #{factId}
+         ON CONFLICT DO NOTHING
+    </insert>
+
+    <delete id="dropSupersededSources">
+        DELETE FROM typed_fact_sources src
+          USING facts n
+          WHERE n.id = #{factId} AND src.fact_id = n.supersedes
+    </delete>
+
+    <insert id="insertTypedSource">
+        INSERT INTO typed_fact_sources (fact_id, statement_id) VALUES (#{factId}, #{statementId})
+         ON CONFLICT DO NOTHING
+    </insert>
+
+    <!-- materialize.rs:514-545 短语规则取数。object_text_sql（implication_rules.rs:244-246）
+         逐字：coalesce(oe.canonical_name, s.object_value ->> 'value', s.object_value #>> '{}', '')。
+         规则没有 marks（#966）：一刻的陈述蕴含状态属性时读法未知，不算隐含行——
+         用 IS NOT DISTINCT FROM：只有起点的陈述上 `=` 是 NULL，NOT 之后照样把它排掉 -->
+    <select id="selectImpliedByStatement" parameterType="java.util.UUID" resultMap="impliedRow">
+        SELECT r.id AS rule, s.id AS statement, NULL::uuid AS entity,
+                s.subject_id, r.conclude_property_id AS property,
+                CASE WHEN r.reading IS NULL THEN s.object_id ELSE pr.entity_id END AS object_id,
+                CASE WHEN r.reading IS NULL THEN s.object_value ELSE pr.value END AS object_value,
+                s.valid_from, s.valid_from_precision, s.valid_from_grade, s.valid_to, s.valid_to_precision,
+                s.attested_from, s.confidence
+           FROM implication_rules r
+           JOIN facts s ON s.kb_id = r.kb_id AND s.layer = 'open' AND s.invalidated_at IS NULL
+           JOIN entities se ON se.id = s.subject_id
+      LEFT JOIN entities oe ON oe.id = s.object_id
+      LEFT JOIN phrase_readings pr ON r.reading IS NOT NULL AND pr.kb_id = r.kb_id
+                                   AND pr.reading = r.reading
+                                   AND pr.phrase = lower(btrim(regexp_replace(coalesce(oe.canonical_name, s.object_value ->> 'value', s.object_value #>> '{}', ''), '\s+', ' ', 'g')))
+          WHERE r.kb_id = #{kbId} AND r.status = 'approved' AND r.trigger = 'phrase'
+            AND r.phrase = lower(btrim(regexp_replace(s.phrase, '\s+', ' ', 'g')))
+       AND r.subject_type_id IS NOT DISTINCT FROM se.type_id
+       AND r.object_is_value = (s.object_id IS NULL)
+       AND (s.object_id IS NULL OR r.object_type_id IS NOT DISTINCT FROM oe.type_id)
+            AND NOT EXISTS (SELECT 1 FROM statement_qualifiers q WHERE q.fact_id = s.id AND q.role = 'mood')
+            AND (r.reading IS NULL OR pr.entity_id IS NOT NULL OR pr.value IS NOT NULL)
+            AND NOT (s.valid_from IS NOT NULL AND s.valid_to IS NOT DISTINCT FROM s.valid_from
+                     AND EXISTS (SELECT 1 FROM relation_types rt
+                                  WHERE rt.id = r.conclude_property_id AND rt.temporal = 'state'))
+            AND NOT EXISTS (SELECT 1 FROM errata_actions ea
+                             WHERE ea.statement_id = s.id AND ea.predicate_id = r.conclude_property_id
+                               AND ea.status = 'applied' AND ea.action IN ('retract', 'revise'))
+            AND NOT EXISTS (SELECT 1 FROM implied_fact_sources i JOIN facts t ON t.id = i.fact_id
+                             WHERE i.rule_id = r.id AND i.statement_id = s.id AND t.invalidated_at IS NULL)
+          ORDER BY s.id
+    </select>
+
+    <!-- materialize.rs:549-568 类别词规则取数（kind_word_sql 逐字；宾语必须来自读数） -->
+    <select id="selectImpliedByEntity" parameterType="java.util.UUID" resultMap="impliedRow">
+        SELECT r.id AS rule, NULL::uuid AS statement, e.id AS entity,
+                e.id AS subject_id, r.conclude_property_id AS property,
+                pr.entity_id AS object_id, pr.value AS object_value,
+                NULL::timestamptz AS valid_from, NULL::text AS valid_from_precision, NULL::text AS valid_from_grade,
+                NULL::timestamptz AS valid_to, NULL::text AS valid_to_precision,
+                NULL::timestamptz AS attested_from, 0.9::real AS confidence
+           FROM implication_rules r
+           JOIN entities e ON e.kb_id = r.kb_id AND e.merged_into IS NULL
+                AND lower(btrim(regexp_replace(e.specific_type, '\s+', ' ', 'g'))) = r.phrase
+           JOIN phrase_readings pr ON pr.kb_id = r.kb_id AND pr.reading = r.reading AND pr.phrase = r.phrase
+          WHERE r.kb_id = #{kbId} AND r.status = 'approved' AND r.trigger = 'kind_word' AND r.reading IS NOT NULL
+            AND (pr.entity_id IS NOT NULL OR pr.value IS NOT NULL)
+            AND NOT EXISTS (SELECT 1 FROM implied_fact_sources i JOIN facts t ON t.id = i.fact_id
+                             WHERE i.rule_id = r.id AND i.entity_id = e.id AND t.invalidated_at IS NULL)
+          ORDER BY e.id
+    </select>
+
+    <update id="markImplied">
+        UPDATE facts SET implied = TRUE WHERE id = #{factId}
+    </update>
+
+    <insert id="insertImpliedSource">
+        INSERT INTO implied_fact_sources (fact_id, rule_id, statement_id, entity_id)
+         VALUES (#{factId}, #{ruleId}, #{statementId}, #{entityId}) ON CONFLICT DO NOTHING
+    </insert>
+
+    <!-- materialize.rs:457-484 sync_typed_attestation：见证跟着来源陈述走（0064 决定 3、5）。
+         来源陈述一条见证都没有的，它也没有（任何时点都成立）。作废了的来源陈述不作证。
+         only：只动这些行（删文档时只动引用了那篇文档的）；NULL 是整个库 -->
+    <select id="syncTypedAttestation" resultType="java.util.UUID">
+        UPDATE facts t
+            SET attested_from = src.at, attested_by = src.by
+           FROM (SELECT u.fact_id,
+                        min(s.attested_from) AS at,
+                        (array_agg(s.attested_by ORDER BY s.attested_from NULLS LAST, s.id))[1] AS by
+                   FROM (SELECT ts.fact_id, ts.statement_id
+                           FROM typed_fact_sources ts
+                           JOIN facts k ON k.id = ts.statement_id AND k.kb_id = #{kbId}
+                         UNION ALL
+                         <!-- 规则的来源按规则的库筛：类别词规则的来源是实体，没有陈述 -->
+                         SELECT i.fact_id, i.statement_id
+                           FROM implied_fact_sources i
+                           JOIN implication_rules r ON r.id = i.rule_id AND r.kb_id = #{kbId}) u
+              LEFT JOIN facts s ON s.id = u.statement_id AND s.invalidated_at IS NULL
+                  GROUP BY u.fact_id) src
+          WHERE t.id = src.fact_id AND t.kb_id = #{kbId} AND t.layer = 'typed'
+            AND t.invalidated_at IS NULL
+            AND (#{only,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[] IS NULL OR t.id = ANY(#{only,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[]))
+            AND (t.implied
+                 OR EXISTS (SELECT 1 FROM typed_fact_sources ts WHERE ts.fact_id = t.id))
+            AND (t.attested_from IS DISTINCT FROM src.at
+                 OR t.attested_by IS DISTINCT FROM src.by)
+          RETURNING t.id
+    </select>
+
+    <select id="countTyped" parameterType="java.util.UUID" resultType="long">
+        SELECT count(*) FROM facts
+          WHERE kb_id = #{kbId} AND layer = 'typed' AND from_statement_id IS NOT NULL
+            AND invalidated_at IS NULL
+    </select>
+</mapper>

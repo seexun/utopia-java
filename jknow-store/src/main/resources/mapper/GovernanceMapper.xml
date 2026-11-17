@@ -1,0 +1,356 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  治理 store 全量 SQL（M4 任务 1，逐字搬迁自旧仓库 utopia-0.1.0-rc9/crates/utopia-store/src/governance.rs，
+  实际 1505 行）。三条铁律照搬：
+  - 先例只认人的决定（actor_id IS NOT NULL），detail 键名（review.* 记 left/right、
+    merge.* 记 source/target）与 LIMIT 数值都是行为；
+  - 队列（queue/cluster_of）不进「写了建议的」也不进「正在裁的」（OPEN_PROPOSAL 片段）；
+  - 有一条开着的建议的对同时只有一条（agent_decisions_open_idx 唯一索引）。
+  纯函数族（name_shape/gate/settled_by_people 等）与咨询锁在 GovernanceService。
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.GovernanceMapper">
+
+  <!-- governance.rs:69-70 台账里两族 detail 的写法：review.* 记 left/right，merge.* 记 source/target -->
+  <sql id="L">lower(COALESCE(detail-&gt;&gt;'left', detail-&gt;&gt;'source', ''))</sql>
+  <sql id="R">lower(COALESCE(detail-&gt;&gt;'right', detail-&gt;&gt;'target', ''))</sql>
+  <!-- governance.rs:71-75 COLS 模板（同上两个 detail 键 + why 空串归 NULL） -->
+  <sql id="COLS">id AS event_id, action,
+         COALESCE(detail-&gt;&gt;'left', detail-&gt;&gt;'source', '') AS "left",
+         COALESCE(detail-&gt;&gt;'right', detail-&gt;&gt;'target', '') AS "right",
+         created_at AS at,
+         NULLIF(detail-&gt;&gt;'why', '') AS why</sql>
+
+  <!-- governance.rs:620-622 OPEN_PROPOSAL：有一条开着的建议的对不进队列（agent 已经问过了，
+       等人答）；正在裁的（adjudicating）也不进——那是这一次任务自己手里的簇 -->
+  <sql id="OPEN_PROPOSAL">NOT EXISTS (SELECT 1 FROM agent_decisions d
+      WHERE d.target_kind = 'review' AND d.target_id = rr.id AND d.status = 'proposed')
+      AND rr.stage &lt;&gt; 'adjudicating'</sql>
+
+  <resultMap id="precedent" type="tech.seexun.jknow.store.entity.Precedent">
+    <constructor>
+      <idArg column="event_id" javaType="java.util.UUID"/>
+      <arg column="action" javaType="java.lang.String"/>
+      <arg column="left" javaType="java.lang.String"/>
+      <arg column="right" javaType="java.lang.String"/>
+      <arg column="at" javaType="java.time.OffsetDateTime"/>
+      <arg column="why" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="typeIdRow" type="tech.seexun.jknow.store.mapper.GovernanceMapper$TypeIdRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="type_id" javaType="java.util.UUID"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="typePairCountsRow"
+             type="tech.seexun.jknow.store.mapper.GovernanceMapper$TypePairCountsRow">
+    <constructor>
+      <arg column="merged" javaType="_long"/>
+      <arg column="kept" javaType="_long"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="reviewRow" type="tech.seexun.jknow.store.mapper.ReviewMapper$ReviewRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="left_id" javaType="java.util.UUID"/>
+      <arg column="right_id" javaType="java.util.UUID"/>
+      <arg column="score" javaType="_float"/>
+      <arg column="reason" javaType="java.lang.String"/>
+      <arg column="stage" javaType="java.lang.String"/>
+      <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <!-- governance.rs:863-872 VIEW：agent 台账的读面（人名 + 合并之后仍按当时的实体读得出名字） -->
+  <sql id="VIEW">SELECT d.id, d.run_id, d.target_kind, d.target_id, d.action, d.confidence,
+        d.reason, d.precedents, d.status, d.merge_id, d.question, d.trace, d.calls,
+        d.created_at, d.decided_at,
+        u.display_name AS decided_by_name,
+        a.canonical_name AS "left", b.canonical_name AS "right"
+    FROM agent_decisions d
+    LEFT JOIN users u ON u.id = d.decided_by
+    LEFT JOIN resolution_reviews rr ON rr.id = d.target_id
+    LEFT JOIN entities a ON a.id = rr.left_id
+    LEFT JOIN entities b ON b.id = rr.right_id</sql>
+
+  <resultMap id="agentDecisionView" type="tech.seexun.jknow.store.entity.AgentDecisionView">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="run_id" javaType="java.util.UUID"/>
+      <arg column="target_kind" javaType="java.lang.String"/>
+      <arg column="target_id" javaType="java.util.UUID"/>
+      <arg column="action" javaType="java.lang.String"/>
+      <arg column="confidence" javaType="_float"/>
+      <arg column="reason" javaType="java.lang.String"/>
+      <arg column="precedents" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="status" javaType="java.lang.String"/>
+      <arg column="merge_id" javaType="java.util.UUID"/>
+      <arg column="question" javaType="java.lang.String"/>
+      <arg column="trace" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="calls" javaType="_int"/>
+      <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="decided_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="decided_by_name" javaType="java.lang.String"/>
+      <arg column="left" javaType="java.lang.String"/>
+      <arg column="right" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="quoteRow" type="tech.seexun.jknow.store.mapper.GovernanceMapper$QuoteRow">
+    <constructor>
+      <arg column="filename" javaType="java.lang.String"/>
+      <arg column="quote" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="namesake" type="tech.seexun.jknow.store.entity.Namesake">
+    <constructor>
+      <arg column="name" javaType="java.lang.String"/>
+      <arg column="type_label" javaType="java.lang.String"/>
+      <arg column="facts" javaType="_long"/>
+      <arg column="merged" javaType="_boolean"/>
+    </constructor>
+  </resultMap>
+
+  <!-- ==================================================================== -->
+  <!-- 先例三族（governance.rs:77-185 precedents_for / type_pair_stats） -->
+
+  <select id="selectSamePair" resultMap="precedent">
+    SELECT <include refid="COLS"/> FROM audit_events
+     WHERE kb_id = #{kbId} AND actor_id IS NOT NULL
+       AND action IN ('review.merge', 'review.keep', 'merge.manual')
+       AND ((<include refid="L"/> = #{a} AND <include refid="R"/> = #{b}) OR (<include refid="L"/> = #{b} AND <include refid="R"/> = #{a}))
+     ORDER BY created_at DESC LIMIT #{limit}
+  </select>
+
+  <select id="selectSameName" resultMap="precedent">
+    SELECT <include refid="COLS"/> FROM audit_events
+     WHERE kb_id = #{kbId} AND actor_id IS NOT NULL
+       AND action IN ('review.merge', 'review.keep', 'merge.manual')
+       AND (<include refid="L"/> IN (#{a}, #{b}) OR <include refid="R"/> IN (#{a}, #{b})) AND NOT ((<include refid="L"/> = #{a} AND <include refid="R"/> = #{b}) OR (<include refid="L"/> = #{b} AND <include refid="R"/> = #{a}))
+     ORDER BY created_at DESC LIMIT #{limit}
+  </select>
+
+  <select id="selectRevertPrecedents" resultMap="precedent">
+    SELECT <include refid="COLS"/> FROM audit_events
+     WHERE kb_id = #{kbId} AND action = 'merge.revert'
+       AND (<include refid="L"/> IN (#{a}, #{b}) OR <include refid="R"/> IN (#{a}, #{b}))
+     ORDER BY created_at DESC LIMIT #{limit}
+  </select>
+
+  <select id="selectEntityTypes" resultMap="typeIdRow">
+    SELECT id, type_id FROM entities WHERE id = ANY(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler})
+  </select>
+
+  <select id="selectTypePairCounts" resultMap="typePairCountsRow">
+    SELECT count(*) FILTER (WHERE rr.status = 'merged') AS merged,
+           count(*) FILTER (WHERE rr.status = 'kept') AS kept
+     FROM resolution_reviews rr
+     JOIN entities a ON a.id = rr.left_id
+     JOIN entities b ON b.id = rr.right_id
+     WHERE rr.kb_id = #{kbId} AND rr.decided_by IS NOT NULL
+       AND ((a.type_id = #{ta} AND b.type_id = #{tb}) OR (a.type_id = #{tb} AND b.type_id = #{ta}))
+  </select>
+
+  <select id="selectTypePairReverted" resultType="_long">
+    SELECT count(*) FROM entity_merges m
+     JOIN entities s ON s.id = m.source_id
+     JOIN entities t ON t.id = m.target_id
+     WHERE m.kb_id = #{kbId} AND m.reverted_at IS NOT NULL
+       AND ((s.type_id = #{ta} AND t.type_id = #{tb}) OR (s.type_id = #{tb} AND t.type_id = #{ta}))
+  </select>
+
+  <select id="selectDecidedBefore" resultType="java.lang.Boolean">
+    SELECT status = 'merged' FROM resolution_reviews
+     WHERE kb_id = #{kbId} AND decided_by IS NOT NULL AND status IN ('merged', 'kept')
+       AND ((left_id = #{a} AND right_id = #{b}) OR (left_id = #{b} AND right_id = #{a}))
+     ORDER BY decided_at DESC LIMIT 1
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- 队列与簇（governance.rs:664-706 queue / cluster_of） -->
+
+  <select id="selectQueueRows" resultMap="reviewRow">
+    SELECT rr.id, rr.left_id, rr.right_id, rr.score, rr.reason, rr.stage, rr.created_at
+     FROM resolution_reviews rr
+     WHERE rr.kb_id = #{kbId} AND rr.status = 'pending' AND <include refid="OPEN_PROPOSAL"/>
+     ORDER BY rr.created_at, rr.id LIMIT #{limit}
+  </select>
+
+  <select id="selectClusterRows" resultMap="reviewRow">
+    SELECT rr.id, rr.left_id, rr.right_id, rr.score, rr.reason, rr.stage, rr.created_at
+     FROM resolution_reviews rr
+     JOIN entities a ON a.id = rr.left_id
+     JOIN entities b ON b.id = rr.right_id
+     WHERE rr.kb_id = #{kbId} AND rr.status = 'pending' AND rr.id &lt;&gt; #{headId} AND <include refid="OPEN_PROPOSAL"/>
+       AND (rr.left_id = ANY(#{entityIds,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler})
+            OR rr.right_id = ANY(#{entityIds,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler})
+            OR lower(a.canonical_name) = ANY(#{names,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler})
+            OR lower(b.canonical_name) = ANY(#{names,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler}))
+     ORDER BY rr.created_at, rr.id LIMIT #{limit}
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- agent_decisions 写读全族（governance.rs:727-1121） -->
+
+  <insert id="insertDecision">
+    INSERT INTO agent_decisions
+        (id, kb_id, run_id, target_kind, target_id, action, confidence, reason,
+         precedents, status, merge_id, question, trace, calls)
+     VALUES (#{id}, #{kbId}, #{runId}, 'review', #{targetId}, #{action}, #{confidence}, #{reason},
+             #{precedents, typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler},
+             #{status}, #{mergeId}, #{question},
+             #{trace, typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler}, #{calls})
+  </insert>
+
+  <select id="selectLoopCallsToday" resultType="_long">
+    SELECT COALESCE(sum(calls), 0)::bigint FROM agent_decisions
+     WHERE kb_id = #{kbId} AND created_at &gt;= date_trunc('day', now())
+  </select>
+
+  <select id="selectDecisionList" resultMap="agentDecisionView">
+    <include refid="VIEW"/> WHERE d.kb_id = #{kbId} ORDER BY d.created_at DESC, d.id DESC LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <select id="selectDecision" resultMap="agentDecisionView">
+    <include refid="VIEW"/> WHERE d.kb_id = #{kbId} AND d.id = #{id}
+  </select>
+
+  <select id="selectAgentRunning" resultType="java.lang.Boolean">
+    SELECT EXISTS (SELECT 1 FROM jobs WHERE kind = 'govern' AND status = 'running'
+                      AND payload-&gt;&gt;'kb_id' = #{kbId})
+  </select>
+
+  <select id="selectQueueLen" resultType="_long">
+    SELECT count(*) FROM resolution_reviews rr
+     WHERE rr.kb_id = #{kbId} AND rr.status = 'pending' AND <include refid="OPEN_PROPOSAL"/>
+  </select>
+
+  <update id="lockReviews">
+    UPDATE resolution_reviews SET stage = 'adjudicating'
+     WHERE kb_id = #{kbId} AND id = ANY(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}) AND status = 'pending'
+  </update>
+
+  <update id="releaseLocks">
+    UPDATE resolution_reviews SET stage = 'human'
+     WHERE kb_id = #{kbId} AND status = 'pending' AND stage = 'adjudicating'
+  </update>
+
+  <!-- governance.rs:955-962 逐字：治理开着 + 任务在跑 + 这一对标着 adjudicating，
+       三个条件缺一个都不算锁 -->
+  <select id="selectLockedByAgent" resultType="java.lang.Boolean">
+    SELECT EXISTS (
+        SELECT 1 FROM resolution_reviews rr
+        JOIN knowledge_bases k ON k.id = rr.kb_id
+        WHERE rr.id = #{reviewId} AND rr.kb_id = #{kbId} AND rr.status = 'pending'
+          AND rr.stage = 'adjudicating' AND k.governance
+          AND EXISTS (SELECT 1 FROM jobs j WHERE j.kind = 'govern' AND j.status = 'running'
+                      AND j.payload->>'kb_id' = #{kbId}::text))
+  </select>
+
+  <select id="selectCountProposed" resultType="_long">
+    SELECT count(*) FROM agent_decisions WHERE kb_id = #{kbId} AND status = 'proposed'
+  </select>
+
+  <update id="settleDecision">
+    UPDATE agent_decisions SET status = #{status}, decided_at = now(), decided_by = #{userId}
+     WHERE kb_id = #{kbId} AND id = #{id} AND status IN ('proposed', 'applied')
+  </update>
+
+  <update id="answerOpen">
+    UPDATE agent_decisions
+        SET status = CASE WHEN action = #{action} THEN 'accepted' ELSE 'overridden' END,
+            decided_at = now(), decided_by = #{userId}
+      WHERE kb_id = #{kbId} AND target_kind = 'review' AND target_id = #{reviewId} AND status = 'proposed'
+  </update>
+
+  <update id="supersedeSiblings">
+    UPDATE agent_decisions d SET status = 'superseded', decided_at = now()
+     FROM resolution_reviews me
+          JOIN entities ma ON ma.id = me.left_id
+          JOIN entities mb ON mb.id = me.right_id,
+          resolution_reviews rr
+          JOIN entities a ON a.id = rr.left_id
+          JOIN entities b ON b.id = rr.right_id
+     WHERE me.id = #{reviewId} AND me.kb_id = #{kbId}
+       AND d.kb_id = #{kbId} AND d.status = 'proposed'
+       AND d.target_kind = 'review' AND d.target_id = rr.id AND rr.id &lt;&gt; me.id
+       AND (rr.left_id IN (me.left_id, me.right_id) OR rr.right_id IN (me.left_id, me.right_id)
+            OR lower(a.canonical_name) IN (lower(ma.canonical_name), lower(mb.canonical_name))
+            OR lower(b.canonical_name) IN (lower(ma.canonical_name), lower(mb.canonical_name)))
+  </update>
+
+  <select id="selectRevertsSince" resultType="_long">
+    SELECT count(*) FROM agent_decisions
+     WHERE kb_id = #{kbId} AND status = 'reverted' AND decided_at &gt;= #{since}
+  </select>
+
+  <update id="tripGovernance">
+    UPDATE knowledge_bases SET governance = FALSE, updated_at = now()
+     WHERE id = #{kbId} AND governance
+  </update>
+
+  <select id="selectSettleByMerge" resultType="java.util.UUID">
+    UPDATE agent_decisions SET status = 'reverted', decided_at = now(), decided_by = #{userId}
+     WHERE kb_id = #{kbId} AND merge_id = #{mergeId} AND status = 'applied'
+     RETURNING id
+  </select>
+
+  <select id="selectDueKbs" resultType="java.util.UUID">
+    SELECT kb.id FROM knowledge_bases kb
+     WHERE kb.governance AND EXISTS (
+         SELECT 1 FROM resolution_reviews rr
+         WHERE rr.kb_id = kb.id AND rr.status = 'pending' AND <include refid="OPEN_PROPOSAL"/>)
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- 第二刀三工具（governance.rs:772-861 quotes_of / ledger_search / namesakes） -->
+
+  <!-- 名字事实排在后面，引文就是名字本身的不要（0041）：known_as 置信度 1.0 按置信度排
+       每块都赢，而「这一块写了它的名字」的引文往往只是那个名字 -->
+  <select id="selectQuotesOf" resultMap="quoteRow">
+    SELECT filename, quote FROM (
+       SELECT DISTINCT ON (fe.chunk_id) d.filename,
+              COALESCE(NULLIF(fe.quote, ''), left(c.text, 240)) AS quote
+       FROM facts f
+       -- 谓词可以为空（0010），LEFT JOIN 才不丢那些事实
+       LEFT JOIN relation_types r ON r.id = f.predicate_id
+       JOIN fact_evidence fe ON fe.fact_id = f.id
+       JOIN chunks c ON c.id = fe.chunk_id
+       JOIN documents d ON d.id = c.document_id
+       WHERE f.kb_id = #{kbId} AND f.invalidated_at IS NULL
+         AND (f.subject_id = #{entityId} OR f.object_id = #{entityId})
+         AND NOT (coalesce(r.builtin AND r.key = 'known_as', false)
+                  AND lower(trim(coalesce(fe.quote, ''))) = lower(f.object_value->>'value'))
+       ORDER BY fe.chunk_id, coalesce(r.builtin AND r.key = 'known_as', false), f.confidence DESC
+     ) q
+     LIMIT #{limit}
+  </select>
+
+  <select id="selectLedgerSearch" resultMap="precedent">
+    SELECT <include refid="COLS"/> FROM audit_events
+     WHERE kb_id = #{kbId} AND actor_id IS NOT NULL
+       AND action IN ('review.merge', 'review.keep', 'merge.manual', 'merge.revert')
+       AND (<include refid="L"/> LIKE #{like} OR <include refid="R"/> LIKE #{like})
+     ORDER BY created_at DESC LIMIT #{limit}
+  </select>
+
+  <select id="selectNamesakes" resultMap="namesake">
+    SELECT e.canonical_name AS name, t.label AS type_label,
+           (SELECT count(*) FROM facts f
+             WHERE f.kb_id = e.kb_id AND f.invalidated_at IS NULL
+               AND (f.subject_id = e.id OR f.object_id = e.id)) AS facts,
+           (e.merged_into IS NOT NULL) AS merged
+     FROM entities e
+     LEFT JOIN entity_types t ON t.id = e.type_id
+     WHERE e.kb_id = #{kbId} AND lower(e.canonical_name) LIKE #{like}
+     ORDER BY e.merged_into IS NOT NULL, facts DESC, e.canonical_name
+     LIMIT #{limit}
+  </select>
+</mapper>

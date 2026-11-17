@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 短语签名向量缓存（utopia-store/src/signature_vectors.rs 逐字；bytea 哈希以 hex
+     文本传——PG 的 bytea 输入解析 hex 文本，数组侧先 text[] 再 cast bytea[]）。 -->
+<mapper namespace="tech.seexun.jknow.store.mapper.SignatureVectorsMapper">
+
+  <!-- signature_vectors.rs:34-49 get 逐字（embedding 以 vector_out 文本形态读出） -->
+  <select id="selectByHashes" resultType="tech.seexun.jknow.store.mapper.SignatureVectorsMapper$VectorRow">
+    SELECT encode(text_hash, 'hex') AS hash, embedding::text AS vector FROM signature_vectors
+     WHERE kb_id = #{kbId} AND model = #{model}
+       AND text_hash = ANY(SELECT decode(h, 'hex') FROM unnest(#{hashes}::text[]) AS t(h))
+  </select>
+
+  <!-- signature_vectors.rs:52-73 put 的单条（VALUES 逐字；事务由调用方组） -->
+  <insert id="insertVector">
+    INSERT INTO signature_vectors (kb_id, model, text_hash, embedding)
+    VALUES (#{kbId}, #{model}, decode(#{hash}, 'hex'), #{vector}::vector)
+    ON CONFLICT DO NOTHING
+  </insert>
+
+  <!-- signature_vectors.rs:78-86 prune 逐字 -->
+  <delete id="prune" parameterType="map">
+    DELETE FROM signature_vectors
+     WHERE kb_id = #{kbId} AND (model &lt;&gt; #{model}
+            OR NOT (text_hash = ANY(SELECT decode(h, 'hex') FROM unnest(#{keep}::text[]) AS t(h))))
+  </delete>
+</mapper>

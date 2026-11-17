@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  等人点头的事实写族 SQL（逐字搬迁自旧仓库 utopia-0.1.0-rc9/crates/utopia-store/src/pending.rs；
+  铁律：占位符 $1..$n 改写 #{param} 外 token 流一字不动，每条注明 file:line）。
+  读面 list/for_chunk 在 ReviewMapper（M1 已落，pending.rs:219-248）；这里补单条 get
+  与写侧全族。
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.PendingMapper">
+
+  <!-- 前置三查之「图上已经有」（pending.rs:81-118）：开放陈述在活着的开放行里按
+       (主语, 短语, 宾语) 找；带本体的形状照旧按 (主语, 谓词, 宾语)。IS NOT DISTINCT
+       FROM——谓词/宾语/值任一为空都不是「不匹配」（0009 的 NULL 陷阱）。 -->
+  <select id="selectAssertedOpen" resultType="int">
+    SELECT 1 FROM facts
+      WHERE kb_id = #{kbId} AND subject_id = #{subjectId}
+        AND layer = 'open' AND phrase = #{phrase}
+        AND object_id IS NOT DISTINCT FROM #{objectId}
+        AND object_value IS NOT DISTINCT FROM #{objectValue,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler}
+        AND invalidated_at IS NULL
+      LIMIT 1
+  </select>
+
+  <select id="selectAssertedTyped" resultType="int">
+    SELECT 1 FROM facts
+      WHERE kb_id = #{kbId} AND subject_id = #{subjectId}
+        AND predicate_id IS NOT DISTINCT FROM #{predicateId}
+        AND object_id IS NOT DISTINCT FROM #{objectId}
+        AND object_value IS NOT DISTINCT FROM #{objectValue,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler}
+        AND invalidated_at IS NULL
+      LIMIT 1
+  </select>
+
+  <!-- 前置三查之「已经在队列里」（pending.rs:122-130）：pending_facts 同键（短语也进键——
+       同一主宾之间两句话是两条提议）。 -->
+  <select id="selectPendingDup" resultType="int">
+    SELECT 1 FROM pending_facts
+      WHERE kb_id = #{kbId} AND subject_id = #{subjectId}
+        AND predicate_id IS NOT DISTINCT FROM #{predicateId}
+        AND object_id IS NOT DISTINCT FROM #{objectId}
+        AND object_value IS NOT DISTINCT FROM #{objectValue,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler}
+        AND phrase IS NOT DISTINCT FROM #{phrase}
+      LIMIT 1
+  </select>
+
+  <!-- 前置三查之「人拒绝过」（pending.rs:146-161）：只按 (主语, 谓词/短语, 宾语实体) 查。
+       **字面值事实不查**——rejected_facts 没有 object_value 列，按 (主语, 谓词) 挡会把
+       「薪水 28000 被拒」扩大成「薪水这个属性永远不再提」；宁可多问一次，不替人拒掉
+       一个新值。短语进了键：同一对实体之间换一个短语是另一句话，不被上一句的拒绝连累。 -->
+  <select id="selectRejected" resultType="int">
+    SELECT 1 FROM rejected_facts
+      WHERE kb_id = #{kbId} AND subject_id = #{subjectId}
+        AND predicate_id IS NOT DISTINCT FROM #{predicateId}
+        AND object_id = #{objectId}
+        AND phrase IS NOT DISTINCT FROM #{phrase}
+      LIMIT 1
+  </select>
+
+  <!-- 提议落队（pending.rs:167-175）：20 列 INSERT，两种形状共用一行
+       （phrase 为空=带本体；phrase 非空=开放陈述，0044/迁移 0062）。 -->
+  <insert id="insertPending">
+    INSERT INTO pending_facts
+         (id, kb_id, subject_id, predicate_id, object_id, object_value, proposed_predicate,
+          valid_from, valid_from_precision, valid_to, valid_to_precision,
+          confidence, chunk_id, proposed_by, proposed_token,
+          phrase, qualifiers, time_words, quote_start, quote_end)
+     VALUES (#{id}, #{kbId}, #{subjectId}, #{predicateId}, #{objectId}, #{objectValue,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler}, #{proposedPredicate},
+             #{from}, #{fromPrecision}, #{to}, #{toPrecision},
+             #{confidence}, #{chunkId}, #{proposedBy}, #{proposedToken},
+             #{phrase}, #{qualifiers,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler}, #{timeWords,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler}, #{quoteStart}, #{quoteEnd})
+  </insert>
+
+  <!-- 单条 get（pending.rs:250-253）：VIEW_SELECT 主体与 ReviewMapper.pendingViewSelect
+       同一 token 流（pending.rs:202-217），此处自带一份以取单条。 -->
+  <select id="selectById" resultMap="tech.seexun.jknow.store.mapper.ReviewMapper.pendingFactView">
+    SELECT p.id, p.subject_id, s.canonical_name AS subject_name, p.predicate_id, r.label AS predicate_label, p.proposed_predicate,
+           p.object_id, o.canonical_name AS object_name, p.object_value,
+           p.valid_from, p.valid_from_precision, p.valid_to, p.valid_to_precision,
+           p.confidence, p.chunk_id, c.text AS quote,
+           p.proposed_by, u.display_name AS proposed_by_name,
+           t.name AS proposed_token_name, p.created_at,
+           p.phrase, p.qualifiers, p.time_words, p.quote_start, p.quote_end
+      FROM pending_facts p
+      JOIN entities s ON s.id = p.subject_id
+      LEFT JOIN relation_types r ON r.id = p.predicate_id
+      LEFT JOIN entities o ON o.id = p.object_id
+      JOIN chunks c ON c.id = p.chunk_id
+      LEFT JOIN users u ON u.id = p.proposed_by
+      LEFT JOIN personal_tokens t ON t.id = p.proposed_token
+     WHERE p.kb_id = #{kbId} AND p.id = #{id}
+  </select>
+
+  <!-- 点头的锚点（pending.rs:301-309）：那句记忆所在文档的日期（0022）——与抽取那条路
+       同一个来源。没起点的 fact 从有证据的那一刻起成立，而证据就是这句话。 -->
+  <select id="selectChunkDocTime" resultType="java.time.OffsetDateTime">
+    SELECT d.doc_time FROM chunks c JOIN documents d ON d.id = c.document_id
+      WHERE c.id = #{chunkId}
+  </select>
+
+  <!-- 开放陈述的锚点（pending.rs:427-434）：记录轴只认文档自己说的日期（#714）——
+       doc_time_source 是 content / source 才取 doc_time，上传时间与文件 mtime 不算。
+       记忆文档是 'none'，于是这里为空，落成此刻（人此刻点了头，人就是证据）。 -->
+  <select id="selectChunkDocTimeStated" resultType="java.time.OffsetDateTime">
+    SELECT d.doc_time FROM chunks c JOIN documents d ON d.id = c.document_id
+      WHERE c.id = #{chunkId} AND d.doc_time_source IN ('content', 'source')
+  </select>
+
+  <!-- 带本体形状点头后的时态对账要不要做（pending.rs:360-365）：state 关系才有唯一性
+       对账——与抽取那条路相同（「Mira 交给 Devin 了」说完，Mira 那条就该闭合）。 -->
+  <select id="selectRelationMeta" resultMap="relationMeta">
+    SELECT functional, inverse_functional, temporal FROM relation_types WHERE id = #{predicateId}
+  </select>
+
+  <!-- 拒绝落账（pending.rs:571-575）：rejected_facts 记 (主语, 谓词, 宾语实体, 短语)——
+       下一轮重抽先查它。开放陈述连短语一起记：拒的是「这句话」，不是这一对实体之间的一切。 -->
+  <insert id="insertRejected">
+    INSERT INTO rejected_facts (kb_id, subject_id, predicate_id, object_id, rejected_by, phrase)
+     VALUES (#{kbId}, #{subjectId}, #{predicateId}, #{objectId}, #{rejectedBy}, #{phrase})
+  </insert>
+
+  <!-- 从队列里拿掉（pending.rs:396/523/583）：点头或拒绝的最后一步。 -->
+  <delete id="deletePending">
+    DELETE FROM pending_facts WHERE id = #{id}
+  </delete>
+
+  <!-- 那句记忆所在的文档（pending.rs:552-558）：确认回报给调用方按它重排时间解析（0045）。 -->
+  <select id="selectDocumentOfChunk" resultType="java.util.UUID">
+    SELECT document_id FROM chunks WHERE id = #{chunkId}
+  </select>
+
+  <resultMap id="relationMeta" type="tech.seexun.jknow.store.mapper.PendingMapper$RelationMeta">
+    <constructor>
+      <arg column="functional" javaType="_boolean"/>
+      <arg column="inverse_functional" javaType="_boolean"/>
+      <arg column="temporal" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+</mapper>

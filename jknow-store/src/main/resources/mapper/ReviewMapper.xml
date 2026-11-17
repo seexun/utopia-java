@@ -1,0 +1,826 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  review 读路径 SQL（逐字搬迁自旧仓库 utopia-0.1.0-rc9/crates/utopia-store/src：review.rs /
+  pending.rs / resolution.rs / temporal.rs / graph.rs / mappings.rs / alignment_queue.rs /
+  type_bindings.rs / names.rs / errata.rs / reasoning.rs / governance.rs / audit.rs）。
+  铁律：占位符 $1..$n 改写 #{param} 外 token 流一字不动，每条注明 file:line。
+
+  Rust format! 片段常量（SQL 文本片段，内嵌换行与缩进原样保留）：
+  · UNCONFIRMED_FACT（review.rs:28-33，「待确认」判据，counts/总览共用，别名固定 f）：
+    f.valid_to IS NULL AND f.valid_to_precision IS NULL
+                   AND EXISTS (SELECT 1 FROM fact_evidence fe WHERE fe.fact_id = f.id)
+                   AND NOT EXISTS (SELECT 1 FROM fact_evidence fe
+                                     JOIN chunks c ON c.id = fe.chunk_id
+                                    WHERE fe.fact_id = f.id
+                                      AND c.superseded_at IS NULL)
+  · WAITING_PHRASE（alignment_queue.rs:101-105，等人定的短语签名，含 #966 bound-marks-NULL-需问）：
+    (b.status = 'undecided'
+           OR (b.status = 'bound' AND b.marks IS NULL
+               AND (b.decided_by = 'person' OR b.marks_asked_at IS NOT NULL)
+               AND EXISTS (SELECT 1 FROM relation_types rt
+                            WHERE rt.id = b.relation_type_id AND rt.temporal = 'state')))
+  · TypeFilter::clause()（resolution.rs:1656-1664）：Any="TRUE"；Same="a.type_id IS NOT NULL AND
+    a.type_id = b.type_id"；Conflict="a.type_id IS NOT NULL AND b.type_id IS NOT NULL AND a.type_id &lt;&gt; b.type_id"
+  · not_a_name("f")（names.rs:136-141）：NOT EXISTS (SELECT 1 FROM relation_types nr
+    WHERE nr.id = f.predicate_id AND nr.builtin AND nr.key = 'known_as')（两行）
+  · DECISION_ACTIONS / history COND（review_summary.rs:30-31 / audit.rs:100-101）：四族动作筛子
+  · facts_holds_to("lf")（world_axis.rs:50-62，violations 的 left_open 判据）= graph mapper
+    holds_to 同款 CASE（eternal NULL / event 桶 / valid_to / unknown→attested_to）
+
+  排版规则（与 GraphMapper.xml 同口径）：
+  · 续行反斜杠（\）折叠：Rust 字符串行尾的反斜杠吃掉换行与下一行行首空白——行尾已有空格的
+    以单空格相连（world_axis 系）。XML 内按折叠后的 token 流书写。
+  · 普通多行字符串（pending 的 VIEW_SELECT，pending.rs:202-217：除开头吃掉首换行的一根
+    反斜杠外无行尾反斜杠）：源内换行与缩进原样保留；Java 侧压成单行是排版选择，
+    token 流等价（源内换行落在逗号后者，单行连写零空格）。
+  · format! 的 {{ }} 转义：'{{}}' 展开为 '{}'（signatures 的 coalesce 缺省、triple 的 #>> '{}'）。
+  · 源内 SQL 注释（SQL 行注释 …）与内嵌换行原样保留（PG 语法的一部分，token 流成员）。
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.ReviewMapper">
+
+  <!-- counts 行（17 列；字段序=Rust ReviewCounts 结构体序，构造器按列名映射） -->
+  <resultMap id="reviewCounts" type="tech.seexun.jknow.store.entity.ReviewCounts">
+    <constructor>
+      <arg column="pending" javaType="_long"/>
+      <arg column="duplicates" javaType="_long"/>
+      <arg column="duplicates_same_type" javaType="_long"/>
+      <arg column="duplicates_type_conflict" javaType="_long"/>
+      <arg column="conflicts" javaType="_long"/>
+      <arg column="unconfirmed" javaType="_long"/>
+      <arg column="lowconf" javaType="_long"/>
+      <arg column="mappings" javaType="_long"/>
+      <arg column="violations" javaType="_long"/>
+      <arg column="alignment" javaType="_long"/>
+      <arg column="errata" javaType="_long"/>
+      <arg column="defects" javaType="_long"/>
+      <arg column="merges" javaType="_long"/>
+      <arg column="agent" javaType="_long"/>
+      <arg column="agent_rows" javaType="_long"/>
+      <arg column="agent_running" javaType="_boolean"/>
+      <arg column="agent_queue" javaType="_long"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="pendingFactView" type="tech.seexun.jknow.store.entity.PendingFactView">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="subject_id" javaType="java.util.UUID"/>
+      <arg column="subject_name" javaType="java.lang.String"/>
+      <arg column="predicate_id" javaType="java.util.UUID"/>
+      <arg column="predicate_label" javaType="java.lang.String"/>
+      <arg column="proposed_predicate" javaType="java.lang.String"/>
+      <arg column="object_id" javaType="java.util.UUID"/>
+      <arg column="object_name" javaType="java.lang.String"/>
+      <arg column="object_value" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="valid_from" javaType="java.time.OffsetDateTime"/>
+      <arg column="valid_from_precision" javaType="java.lang.String"/>
+      <arg column="valid_to" javaType="java.time.OffsetDateTime"/>
+      <arg column="valid_to_precision" javaType="java.lang.String"/>
+      <arg column="confidence" javaType="_float"/>
+      <arg column="chunk_id" javaType="java.util.UUID"/>
+      <arg column="quote" javaType="java.lang.String"/>
+      <arg column="proposed_by" javaType="java.util.UUID"/>
+      <arg column="proposed_by_name" javaType="java.lang.String"/>
+      <arg column="proposed_token_name" javaType="java.lang.String"/>
+      <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="phrase" javaType="java.lang.String"/>
+      <arg column="qualifiers" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="time_words" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="quote_start" javaType="java.lang.Integer"/>
+      <arg column="quote_end" javaType="java.lang.Integer"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="reviewRow" type="tech.seexun.jknow.store.mapper.ReviewMapper$ReviewRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="left_id" javaType="java.util.UUID"/>
+      <arg column="right_id" javaType="java.util.UUID"/>
+      <arg column="score" javaType="_float"/>
+      <arg column="reason" javaType="java.lang.String"/>
+      <arg column="stage" javaType="java.lang.String"/>
+      <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="sideRow" type="tech.seexun.jknow.store.mapper.ReviewMapper$SideRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="name" javaType="java.lang.String"/>
+      <arg column="type_label" javaType="java.lang.String"/>
+      <arg column="color" javaType="java.lang.String"/>
+      <arg column="disambiguator" javaType="java.lang.String"/>
+      <arg column="degree" javaType="_long"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="factLineRow" type="tech.seexun.jknow.store.mapper.ReviewMapper$FactLineRow">
+    <constructor>
+      <arg column="entity_id" javaType="java.util.UUID"/>
+      <arg column="direction" javaType="java.lang.String"/>
+      <arg column="predicate_label" javaType="java.lang.String"/>
+      <arg column="other_name" javaType="java.lang.String"/>
+      <arg column="valid_from" javaType="java.time.OffsetDateTime"/>
+      <arg column="valid_to" javaType="java.time.OffsetDateTime"/>
+      <arg column="confidence" javaType="_float"/>
+      <arg column="recorded_at" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="nameRow" type="tech.seexun.jknow.store.mapper.ReviewMapper$NameRow">
+    <constructor>
+      <arg column="entity_id" javaType="java.util.UUID"/>
+      <arg column="v" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="proposalRow" type="tech.seexun.jknow.store.mapper.ReviewMapper$ProposalRow">
+    <constructor>
+      <arg column="target_id" javaType="java.util.UUID"/>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="action" javaType="java.lang.String"/>
+      <arg column="confidence" javaType="_float"/>
+      <arg column="reason" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="conflictView" type="tech.seexun.jknow.store.entity.ConflictView">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="reason" javaType="java.lang.String"/>
+      <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="predicate_label" javaType="java.lang.String"/>
+      <arg column="old_fact_id" javaType="java.util.UUID"/>
+      <arg column="old_subject" javaType="java.lang.String"/>
+      <arg column="old_object" javaType="java.lang.String"/>
+      <arg column="old_valid_from" javaType="java.time.OffsetDateTime"/>
+      <arg column="new_fact_id" javaType="java.util.UUID"/>
+      <arg column="new_subject" javaType="java.lang.String"/>
+      <arg column="new_object" javaType="java.lang.String"/>
+      <arg column="new_valid_from" javaType="java.time.OffsetDateTime"/>
+      <arg column="new_confidence" javaType="_float"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="factReviewItem" type="tech.seexun.jknow.store.entity.FactReviewItem">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="subject_name" javaType="java.lang.String"/>
+      <arg column="predicate_label" javaType="java.lang.String"/>
+      <arg column="object_name" javaType="java.lang.String"/>
+      <arg column="valid_from" javaType="java.time.OffsetDateTime"/>
+      <arg column="valid_to" javaType="java.time.OffsetDateTime"/>
+      <arg column="confidence" javaType="_float"/>
+      <arg column="evidence_count" javaType="_long"/>
+      <arg column="quote" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="conceptMapping" type="tech.seexun.jknow.store.entity.ConceptMapping">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="concept_id" javaType="java.util.UUID"/>
+      <arg column="concept_name" javaType="java.lang.String"/>
+      <arg column="source" javaType="java.lang.String"/>
+      <arg column="table_name" javaType="java.lang.String"/>
+      <arg column="expr" javaType="java.lang.String"/>
+      <arg column="sql" javaType="java.lang.String"/>
+      <arg column="unit" javaType="java.lang.String"/>
+      <arg column="summary" javaType="java.lang.String"/>
+      <arg column="derived" javaType="_boolean"/>
+      <arg column="status" javaType="java.lang.String"/>
+      <arg column="written_by" javaType="java.util.UUID"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="phraseRow" type="tech.seexun.jknow.store.mapper.ReviewMapper$PhraseRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="phrase" javaType="java.lang.String"/>
+      <arg column="subject_class" javaType="java.lang.String"/>
+      <arg column="object_class" javaType="java.lang.String"/>
+      <arg column="object_is_value" javaType="_boolean"/>
+      <arg column="statement_count" javaType="_int"/>
+      <arg column="examples" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.TextArrayTypeHandler"/>
+      <arg column="votes" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="decided_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="bound_to" javaType="java.lang.String"/>
+      <arg column="direction" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="ruleRow" type="tech.seexun.jknow.store.mapper.ReviewMapper$RuleRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="trigger" javaType="java.lang.String"/>
+      <arg column="phrase" javaType="java.lang.String"/>
+      <arg column="subject_class" javaType="java.lang.String"/>
+      <arg column="object_class" javaType="java.lang.String"/>
+      <arg column="object_is_value" javaType="_boolean"/>
+      <arg column="property" javaType="java.lang.String"/>
+      <arg column="property_label" javaType="java.lang.String"/>
+      <arg column="reading" javaType="java.lang.String"/>
+      <arg column="statement_count" javaType="_int"/>
+      <arg column="examples" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.TextArrayTypeHandler"/>
+      <arg column="votes" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="decided_at" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="kindWordRow" type="tech.seexun.jknow.store.mapper.ReviewMapper$KindWordRow">
+    <constructor>
+      <arg column="kind_word" javaType="java.lang.String"/>
+      <arg column="words" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.TextArrayTypeHandler"/>
+      <arg column="votes" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="decided_at" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="signatureRow" type="tech.seexun.jknow.store.mapper.ReviewMapper$SignatureRow">
+    <constructor>
+      <arg column="kind_word" javaType="java.lang.String"/>
+      <arg column="words" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.TextArrayTypeHandler"/>
+      <arg column="count" javaType="_long"/>
+      <arg column="examples" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.TextArrayTypeHandler"/>
+      <arg column="phrases" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.TextArrayTypeHandler"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="errataHeld" type="tech.seexun.jknow.store.entity.ErrataHeldItem">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="document_id" javaType="java.util.UUID"/>
+      <arg column="document" javaType="java.lang.String"/>
+      <arg column="action" javaType="java.lang.String"/>
+      <arg column="flag" javaType="java.lang.String"/>
+      <arg column="fact_id" javaType="java.util.UUID"/>
+      <arg column="proposed" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="reason" javaType="java.lang.String"/>
+      <arg column="quote" javaType="java.lang.String"/>
+      <arg column="detail" javaType="java.lang.String"/>
+      <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="violationRow" type="tech.seexun.jknow.store.mapper.ReviewMapper$ViolationRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="kind" javaType="java.lang.String"/>
+      <arg column="predicate" javaType="java.lang.String"/>
+      <arg column="left_fact" javaType="java.util.UUID"/>
+      <arg column="left_text" javaType="java.lang.String"/>
+      <arg column="right_fact" javaType="java.util.UUID"/>
+      <arg column="right_text" javaType="java.lang.String"/>
+      <arg column="path_len" javaType="_int"/>
+      <arg column="detected_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="detail" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="path" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="left_open" javaType="_boolean"/>
+      <arg column="left_confidence" javaType="_float"/>
+      <arg column="same_name_peers" javaType="_boolean"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="ontologyDefect" type="tech.seexun.jknow.store.entity.OntologyDefect">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="kind" javaType="java.lang.String"/>
+      <arg column="detail" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="subject_label" javaType="java.lang.String"/>
+      <arg column="other_label" javaType="java.lang.String"/>
+      <arg column="path_labels" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.TextArrayTypeHandler"/>
+      <arg column="detected_at" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="mergeLogView" type="tech.seexun.jknow.store.entity.MergeLogView">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="source_name" javaType="java.lang.String"/>
+      <arg column="target_name" javaType="java.lang.String"/>
+      <arg column="merged_by_name" javaType="java.lang.String"/>
+      <arg column="reason" javaType="java.lang.String"/>
+      <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="reverted_at" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="agentDecisionView" type="tech.seexun.jknow.store.entity.AgentDecisionView">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="run_id" javaType="java.util.UUID"/>
+      <arg column="target_kind" javaType="java.lang.String"/>
+      <arg column="target_id" javaType="java.util.UUID"/>
+      <arg column="action" javaType="java.lang.String"/>
+      <arg column="confidence" javaType="_float"/>
+      <arg column="reason" javaType="java.lang.String"/>
+      <arg column="precedents" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="status" javaType="java.lang.String"/>
+      <arg column="merge_id" javaType="java.util.UUID"/>
+      <arg column="question" javaType="java.lang.String"/>
+      <arg column="trace" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="calls" javaType="_int"/>
+      <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="decided_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="decided_by_name" javaType="java.lang.String"/>
+      <arg column="left" javaType="java.lang.String"/>
+      <arg column="right" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="auditEventView" type="tech.seexun.jknow.store.entity.AuditEventView">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="action" javaType="java.lang.String"/>
+      <arg column="target_kind" javaType="java.lang.String"/>
+      <arg column="target_id" javaType="java.util.UUID"/>
+      <arg column="detail" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="actor_id" javaType="java.util.UUID"/>
+      <arg column="actor_name" javaType="java.lang.String"/>
+      <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <!-- ==================================================================== -->
+  <!-- counts（review.rs:35-84：17 列子查询一条查询；{same}/{conflict}=TypeFilter clause、
+       {unconfirmed}=UNCONFIRMED_FACT、{waiting_phrase}=WAITING_PHRASE 内联展开） -->
+
+  <select id="selectCounts" resultMap="reviewCounts">
+    SELECT
+       (SELECT count(*) FROM pending_facts WHERE kb_id = #{kbId}) AS pending,
+       (SELECT count(*) FROM resolution_reviews
+         WHERE kb_id = #{kbId} AND status = 'pending') AS duplicates,
+       (SELECT count(*) FROM resolution_reviews rr
+         JOIN entities a ON a.id = rr.left_id JOIN entities b ON b.id = rr.right_id
+         WHERE rr.kb_id = #{kbId} AND rr.status = 'pending' AND a.type_id IS NOT NULL AND a.type_id = b.type_id) AS duplicates_same_type,
+       (SELECT count(*) FROM resolution_reviews rr
+         JOIN entities a ON a.id = rr.left_id JOIN entities b ON b.id = rr.right_id
+         WHERE rr.kb_id = #{kbId} AND rr.status = 'pending' AND a.type_id IS NOT NULL AND b.type_id IS NOT NULL AND a.type_id &lt;&gt; b.type_id) AS duplicates_type_conflict,
+       (SELECT count(*) FROM fact_conflicts
+         WHERE kb_id = #{kbId} AND status = 'open') AS conflicts,
+       (SELECT count(*) FROM facts f
+         WHERE f.kb_id = #{kbId} AND f.invalidated_at IS NULL AND f.valid_to IS NULL AND f.valid_to_precision IS NULL
+               AND EXISTS (SELECT 1 FROM fact_evidence fe WHERE fe.fact_id = f.id)
+               AND NOT EXISTS (SELECT 1 FROM fact_evidence fe
+                                 JOIN chunks c ON c.id = fe.chunk_id
+                                WHERE fe.fact_id = f.id
+                                  AND c.superseded_at IS NULL)) AS unconfirmed,
+       (SELECT count(*) FROM facts
+         WHERE kb_id = #{kbId} AND invalidated_at IS NULL
+           AND confidence &lt; #{below} AND derived_by_rule IS NULL) AS lowconf,
+       (SELECT count(*) FROM concept_mappings
+         WHERE kb_id = #{kbId} AND status = 'proposed') AS mappings,
+       (SELECT count(*) FROM axiom_violations
+         WHERE kb_id = #{kbId} AND status = 'open') AS violations,
+       (SELECT count(*) FROM ontology_defects
+         WHERE kb_id = #{kbId} AND status = 'open') AS defects,
+       (SELECT count(*) FROM entity_merges WHERE kb_id = #{kbId}) AS merges,
+       (SELECT count(*) FROM agent_decisions
+         WHERE kb_id = #{kbId} AND status = 'proposed') AS agent,
+       (SELECT count(*) FROM agent_decisions WHERE kb_id = #{kbId}) AS agent_rows,
+       EXISTS (SELECT 1 FROM jobs j WHERE j.kind = 'govern' AND j.status = 'running'
+                 AND j.payload->>'kb_id' = #{kbId}::text) AS agent_running,
+       (SELECT count(*) FROM resolution_reviews rr
+         WHERE rr.kb_id = #{kbId} AND rr.status = 'pending'
+           AND NOT EXISTS (SELECT 1 FROM agent_decisions d
+                           WHERE d.target_kind = 'review' AND d.target_id = rr.id
+                             AND d.status = 'proposed')) AS agent_queue,
+       (SELECT count(*) FROM (SELECT 1 FROM phrase_bindings b WHERE b.kb_id = #{kbId} AND (b.status = 'undecided'
+           OR (b.status = 'bound' AND b.marks IS NULL
+               AND (b.decided_by = 'person' OR b.marks_asked_at IS NOT NULL)
+               AND EXISTS (SELECT 1 FROM relation_types rt
+                            WHERE rt.id = b.relation_type_id AND rt.temporal = 'state')))
+                          UNION ALL SELECT 1 FROM type_bindings WHERE kb_id = #{kbId} AND status = 'undecided') a) AS alignment,
+       (SELECT count(*) FROM errata_actions WHERE kb_id = #{kbId} AND status = 'held') AS errata
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- pending 队列（pending.rs:202-233）：VIEW_SELECT（普通多行字符串，Java 压单行、token 流等价）
+       + list 的 WHERE/ORDER/LIMIT 后缀；for_chunk 同主体（241-248）。 -->
+
+  <sql id="pendingViewSelect">
+    SELECT p.id, p.subject_id, s.canonical_name AS subject_name,p.predicate_id, r.label AS predicate_label, p.proposed_predicate,p.object_id, o.canonical_name AS object_name, p.object_value,p.valid_from, p.valid_from_precision, p.valid_to, p.valid_to_precision,p.confidence, p.chunk_id, c.text AS quote,p.proposed_by, u.display_name AS proposed_by_name,t.name AS proposed_token_name, p.created_at,p.phrase, p.qualifiers, p.time_words, p.quote_start, p.quote_end FROM pending_facts p JOIN entities s ON s.id = p.subject_id LEFT JOIN relation_types r ON r.id = p.predicate_id LEFT JOIN entities o ON o.id = p.object_id JOIN chunks c ON c.id = p.chunk_id LEFT JOIN users u ON u.id = p.proposed_by LEFT JOIN personal_tokens t ON t.id = p.proposed_token
+  </sql>
+
+  <select id="selectPendingFacts" resultMap="pendingFactView">
+    <include refid="pendingViewSelect"/>
+     WHERE p.kb_id = #{kbId} ORDER BY p.created_at DESC, p.id DESC LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <select id="selectPendingForChunk" resultMap="pendingFactView">
+    <include refid="pendingViewSelect"/>
+     WHERE p.kb_id = #{kbId} AND p.chunk_id = #{chunkId} ORDER BY p.created_at
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- duplicates 队列（resolution.rs:1675-1683 list_reviews）：types 分档是 Rust format!
+       的 {types.clause()} 三选一——Java 以三条语句对等（token 流各自逐字）。 -->
+
+  <select id="selectDuplicateReviewsAny" resultMap="reviewRow">
+    SELECT rr.id, rr.left_id, rr.right_id, rr.score, rr.reason, rr.stage, rr.created_at
+     FROM resolution_reviews rr
+     JOIN entities a ON a.id = rr.left_id
+     JOIN entities b ON b.id = rr.right_id
+     WHERE rr.kb_id = #{kbId} AND rr.status = 'pending' AND TRUE
+     ORDER BY rr.created_at DESC, rr.id DESC LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <select id="selectDuplicateReviewsSame" resultMap="reviewRow">
+    SELECT rr.id, rr.left_id, rr.right_id, rr.score, rr.reason, rr.stage, rr.created_at
+     FROM resolution_reviews rr
+     JOIN entities a ON a.id = rr.left_id
+     JOIN entities b ON b.id = rr.right_id
+     WHERE rr.kb_id = #{kbId} AND rr.status = 'pending' AND a.type_id IS NOT NULL AND a.type_id = b.type_id
+     ORDER BY rr.created_at DESC, rr.id DESC LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <select id="selectDuplicateReviewsConflict" resultMap="reviewRow">
+    SELECT rr.id, rr.left_id, rr.right_id, rr.score, rr.reason, rr.stage, rr.created_at
+     FROM resolution_reviews rr
+     JOIN entities a ON a.id = rr.left_id
+     JOIN entities b ON b.id = rr.right_id
+     WHERE rr.kb_id = #{kbId} AND rr.status = 'pending' AND a.type_id IS NOT NULL AND b.type_id IS NOT NULL AND a.type_id &lt;&gt; b.type_id
+     ORDER BY rr.created_at DESC, rr.id DESC LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <!-- 两侧实体摘要（resolution.rs:1448-1458 review_sides；not_name 内联；源内 SQL 行注释保留） -->
+
+  <select id="selectReviewSides" resultMap="sideRow">
+    SELECT e.id, e.canonical_name AS name, t.label AS type_label,
+            coalesce(t.color, '#94a3b8') AS color, e.disambiguator,
+            (SELECT count(*) FROM facts f
+             WHERE f.kb_id = e.kb_id AND (f.subject_id = e.id OR f.object_id = e.id)
+           AND f.invalidated_at IS NULL AND NOT EXISTS (SELECT 1 FROM relation_types nr
+                         WHERE nr.id = f.predicate_id AND nr.builtin AND nr.key = 'known_as')) AS degree
+    -- LEFT JOIN：没判出类型的实体照样要能进审核（0009）。
+    -- 内连接会让它整条审核项取不出来，而漂移审核恰恰最常发生在它们身上
+    FROM entities e LEFT JOIN entity_types t ON t.id = e.type_id
+    WHERE e.kb_id = #{kbId} AND e.id = ANY(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler})
+  </select>
+
+  <!-- 每实体 top4 事实摘要（resolution.rs:1521-1540 entity_fact_lines_many 的 LATERAL 主查询） -->
+
+  <select id="selectEntityFactLines" resultMap="factLineRow">
+    SELECT requested.id AS entity_id, line.*
+     FROM unnest(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[]) AS requested(id)
+     CROSS JOIN LATERAL (
+     SELECT CASE WHEN f.subject_id = requested.id THEN 'out' ELSE 'in' END AS direction,
+            COALESCE(r.label, f.phrase, fact_surface_predicate(f.id)) AS predicate_label,
+            o.canonical_name AS other_name,
+            f.valid_from, f.valid_to, f.confidence, f.recorded_at
+     FROM facts f
+     LEFT JOIN relation_types r ON r.id = f.predicate_id
+     LEFT JOIN entities o
+       ON o.id = CASE WHEN f.subject_id = requested.id THEN f.object_id ELSE f.subject_id END
+     WHERE f.kb_id = #{kbId} AND f.invalidated_at IS NULL
+       AND (f.subject_id = requested.id OR f.object_id = requested.id)
+       AND COALESCE(r.label, f.phrase, fact_surface_predicate(f.id)) IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM relation_types nr
+                     WHERE nr.id = f.predicate_id AND nr.builtin AND nr.key = 'known_as')
+     ORDER BY f.confidence DESC, f.recorded_at DESC
+     LIMIT #{limit}
+     ) line
+     ORDER BY requested.id, line.confidence DESC, line.recorded_at DESC
+  </select>
+
+  <!-- 本名以外的别名（names.rs:296-307 other_names_many；$2=known_as 参数绑定） -->
+
+  <select id="selectOtherNames" resultMap="nameRow">
+    SELECT entity_id, v FROM (
+       SELECT DISTINCT ON (f.subject_id, lower(f.object_value->>'value'))
+              f.subject_id AS entity_id, f.object_value->>'value' AS v, f.recorded_at
+         FROM entities e
+         JOIN facts f ON f.subject_id = e.id AND f.kb_id = e.kb_id
+         JOIN relation_types r ON r.id = f.predicate_id
+        WHERE e.id = ANY(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}) AND r.builtin AND r.key = #{knownAs}
+          AND f.invalidated_at IS NULL
+          AND lower(f.object_value->>'value') &lt;&gt; lower(e.canonical_name)
+        ORDER BY f.subject_id, lower(f.object_value->>'value'), f.recorded_at
+     ) n ORDER BY n.entity_id, n.recorded_at
+  </select>
+
+  <!-- 一页上开着的 agent 建议（resolution.rs:1593-1596） -->
+
+  <select id="selectOpenProposals" resultMap="proposalRow">
+    SELECT target_id, id, action, confidence, reason FROM agent_decisions
+ WHERE target_kind = 'review' AND target_id = ANY(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}) AND status = 'proposed'
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- conflicts 队列（temporal.rs:1325-1342 list_conflicts：只读——陈冲突的退场钉在
+       作废发生处（0051 触发器），这里不带从前那条 UPDATE） -->
+
+  <select id="selectConflicts" resultMap="conflictView">
+    SELECT c.id, c.reason, c.created_at, r.label AS predicate_label,
+            c.old_fact_id, os.canonical_name AS old_subject,
+            oo.canonical_name AS old_object, fo.valid_from AS old_valid_from,
+            c.new_fact_id, ns.canonical_name AS new_subject,
+            no_.canonical_name AS new_object, fn_.valid_from AS new_valid_from,
+            fn_.confidence AS new_confidence
+     FROM fact_conflicts c
+     JOIN facts fo ON fo.id = c.old_fact_id
+     JOIN facts fn_ ON fn_.id = c.new_fact_id
+     JOIN entities os ON os.id = fo.subject_id
+     JOIN entities ns ON ns.id = fn_.subject_id
+     JOIN relation_types r ON r.id = fo.predicate_id
+     LEFT JOIN entities oo ON oo.id = fo.object_id
+     LEFT JOIN entities no_ ON no_.id = fn_.object_id
+     WHERE c.kb_id = #{kbId} AND c.status = 'open'
+     ORDER BY c.created_at DESC, c.id DESC
+     LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <!-- unconfirmed 队列（graph.rs:2013-2031 stale_facts：判据与 UNCONFIRMED_FACT 同一套，
+       此处源内直写） -->
+
+  <select id="selectUnconfirmedFacts" resultMap="factReviewItem">
+    SELECT f.id, s.canonical_name AS subject_name, COALESCE(r.label, fact_surface_predicate(f.id)) AS predicate_label,
+            COALESCE(o.canonical_name, f.object_value->>'summary') AS object_name,
+            f.valid_from, f.valid_to, f.confidence,
+            (SELECT count(*) FROM fact_evidence fe WHERE fe.fact_id = f.id) AS evidence_count,
+            (SELECT fe.quote FROM fact_evidence fe
+             WHERE fe.fact_id = f.id AND fe.quote IS NOT NULL LIMIT 1) AS quote
+     FROM facts f
+     JOIN entities s ON s.id = f.subject_id
+     LEFT JOIN relation_types r ON r.id = f.predicate_id
+     LEFT JOIN entities o ON o.id = f.object_id
+     WHERE f.kb_id = #{kbId} AND f.invalidated_at IS NULL
+       AND f.valid_to IS NULL AND f.valid_to_precision IS NULL
+       AND EXISTS (SELECT 1 FROM fact_evidence fe WHERE fe.fact_id = f.id)
+       AND NOT EXISTS (SELECT 1 FROM fact_evidence fe
+                       JOIN chunks c ON c.id = fe.chunk_id
+                       WHERE fe.fact_id = f.id AND c.superseded_at IS NULL)
+     ORDER BY f.recorded_at DESC, f.id DESC
+     LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <!-- lowconf 队列（graph.rs:1976-1989：confidence 升序——最没把握的最先看） -->
+
+  <select id="selectLowConfidenceFacts" resultMap="factReviewItem">
+    SELECT f.id, s.canonical_name AS subject_name, COALESCE(r.label, fact_surface_predicate(f.id)) AS predicate_label,
+            COALESCE(o.canonical_name, f.object_value->>'summary') AS object_name,
+            f.valid_from, f.valid_to, f.confidence,
+            (SELECT count(*) FROM fact_evidence fe WHERE fe.fact_id = f.id) AS evidence_count,
+            (SELECT fe.quote FROM fact_evidence fe
+             WHERE fe.fact_id = f.id AND fe.quote IS NOT NULL LIMIT 1) AS quote
+     FROM facts f
+     JOIN entities s ON s.id = f.subject_id
+     LEFT JOIN relation_types r ON r.id = f.predicate_id
+     LEFT JOIN entities o ON o.id = f.object_id
+     WHERE f.kb_id = #{kbId} AND f.invalidated_at IS NULL AND f.confidence &lt; #{below}
+     ORDER BY f.confidence, f.recorded_at DESC, f.id DESC
+     LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <!-- mappings 队列（mappings.rs:141-148 proposed：等人表态的语义层映射） -->
+
+  <select id="selectProposedMappings" resultMap="conceptMapping">
+    SELECT m.id, m.concept_id, e.canonical_name AS concept_name, m.source,
+            m.table_name, m.expr, m.sql, m.unit, m.summary, m.derived, m.status, m.written_by
+     FROM concept_mappings m
+     JOIN entities e ON e.id = m.concept_id
+     WHERE m.kb_id = #{kbId} AND m.status = 'proposed'
+     ORDER BY e.canonical_name, m.source, m.id
+     LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- alignment 队列（alignment_queue.rs:116-225）：三查询全量取回（SQL 不带 LIMIT），
+       按 decided_at 升序稳定排序后内存 skip/take——分页在 service。 -->
+
+  <select id="selectWaitingPhrases" resultMap="phraseRow">
+    SELECT b.id, b.phrase, st.key AS subject_class, ot.key AS object_class,
+            b.object_is_value, b.statement_count, b.examples, b.votes, b.decided_at,
+            CASE WHEN b.status = 'bound' THEN p.key END AS bound_to,
+            CASE WHEN b.status = 'bound' THEN b.direction END AS direction
+       FROM phrase_bindings b
+  LEFT JOIN entity_types st ON st.id = b.subject_type_id
+  LEFT JOIN entity_types ot ON ot.id = b.object_type_id
+  LEFT JOIN relation_types p ON p.id = b.relation_type_id
+      WHERE b.kb_id = #{kbId} AND (b.status = 'undecided'
+       OR (b.status = 'bound' AND b.marks IS NULL
+           AND (b.decided_by = 'person' OR b.marks_asked_at IS NOT NULL)
+           AND EXISTS (SELECT 1 FROM relation_types rt
+                        WHERE rt.id = b.relation_type_id AND rt.temporal = 'state')))
+  </select>
+
+  <select id="selectProposedRules" resultMap="ruleRow">
+    SELECT r.id, r.trigger, r.phrase, st.key AS subject_class, ot.key AS object_class,
+            r.object_is_value, p.key AS property, p.label AS property_label, r.reading,
+            r.statement_count, r.examples, r.votes, r.decided_at
+       FROM implication_rules r
+       JOIN relation_types p ON p.id = r.conclude_property_id
+  LEFT JOIN entity_types st ON st.id = r.subject_type_id
+  LEFT JOIN entity_types ot ON ot.id = r.object_type_id
+      WHERE r.kb_id = #{kbId} AND r.status = 'proposed'
+  </select>
+
+  <select id="selectUndecidedKindWords" resultMap="kindWordRow">
+    SELECT kind_word, words, votes, decided_at
+       FROM type_bindings WHERE kb_id = #{kbId} AND status = 'undecided'
+  </select>
+
+  <!-- 类别词签名（type_bindings.rs:61-109：kind=kind_word_sql("e.specific_type") 内联展开；
+       {{}} 折叠为 {}；源内 SQL 行注释保留） -->
+
+  <select id="selectKindWordSignatures" resultMap="signatureRow">
+    WITH live AS (
+         SELECT e.id, e.canonical_name, e.description, e.created_at,
+                btrim(regexp_replace(e.specific_type, '\s+', ' ', 'g')) AS spelling,
+                lower(btrim(regexp_replace(e.specific_type, '\s+', ' ', 'g'))) AS kind_word
+         FROM entities e
+         WHERE e.kb_id = #{kbId} AND e.merged_into IS NULL
+           AND e.specific_type IS NOT NULL AND btrim(e.specific_type) &lt;&gt; ''
+     ),
+     -- 写法、例名、关系短语的前 3 个各在一趟里聚出来。从前每个词各跑三个关联子查询，
+     -- 每个都把全部实体（短语那个还连着陈述）重扫一遍，耗时随库的大小平方增长（#1096）
+     grouped AS (
+         SELECT kind_word, count(*) AS count,
+                (array_agg(canonical_name ORDER BY (description IS NOT NULL), created_at, id))[1:3] AS examples
+         FROM live GROUP BY kind_word
+     ),
+     spellings AS (
+         SELECT kind_word, spelling,
+                row_number() OVER (PARTITION BY kind_word ORDER BY count(*) DESC, spelling) AS rn
+         FROM live GROUP BY kind_word, spelling
+     ),
+     words AS (
+         SELECT kind_word, array_agg(spelling ORDER BY rn) AS words
+         FROM spellings WHERE rn &lt;= 3 GROUP BY kind_word
+     ),
+     phrase_counts AS (
+         SELECT l.kind_word, f.phrase,
+                row_number() OVER (PARTITION BY l.kind_word ORDER BY count(*) DESC, f.phrase) AS rn
+         FROM facts f JOIN live l ON l.id = f.subject_id
+         WHERE f.kb_id = #{kbId} AND f.layer = 'open' AND f.invalidated_at IS NULL
+           AND f.phrase IS NOT NULL
+         GROUP BY l.kind_word, f.phrase
+     ),
+     phrases AS (
+         SELECT kind_word, array_agg(phrase ORDER BY rn) AS phrases
+         FROM phrase_counts WHERE rn &lt;= 3 GROUP BY kind_word
+     )
+     SELECT g.kind_word,
+            g.count,
+            coalesce(w.words, '{}') AS words,
+            g.examples,
+            coalesce(p.phrases, '{}') AS phrases
+     FROM grouped g
+     LEFT JOIN words w ON w.kind_word = g.kind_word
+     LEFT JOIN phrases p ON p.kind_word = g.kind_word
+     ORDER BY g.count DESC, g.kind_word
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- errata 队列（errata.rs:741-755 held：先来的在前） -->
+
+  <select id="selectHeldErrata" resultMap="errataHeld">
+    SELECT ea.id, ea.document_id, d.filename AS document, ea.action, ea.flag, ea.fact_id,
+            ea.proposed, ea.reason, ea.quote, ea.detail, ea.created_at
+       FROM errata_actions ea JOIN documents d ON d.id = ea.document_id
+      WHERE ea.kb_id = #{kbId} AND ea.status = 'held'
+      ORDER BY ea.created_at, ea.id
+      LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <!-- violations 队列（reasoning.rs:801-855：CTE triple + path jsonb_agg + left_open
+       （facts_holds_to("lf") 展开，同 GraphMapper holds_to）+ same_name_peers；
+       id 第二键防同 detected_at 翻页漂移（#646）；hint 在 service） -->
+
+  <select id="selectOpenViolations" resultMap="violationRow">
+    WITH triple AS (
+         SELECT f.id,
+                s.canonical_name || ' · '
+                  || COALESCE(r.label, fact_surface_predicate(f.id), '?') || ' · '
+                  || COALESCE(o.canonical_name, f.object_value ->> 'summary',
+                              f.object_value #>> '{}', '?') AS text,
+                r.label AS predicate
+           FROM facts f
+           JOIN entities s ON s.id = f.subject_id
+           LEFT JOIN relation_types r ON r.id = f.predicate_id
+           LEFT JOIN entities o ON o.id = f.object_id
+          WHERE f.kb_id = #{kbId}
+     )
+     SELECT v.id, v.kind, l.predicate,
+            v.left_fact, l.text AS left_text,
+            v.right_fact, rt.text AS right_text,
+            coalesce(array_length(v.path, 1), 0) AS path_len,
+            v.detected_at, v.detail,
+            COALESCE((SELECT jsonb_agg(jsonb_build_object('id', x.id, 'text', pt.text)
+                                       ORDER BY x.ord)
+                        FROM unnest(v.path) WITH ORDINALITY AS x(id, ord)
+                        JOIN triple pt ON pt.id = x.id), '[]'::jsonb) AS path,
+            CASE WHEN (SELECT r.temporal FROM relation_types r WHERE r.id = lf.predicate_id) = 'eternal' THEN NULL WHEN (SELECT r.temporal FROM relation_types r WHERE r.id = lf.predicate_id) = 'event' THEN CASE WHEN lf.valid_from IS NULL THEN lf.attested_from ELSE COALESCE(lf.valid_to, lf.valid_from) + ('1 ' || COALESCE(NULLIF(lf.valid_to_precision, 'unknown'), lf.valid_from_precision))::interval END WHEN lf.valid_to IS NOT NULL THEN lf.valid_to WHEN lf.valid_to_precision = 'unknown' THEN lf.attested_to END IS NULL AS left_open,
+            lf.confidence AS left_confidence,
+            -- 先按主键拿到两个实体，再各自问一句「同库里还有同名的吗」（走
+            -- entities_kb_name_idx）。从前写成 e JOIN x 再 WHERE e.id IN (...)：
+            -- 表刚成批写完、还没来得及 ANALYZE 时，规划器从 x 那一侧起步，每条违规
+            -- 扫全部实体再逐个回查，一页 37 条要 1.6 秒，翻页越靠后越慢；有统计信息时
+            -- 也要 40ms。改后两种情况都是十几毫秒，结果逐行相同
+            EXISTS (
+                SELECT 1 FROM entities e
+                WHERE e.id IN (lf.subject_id, lf.object_id)
+                  AND EXISTS (SELECT 1 FROM entities x
+                               WHERE x.kb_id = e.kb_id AND x.id &lt;&gt; e.id
+                                 AND x.merged_into IS NULL
+                                 AND lower(x.canonical_name) = lower(e.canonical_name))
+            ) AS same_name_peers
+       FROM axiom_violations v
+       JOIN triple l  ON l.id  = v.left_fact
+       JOIN triple rt ON rt.id = v.right_fact
+       JOIN facts lf ON lf.id = v.left_fact
+      WHERE v.kb_id = #{kbId} AND v.status = 'open'
+      -- id 做第二键（#646）：一轮检查插下的行 detected_at 全都相同，只按它排，
+      -- 翻页时每一页的先后可以不同——有的行出现两次，有的一次也不出现
+      ORDER BY v.detected_at DESC, v.id DESC
+      LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <!-- defects 队列（reasoning.rs:2711-2729：subject/other 双 LEFT JOIN 取标签 + path_labels） -->
+
+  <select id="selectOpenDefects" resultMap="ontologyDefect">
+    SELECT d.id, d.kind, d.detail,
+            COALESCE(st.label, sr.label) AS subject_label,
+            COALESCE(ot.label, orr.label) AS other_label,
+            COALESCE(
+                (SELECT array_agg(t.label ORDER BY x.ord)
+                   FROM unnest(d.path) WITH ORDINALITY AS x(id, ord)
+                   JOIN entity_types t ON t.id = x.id),
+                ARRAY[]::text[]
+            ) AS path_labels,
+            d.detected_at
+       FROM ontology_defects d
+       LEFT JOIN entity_types   st ON st.id = d.subject
+       LEFT JOIN relation_types sr ON sr.id = d.subject
+       LEFT JOIN entity_types   ot ON ot.id = d.other
+       LEFT JOIN relation_types orr ON orr.id = d.other
+      WHERE d.kb_id = #{kbId} AND d.status = 'open'
+      ORDER BY d.detected_at DESC, d.id DESC
+      LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <!-- merges 队列（resolution.rs:2364-2372 list_merges：合并日志，最新在前） -->
+
+  <select id="selectMerges" resultMap="mergeLogView">
+    SELECT m.id, s.canonical_name AS source_name, t.canonical_name AS target_name,
+            u.display_name AS merged_by_name, m.reason, m.created_at, m.reverted_at
+     FROM entity_merges m
+     JOIN entities s ON s.id = m.source_id
+     JOIN entities t ON t.id = m.target_id
+     LEFT JOIN users u ON u.id = m.merged_by
+     WHERE m.kb_id = #{kbId}
+     ORDER BY m.created_at DESC, m.id DESC LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <!-- agent 队列（governance.rs:863-883：VIEW 常量 + list 后缀，联 resolution_reviews 取左右名） -->
+
+  <select id="selectAgentDecisions" resultMap="agentDecisionView">
+    SELECT d.id, d.run_id, d.target_kind, d.target_id, d.action, d.confidence,
+            d.reason, d.precedents, d.status, d.merge_id, d.question, d.trace, d.calls,
+            d.created_at, d.decided_at,
+            u.display_name AS decided_by_name,
+            a.canonical_name AS "left", b.canonical_name AS "right"
+        FROM agent_decisions d
+        LEFT JOIN users u ON u.id = d.decided_by
+        LEFT JOIN resolution_reviews rr ON rr.id = d.target_id
+        LEFT JOIN entities a ON a.id = rr.left_id
+        LEFT JOIN entities b ON b.id = rr.right_id WHERE d.kb_id = #{kbId} ORDER BY d.created_at DESC, d.id DESC LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- history（audit.rs:94-119 review_history：COND=review 域四族动作筛子，内嵌换行保留） -->
+
+  <select id="selectReviewHistory" resultMap="auditEventView">
+    SELECT e.id, e.action, e.target_kind, e.target_id, e.detail,
+                    e.actor_id, u.display_name AS actor_name, e.created_at
+             FROM audit_events e LEFT JOIN users u ON u.id = e.actor_id
+             WHERE e.kb_id = #{kbId} AND (e.action LIKE 'review.%' OR e.action LIKE 'fact.%'
+                                OR e.action LIKE 'conflict.%' OR e.action LIKE 'merge.%') ORDER BY e.created_at DESC, e.id DESC LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <select id="countReviewHistory" resultType="_long">
+    SELECT count(*) FROM audit_events e WHERE e.kb_id = #{kbId} AND (e.action LIKE 'review.%' OR e.action LIKE 'fact.%'
+                        OR e.action LIKE 'conflict.%' OR e.action LIKE 'merge.%')
+  </select>
+</mapper>

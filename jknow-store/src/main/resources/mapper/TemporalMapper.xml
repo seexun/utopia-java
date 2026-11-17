@@ -1,0 +1,571 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  时态引擎 SQL（逐字搬迁自旧仓库 utopia-0.1.0-rc9/crates/utopia-store/src/temporal.rs，
+  少量来自 graph.rs/documents.rs/materialize.rs——每条注明 file:line；
+  铁律：占位符 $1..$n 改写 #{param}（多处出现同名）外 token 流一字不动，禁止顺手优化）。
+
+  排版说明：Rust format! 的内插（DATED_AT/DESCRIBED/holder_column）按其取值展开为常量文本；
+  续行反斜杠折叠为单空格，模板内嵌换行保留。Rust 里按 side 选列（f.subject_id|f.object_id）
+  的语句拆成两条 statement（…Subject/…Object），除该列名外逐字相同——与 Rust format! 展开一致。
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.TemporalMapper">
+
+  <!-- TRow 构造映射（temporal.rs:99-117 的 FromRow 等价） -->
+
+  <resultMap id="trow" type="tech.seexun.jknow.store.temporal.TRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="subject_id" javaType="java.util.UUID"/>
+      <arg column="object_id" javaType="java.util.UUID"/>
+      <arg column="object_value" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="valid_from" javaType="java.time.OffsetDateTime"/>
+      <arg column="valid_from_precision" javaType="java.lang.String"/>
+      <arg column="valid_to" javaType="java.time.OffsetDateTime"/>
+      <arg column="valid_to_precision" javaType="java.lang.String"/>
+      <arg column="attested_to" javaType="java.time.OffsetDateTime"/>
+      <arg column="end_derived" javaType="_boolean"/>
+      <arg column="dated_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="valid_from_grade" javaType="java.lang.String"/>
+      <arg column="described" javaType="_boolean"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="placedFact" type="tech.seexun.jknow.store.mapper.TemporalMapper$PlacedFact">
+    <constructor>
+      <arg column="subject_id" javaType="java.util.UUID"/>
+      <arg column="object_id" javaType="java.util.UUID"/>
+      <arg column="predicate_id" javaType="java.util.UUID"/>
+      <arg column="functional" javaType="_boolean"/>
+      <arg column="inverse_functional" javaType="_boolean"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="declared" type="tech.seexun.jknow.store.mapper.TemporalMapper$Declared">
+    <constructor>
+      <arg column="functional" javaType="_boolean"/>
+      <arg column="inverse_functional" javaType="_boolean"/>
+      <arg column="temporal" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="rewriteAlive" type="tech.seexun.jknow.store.mapper.TemporalMapper$RewriteAlive">
+    <constructor>
+      <arg column="valid_from" javaType="java.time.OffsetDateTime"/>
+      <arg column="predicate_id" javaType="java.util.UUID"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="conflictRow" type="tech.seexun.jknow.store.mapper.TemporalMapper$ConflictRow">
+    <constructor>
+      <arg column="old_fact_id" javaType="java.util.UUID"/>
+      <arg column="new_fact_id" javaType="java.util.UUID"/>
+      <arg column="valid_from" javaType="java.time.OffsetDateTime"/>
+      <arg column="valid_from_precision" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="sharedPredicate" type="tech.seexun.jknow.store.mapper.TemporalMapper$SharedPredicate">
+    <constructor>
+      <arg column="predicate_id" javaType="java.util.UUID"/>
+      <arg column="label" javaType="java.lang.String"/>
+      <arg column="functional" javaType="_boolean"/>
+      <arg column="inverse_functional" javaType="_boolean"/>
+      <arg column="temporal" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="candidateRow" type="tech.seexun.jknow.store.mapper.TemporalMapper$CandidateRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="predicate_id" javaType="java.util.UUID"/>
+      <arg column="key" javaType="java.lang.String"/>
+      <arg column="label" javaType="java.lang.String"/>
+      <arg column="kind" javaType="java.lang.String"/>
+      <arg column="declared" javaType="_boolean"/>
+      <arg column="holder_name" javaType="java.lang.String"/>
+      <arg column="other_name" javaType="java.lang.String"/>
+      <arg column="object_value" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="valid_from" javaType="java.time.OffsetDateTime"/>
+      <arg column="valid_from_grade" javaType="java.lang.String"/>
+      <arg column="confidence" javaType="_float"/>
+    </constructor>
+  </resultMap>
+
+  <!-- ==================================================================== -->
+  <!-- 两级咨询锁（temporal.rs:239-287）。锁分两级：平常先拿谓词一级的共享锁，
+       再拿时间线一级的排他锁——同一谓词上不同持有者的时间线互不相干，照旧并行。
+       一次要锁的时间线太多时（>BULK_TIMELINES=256）改拿谓词排他锁、不再逐条锁
+       （#679 第四轮评审：两万条时 Postgres 锁表装不下，文档就删不掉了）。
+       谓词锁在前、时间线锁在后，各自排序，两级之间不会反着等。 -->
+
+  <update id="lockPredicateShared">
+    SELECT pg_advisory_xact_lock_shared(hashtextextended(#{key}, 0))
+  </update>
+
+  <update id="lockExclusive">
+    SELECT pg_advisory_xact_lock(hashtextextended(#{key}, 0))
+  </update>
+
+  <!-- ==================================================================== -->
+  <!-- load_timeline（temporal.rs:289-315）。读档即锁行（FOR UPDATE OF f）：
+       并行的两次改写只有一次看得见它还活着。DATED_AT=f.attested_from（事实自己的
+       见证，与世界轴下界同源，0064）；DESCRIBED（temporal.rs:38-44）＝出处 chunk
+       origin='described'（直接证据或 typed_fact_sources→statement→chunk 两条路，
+       0040 决定 4）。按 recorded_at 排（到达序，desired_ends 自己会重排）。 -->
+
+  <select id="selectTimelineSubject" resultMap="trow">
+    SELECT f.id, f.subject_id, f.object_id, f.object_value,
+           f.valid_from, f.valid_from_precision, f.valid_to, f.valid_to_precision,
+           f.attested_to, f.end_derived, f.attested_from AS dated_at,
+           f.valid_from_grade, (EXISTS (SELECT 1 FROM fact_evidence fe
+                                    JOIN chunks ch ON ch.id = fe.chunk_id
+                                   WHERE fe.fact_id = f.id AND ch.origin = 'described')
+                          OR EXISTS (SELECT 1 FROM typed_fact_sources ts
+                                       JOIN fact_evidence fe ON fe.fact_id = ts.statement_id
+                                       JOIN chunks ch ON ch.id = fe.chunk_id
+                                      WHERE ts.fact_id = f.id AND ch.origin = 'described')) AS described
+     FROM facts f
+     WHERE f.kb_id = #{kbId} AND f.subject_id = #{holder} AND f.predicate_id = #{predicateId}
+       AND f.invalidated_at IS NULL
+     ORDER BY f.recorded_at
+     FOR UPDATE OF f
+  </select>
+
+  <select id="selectTimelineObject" resultMap="trow">
+    SELECT f.id, f.subject_id, f.object_id, f.object_value,
+           f.valid_from, f.valid_from_precision, f.valid_to, f.valid_to_precision,
+           f.attested_to, f.end_derived, f.attested_from AS dated_at,
+           f.valid_from_grade, (EXISTS (SELECT 1 FROM fact_evidence fe
+                                    JOIN chunks ch ON ch.id = fe.chunk_id
+                                   WHERE fe.fact_id = f.id AND ch.origin = 'described')
+                          OR EXISTS (SELECT 1 FROM typed_fact_sources ts
+                                       JOIN fact_evidence fe ON fe.fact_id = ts.statement_id
+                                       JOIN chunks ch ON ch.id = fe.chunk_id
+                                      WHERE ts.fact_id = f.id AND ch.origin = 'described')) AS described
+     FROM facts f
+     WHERE f.kb_id = #{kbId} AND f.object_id = #{holder} AND f.predicate_id = #{predicateId}
+       AND f.invalidated_at IS NULL
+     ORDER BY f.recorded_at
+     FOR UPDATE OF f
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- timelines_of 放置查询（temporal.rs:342-350）：这些事实所在的全部唯一性时间线
+       （只算 temporal='state'、声明了唯一性的谓词）；swap（合并/撤回两边都要锁）由
+       服务层推导（temporal.rs:352-381）。 -->
+
+  <select id="selectTimelinesOf" resultMap="placedFact">
+    SELECT DISTINCT f.subject_id, f.object_id, f.predicate_id, r.functional, r.inverse_functional
+     FROM facts f JOIN relation_types r ON r.id = f.predicate_id
+    WHERE f.kb_id = #{kbId} AND f.id = ANY(#{factIds,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[])
+      AND r.temporal = 'state' AND (r.functional OR r.inverse_functional)
+  </select>
+
+  <!-- temporal.rs:414-415 谓词是否两侧都唯一（fetch_optional：查无 → null）。 -->
+  <select id="selectBothSides" resultType="java.lang.Boolean">
+    SELECT functional AND inverse_functional FROM relation_types WHERE id = #{predicateId}
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- reconcile_predicate（temporal.rs:817-848）：声明来晚了（#341）——本体自己
+       长出来的库里没人声明过唯一性；人补上声明之后把账上的行对一遍。 -->
+
+  <select id="selectDeclared" resultMap="declared">
+    SELECT functional, inverse_functional, temporal FROM relation_types
+     WHERE kb_id = #{kbId} AND id = #{predicateId}
+  </select>
+
+  <select id="selectPredicateFactIds" resultType="java.util.UUID">
+    SELECT id FROM facts
+     WHERE kb_id = #{kbId} AND predicate_id = #{predicateId} AND invalidated_at IS NULL
+       AND (object_id IS NOT NULL OR object_value IS NOT NULL)
+  </select>
+
+  <!-- retract（temporal.rs:858-861）：先锁时间线再作废（见模块头）；返回受影响行数。 -->
+  <update id="retractFact">
+    UPDATE facts SET invalidated_at = now()
+     WHERE id = #{factId} AND kb_id = #{kbId} AND invalidated_at IS NULL
+  </update>
+
+  <!-- state_derived_end（temporal.rs:929-931）：原文说出了一条引擎关上的行的终点——
+       先锁行确认它确实还活着且 end_derived。 -->
+  <select id="selectEndDerivedForUpdate" resultType="java.lang.Boolean">
+    SELECT end_derived FROM facts WHERE id = #{factId} AND invalidated_at IS NULL FOR UPDATE
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- rewrite_end_tx（temporal.rs:949-1021）：作废+改写一行的终点——先 FOR UPDATE 锁住
+       旧行（并行的两次改写只有一次看得见它还活着）；修正行 INSERT；开着的冲突跟着换到
+       修正行上；旧行作废；证据/限定/物化链接随行复制（物化链接不复制的话下一轮物化
+       会再算一行，#899）。 -->
+
+  <select id="selectForRewrite" resultMap="rewriteAlive">
+    SELECT valid_from, predicate_id FROM facts
+     WHERE id = #{factId} AND invalidated_at IS NULL
+       AND (NOT #{requireOpen} OR (valid_to IS NULL AND valid_to_precision IS NULL))
+     FOR UPDATE
+  </select>
+
+  <insert id="insertRewriteEnd">
+    INSERT INTO facts (id, kb_id, subject_id, predicate_id, object_id, object_value,
+                        valid_from, valid_from_precision, valid_from_grade,
+                        valid_to, valid_to_precision, confidence, supersedes,
+                        attested_from, attested_by, attested_to, end_derived,
+                        from_statement_id, implied, corrected_ends)
+     SELECT #{corrected}, kb_id, subject_id, predicate_id, object_id, object_value,
+            valid_from, valid_from_precision, valid_from_grade, #{validTo}, #{precision}, confidence, id,
+            attested_from, attested_by,
+            CASE WHEN #{precision}::text = 'unknown' THEN COALESCE(#{anchor}, now()) END, #{derived},
+            from_statement_id, implied,
+            <!-- 终点在这里被重新写下（文档说了终点，或时间线推了一个），人改过的终点就不在了；
+                 起点那一半照旧 -->
+            CASE corrected_ends WHEN 'both' THEN 'start' WHEN 'end' THEN NULL
+                 ELSE corrected_ends END
+     FROM facts WHERE id = #{factId}
+  </insert>
+
+  <!-- carry_open_conflicts（temporal.rs:1109-1128）：还开着的冲突从旧行换到修正行上
+       （旧行一作废，0051 的触发器就会把它们撤下）。修正行上已有同一对的，留着旧的随作废撤下。 -->
+  <update id="carryConflictsOld">
+    UPDATE fact_conflicts c SET old_fact_id = #{to}
+      WHERE c.status = 'open' AND c.old_fact_id = #{from}
+        AND NOT EXISTS (SELECT 1 FROM fact_conflicts d
+                         WHERE d.old_fact_id = #{to} AND d.new_fact_id = c.new_fact_id)
+  </update>
+
+  <update id="carryConflictsNew">
+    UPDATE fact_conflicts c SET new_fact_id = #{to}
+      WHERE c.status = 'open' AND c.new_fact_id = #{from}
+        AND NOT EXISTS (SELECT 1 FROM fact_conflicts d
+                         WHERE d.new_fact_id = #{to} AND d.old_fact_id = c.old_fact_id)
+  </update>
+
+  <!-- ==== rehome_tx（temporal.rs:1056-1100，撤回合并的活改写行换持有者） ==== -->
+
+  <select id="selectAliveForUpdate" resultType="java.util.UUID">
+    SELECT id FROM facts WHERE id = #{factId} AND invalidated_at IS NULL FOR UPDATE
+  </select>
+
+  <!-- temporal.rs:1068-1080 逐字：作废 + 在新持有者上另起一行接着它（supersedes 链回
+       旧行），COALESCE 只换指定的那一侧持有者 -->
+  <insert id="insertRehome">
+    INSERT INTO facts (id, kb_id, subject_id, predicate_id, object_id, object_value,
+                        valid_from, valid_from_precision, valid_to, valid_to_precision,
+                        confidence, derived_by_rule, supersedes,
+                        attested_from, attested_to, end_derived,
+                        from_statement_id, implied, corrected_ends)
+     SELECT #{moved}, kb_id, COALESCE(#{subjectId}, subject_id), predicate_id, COALESCE(#{objectId}, object_id),
+            object_value, valid_from, valid_from_precision, valid_to, valid_to_precision,
+            confidence, derived_by_rule, id, attested_from, attested_to, end_derived,
+            from_statement_id, implied, corrected_ends
+     FROM facts WHERE id = #{factId}
+  </insert>
+
+  <update id="invalidateFact">
+    UPDATE facts SET invalidated_at = now() WHERE id = #{factId}
+  </update>
+
+  <!-- copy_evidence（temporal.rs:1158-1164）：证据引用随修正行复制——表层谓词一起搬。 -->
+  <insert id="copyEvidence">
+    INSERT INTO fact_evidence (fact_id, chunk_id, quote, proposed_predicate, document_id, doc_version,
+                                quote_start, quote_end)
+     SELECT #{to}, chunk_id, quote, proposed_predicate, document_id, doc_version,
+            quote_start, quote_end
+     FROM fact_evidence WHERE fact_id = #{from}
+     ON CONFLICT DO NOTHING
+  </insert>
+
+  <!-- copy_qualifiers（temporal.rs:1139-1143）：边上的属性随修正行复制（0037）——
+       不搬的话，闭合一段任职就丢了它的职务。 -->
+  <insert id="copyQualifiers">
+    INSERT INTO fact_qualifiers (fact_id, qualifier_type_id, value, entity_id)
+     SELECT #{to}, qualifier_type_id, value, entity_id
+     FROM fact_qualifiers WHERE fact_id = #{from}
+     ON CONFLICT DO NOTHING
+  </insert>
+
+  <!-- copy_materialization_links（temporal.rs:1032-1049）：物化出来的行改写之后还是
+       物化出来的行（#899）——typed/implied 来源随修正行复制，from_statement_id 与
+       implied 在 INSERT 里一起带过去。 -->
+  <insert id="copyTypedSources">
+    INSERT INTO typed_fact_sources (fact_id, statement_id)
+     SELECT #{to}, statement_id FROM typed_fact_sources WHERE fact_id = #{from}
+     ON CONFLICT DO NOTHING
+  </insert>
+
+  <insert id="copyImpliedSources">
+    INSERT INTO implied_fact_sources (fact_id, rule_id, statement_id, entity_id)
+     SELECT #{to}, rule_id, statement_id, entity_id FROM implied_fact_sources WHERE fact_id = #{from}
+     ON CONFLICT DO NOTHING
+  </insert>
+
+  <!-- predicate_temporal（graph.rs:437-441）：rewrite_end_tx 的 empty_state_span 判断
+       与 correct_interval 的归一共用。 -->
+  <select id="selectPredicateTemporal" resultType="java.lang.String">
+    SELECT temporal FROM relation_types WHERE id = #{predicateId}
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- correct_interval（temporal.rs:1194-1267）：人工修正有效区间。**不原地 UPDATE**——
+       原地改会把修正本身抹掉，而那正是记录轴要回放的东西（0019）。改了哪一端记在
+       修正行上（corrected_ends，#970）：值或精度变了的那一端，与旧行已有的取并集。 -->
+
+  <select id="selectFactPredicateId" resultType="java.util.UUID">
+    SELECT predicate_id FROM facts WHERE id = #{factId}
+  </select>
+
+  <select id="insertCorrectInterval" resultType="java.util.UUID">
+    INSERT INTO facts (id, kb_id, subject_id, predicate_id, object_id, object_value,
+                        valid_from, valid_from_precision,
+                        valid_to, valid_to_precision, confidence, supersedes,
+                        attested_from, attested_to,
+                        from_statement_id, implied, corrected_ends)
+     SELECT #{corrected}, kb_id, subject_id, predicate_id, object_id, object_value,
+            #{from}, #{fromPrecision}, #{to}, #{toPrecision}, confidence, id,
+            attested_from,
+            CASE WHEN #{toPrecision}::text = 'unknown' THEN COALESCE(attested_to, now()) END,
+            from_statement_id, implied,
+            CASE WHEN start_marked AND end_marked THEN 'both'
+                 WHEN start_marked THEN 'start'
+                 WHEN end_marked THEN 'end' END
+     FROM (SELECT f.*,
+                  c.start_changed OR COALESCE(f.corrected_ends IN ('start', 'both'), false)
+                      AS start_marked,
+                  c.end_changed OR f.end_derived
+                  OR COALESCE(f.corrected_ends IN ('end', 'both'), false)
+                      AS end_marked
+             FROM facts f,
+                  LATERAL (SELECT f.valid_from IS DISTINCT FROM #{from}::timestamptz
+                                      OR f.valid_from_precision IS DISTINCT FROM #{fromPrecision}::text
+                                      AS start_changed,
+                                  f.valid_to IS DISTINCT FROM #{to}::timestamptz
+                                      OR f.valid_to_precision IS DISTINCT FROM #{toPrecision}::text
+                                      AS end_changed) c
+            WHERE f.id = #{factId} AND f.invalidated_at IS NULL) old
+     RETURNING id
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- record_conflict_tx（temporal.rs:1280-1308）：记一对冲突。人已裁过 kept_both 的，
+       顺着 supersedes 链找两行的前身不再问（#679 第三轮评审）；同一对反过来记过的也算
+       记过（重算按时间线顺序看，谁是旧谁是新随到达顺序变）。 -->
+
+  <insert id="insertRecordConflict">
+    INSERT INTO fact_conflicts (id, kb_id, old_fact_id, new_fact_id, reason)
+     SELECT #{id}, #{kbId}, #{oldFactId}, #{newFactId}, #{reason}
+     WHERE NOT EXISTS (
+         WITH RECURSIVE a(id) AS (
+                 SELECT #{oldFactId}::uuid
+                 UNION SELECT f.supersedes FROM facts f JOIN a ON f.id = a.id
+                  WHERE f.supersedes IS NOT NULL),
+             b(id) AS (
+                 SELECT #{newFactId}::uuid
+                 UNION SELECT f.supersedes FROM facts f JOIN b ON f.id = b.id
+                  WHERE f.supersedes IS NOT NULL)
+         SELECT 1 FROM fact_conflicts c
+          WHERE c.status = 'resolved' AND c.resolution = 'kept_both'
+            AND ((c.old_fact_id IN (SELECT id FROM a) AND c.new_fact_id IN (SELECT id FROM b))
+              OR (c.old_fact_id IN (SELECT id FROM b) AND c.new_fact_id IN (SELECT id FROM a))))
+       AND NOT EXISTS (SELECT 1 FROM fact_conflicts r
+                        WHERE r.old_fact_id = #{newFactId} AND r.new_fact_id = #{oldFactId} AND r.status = 'open')
+     ON CONFLICT (old_fact_id, new_fact_id) DO NOTHING
+  </insert>
+
+  <!-- ==================================================================== -->
+  <!-- resolve_conflict（temporal.rs:1357-1429）：人工裁决三出路——close（旧事实闭合于
+       close_at 或新事实起点）/ keep（并存不矛盾）/ reject_new（新事实是抽取错误，作废）。 -->
+
+  <select id="selectConflictRow" resultMap="conflictRow">
+    SELECT c.old_fact_id, c.new_fact_id, fn_.valid_from, fn_.valid_from_precision
+     FROM fact_conflicts c JOIN facts fn_ ON fn_.id = c.new_fact_id
+    WHERE c.id = #{conflictId} AND c.kb_id = #{kbId} AND c.status = 'open'
+  </select>
+
+  <update id="resolveOtherOpenConflicts">
+    UPDATE fact_conflicts
+     SET status = 'resolved', resolution = 'rejected_new', resolved_at = now()
+     WHERE new_fact_id = #{newFactId} AND status = 'open' AND id &lt;&gt; #{conflictId}
+  </update>
+
+  <update id="markConflictResolved">
+    UPDATE fact_conflicts SET status = 'resolved', resolution = #{resolution}, resolved_at = now()
+     WHERE id = #{conflictId} AND kb_id = #{kbId}
+  </update>
+
+  <!-- ==================================================================== -->
+  <!-- uniqueness_candidates（temporal.rs:1476-1554 双 SQL）：一条谓词的一端挂着两个
+       以上开放值的持有者——唯一性没声明（或声明来晚了）时账本的样子（#341）。
+       给人看的提议依据，不是判决。开放 = 世界轴没有终点，与落库对账同一不变量。 -->
+
+  <select id="selectUniquenessSubjectSide" resultMap="candidateRow">
+    WITH open AS (
+         SELECT f.id, f.predicate_id, f.subject_id AS holder, f.object_id, f.object_value,
+                COALESCE(f.object_id::text, f.object_value::text) AS value_key,
+                f.valid_from, f.valid_from_grade, f.confidence, f.recorded_at
+         FROM facts f JOIN relation_types r ON r.id = f.predicate_id
+         WHERE f.kb_id = #{kbId} AND f.invalidated_at IS NULL
+           AND f.valid_to IS NULL AND f.valid_to_precision IS NULL
+           AND r.temporal = 'state'
+           <!-- 名字不算：一个实体有两个名字是常态，不是「这个属性该唯一」的证据（0041） -->
+           AND NOT (r.builtin AND r.key = 'known_as')
+           AND (f.object_id IS NOT NULL OR f.object_value IS NOT NULL)
+     ),
+     crowded AS (
+         SELECT predicate_id, holder FROM open
+         GROUP BY predicate_id, holder HAVING count(DISTINCT value_key) &gt;= 2
+     )
+     SELECT o.id, o.predicate_id, r.key, r.label, r.kind, r.functional AS declared,
+            h.canonical_name AS holder_name, e.canonical_name AS other_name,
+            o.object_value, o.valid_from, o.valid_from_grade, o.confidence
+     FROM open o
+     JOIN crowded c ON c.predicate_id = o.predicate_id AND c.holder = o.holder
+     JOIN relation_types r ON r.id = o.predicate_id
+     JOIN entities h ON h.id = o.holder
+     LEFT JOIN entities e ON e.id = o.object_id
+     ORDER BY r.key, h.canonical_name, o.valid_from ASC NULLS LAST, o.recorded_at ASC
+  </select>
+
+  <select id="selectUniquenessObjectSide" resultMap="candidateRow">
+    WITH open AS (
+         SELECT f.id, f.predicate_id, f.object_id AS holder, f.subject_id,
+                f.valid_from, f.valid_from_grade, f.confidence, f.recorded_at
+         FROM facts f JOIN relation_types r ON r.id = f.predicate_id
+         WHERE f.kb_id = #{kbId} AND f.invalidated_at IS NULL
+           AND f.valid_to IS NULL AND f.valid_to_precision IS NULL
+           AND r.temporal = 'state' AND r.kind = 'relation'
+           AND f.object_id IS NOT NULL
+     ),
+     crowded AS (
+         SELECT predicate_id, holder FROM open
+         GROUP BY predicate_id, holder HAVING count(DISTINCT subject_id) &gt;= 2
+     )
+     SELECT o.id, o.predicate_id, r.key, r.label, r.kind, r.inverse_functional AS declared,
+            h.canonical_name AS holder_name, e.canonical_name AS other_name,
+            NULL::jsonb AS object_value, o.valid_from, o.valid_from_grade, o.confidence
+     FROM open o
+     JOIN crowded c ON c.predicate_id = o.predicate_id AND c.holder = o.holder
+     JOIN relation_types r ON r.id = o.predicate_id
+     JOIN entities h ON h.id = o.holder
+     JOIN entities e ON e.id = o.subject_id
+     ORDER BY r.key, h.canonical_name, o.valid_from ASC NULLS LAST, o.recorded_at ASC
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- merge_would_overlap（temporal.rs:616-712）：两个实体合成一个之后，哪些唯一性
+       关系上还会有两个值同时成立（执行闸门，0027）。取数无 FOR UPDATE——闸门只读，
+       不改行。 -->
+
+  <select id="selectSharedPredicates" resultMap="sharedPredicate">
+    SELECT DISTINCT r.id AS predicate_id, r.label, r.functional, r.inverse_functional,
+            r.temporal
+     FROM facts x
+     JOIN facts y ON y.predicate_id = x.predicate_id AND y.kb_id = x.kb_id
+     JOIN relation_types r ON r.id = x.predicate_id
+     WHERE x.kb_id = #{kbId}
+       AND x.invalidated_at IS NULL AND y.invalidated_at IS NULL
+       AND x.object_id IS NOT NULL AND y.object_id IS NOT NULL
+       AND ((r.functional AND x.subject_id = #{a} AND y.subject_id = #{b}
+             AND x.object_id &lt;&gt; y.object_id)
+         OR (r.inverse_functional AND x.object_id = #{a} AND y.object_id = #{b}
+             AND x.subject_id &lt;&gt; y.subject_id))
+  </select>
+
+  <select id="selectMergeRowsSubject" resultMap="trow">
+    SELECT f.id, f.subject_id, f.object_id, f.object_value,
+           f.valid_from, f.valid_from_precision, f.valid_to, f.valid_to_precision,
+           f.attested_to, f.end_derived, f.attested_from AS dated_at,
+           f.valid_from_grade, (EXISTS (SELECT 1 FROM fact_evidence fe
+                                    JOIN chunks ch ON ch.id = fe.chunk_id
+                                   WHERE fe.fact_id = f.id AND ch.origin = 'described')
+                          OR EXISTS (SELECT 1 FROM typed_fact_sources ts
+                                       JOIN fact_evidence fe ON fe.fact_id = ts.statement_id
+                                       JOIN chunks ch ON ch.id = fe.chunk_id
+                                      WHERE ts.fact_id = f.id AND ch.origin = 'described')) AS described
+     FROM facts f
+     WHERE f.kb_id = #{kbId} AND f.subject_id = ANY(#{holders,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[]) AND f.predicate_id = #{predicateId}
+       AND f.invalidated_at IS NULL AND f.object_id IS NOT NULL
+  </select>
+
+  <select id="selectMergeRowsObject" resultMap="trow">
+    SELECT f.id, f.subject_id, f.object_id, f.object_value,
+           f.valid_from, f.valid_from_precision, f.valid_to, f.valid_to_precision,
+           f.attested_to, f.end_derived, f.attested_from AS dated_at,
+           f.valid_from_grade, (EXISTS (SELECT 1 FROM fact_evidence fe
+                                    JOIN chunks ch ON ch.id = fe.chunk_id
+                                   WHERE fe.fact_id = f.id AND ch.origin = 'described')
+                          OR EXISTS (SELECT 1 FROM typed_fact_sources ts
+                                       JOIN fact_evidence fe ON fe.fact_id = ts.statement_id
+                                       JOIN chunks ch ON ch.id = fe.chunk_id
+                                      WHERE ts.fact_id = f.id AND ch.origin = 'described')) AS described
+     FROM facts f
+     WHERE f.kb_id = #{kbId} AND f.object_id = ANY(#{holders,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[]) AND f.predicate_id = #{predicateId}
+       AND f.invalidated_at IS NULL AND f.object_id IS NOT NULL
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- reattest_tx（documents.rs:1020-1066；M2 时自 DocumentsWriteMapper 迁入，SQL
+       一字未动）：证据文档变了，把这些事实的见证按还在的证据重算（#679 第四轮评审）。
+       三条：开放陈述重锚 → 类型化行抄陈述见证（materialize.rs sync_typed_attestation，
+       only 名单）→ 其余行按活文档最早文档日期。 -->
+
+  <update id="reattestOpen">
+    UPDATE facts f SET attested_from = w.at, attested_by = w.by
+      FROM (SELECT DISTINCT ON (fe.fact_id) fe.fact_id,
+                   COALESCE(fe.attested_at, own.at) AS at,
+                   CASE WHEN fe.attested_at IS NOT NULL THEN fe.attested_by END AS by
+              FROM fact_evidence fe
+              JOIN documents d ON d.id = fe.document_id
+             LEFT JOIN document_versions v ON v.document_id = fe.document_id
+                                      AND v.version = fe.doc_version
+               CROSS JOIN LATERAL (
+                     SELECT CASE WHEN d.doc_time_source IN ('content', 'source')
+                                 THEN COALESCE(v.doc_time, d.doc_time) END AS at) own
+             WHERE fe.fact_id = ANY(#{factIds,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[]) AND d.deleted_at IS NULL
+             ORDER BY fe.fact_id, COALESCE(fe.attested_at, own.at) NULLS LAST, fe.chunk_id) w
+     WHERE f.id = w.fact_id AND f.layer = 'open' AND f.invalidated_at IS NULL
+       AND (f.attested_from IS DISTINCT FROM w.at OR f.attested_by IS DISTINCT FROM w.by)
+  </update>
+
+  <select id="reattestTyped" resultType="java.util.UUID">
+    UPDATE facts t
+       SET attested_from = src.at, attested_by = src.by
+      FROM (SELECT u.fact_id,
+                   min(s.attested_from) AS at,
+                   (array_agg(s.attested_by ORDER BY s.attested_from NULLS LAST, s.id))[1] AS by
+              FROM (SELECT ts.fact_id, ts.statement_id
+                      FROM typed_fact_sources ts
+                      JOIN facts k ON k.id = ts.statement_id AND k.kb_id = #{kbId}
+                    UNION ALL
+                    <!-- 规则的来源按规则的库筛：类别词规则的来源是实体，没有陈述 -->
+                    SELECT i.fact_id, i.statement_id
+                      FROM implied_fact_sources i
+                      JOIN implication_rules r ON r.id = i.rule_id AND r.kb_id = #{kbId}) u
+       LEFT JOIN facts s ON s.id = u.statement_id AND s.invalidated_at IS NULL
+          GROUP BY u.fact_id) src
+     WHERE t.id = src.fact_id AND t.kb_id = #{kbId} AND t.layer = 'typed'
+       AND t.invalidated_at IS NULL
+       AND (#{only,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[] IS NULL OR t.id = ANY(#{only,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[]))
+       AND (t.implied
+            OR EXISTS (SELECT 1 FROM typed_fact_sources ts WHERE ts.fact_id = t.id))
+       AND (t.attested_from IS DISTINCT FROM src.at
+            OR t.attested_by IS DISTINCT FROM src.by)
+     RETURNING t.id
+  </select>
+
+  <update id="reattestNonOpen">
+    UPDATE facts f SET attested_from = e.first
+      FROM (SELECT fe.fact_id, min(d.doc_time) AS first
+              FROM fact_evidence fe
+              JOIN chunks c ON c.id = fe.chunk_id
+              JOIN documents d ON d.id = c.document_id
+             WHERE fe.fact_id = ANY(#{factIds,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[]) AND d.deleted_at IS NULL AND d.doc_time IS NOT NULL
+             GROUP BY fe.fact_id) e
+     WHERE f.id = e.fact_id AND f.invalidated_at IS NULL AND f.layer &lt;&gt; 'open'
+       AND NOT (f.implied
+                OR EXISTS (SELECT 1 FROM typed_fact_sources ts WHERE ts.fact_id = f.id))
+       AND f.attested_from IS DISTINCT FROM e.first
+  </update>
+</mapper>

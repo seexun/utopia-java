@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  凭据补封 SQL（逐字搬迁自旧仓库 utopia-0.1.0-rc9/crates/utopia-store/src/sealing.rs:14-112）。
+  判据一律「值没有 enc:v1: 前缀」，已封的不动——幂等，每次启动都跑。
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.SealingMapper">
+
+  <resultMap id="llmSecretRow" type="tech.seexun.jknow.store.mapper.SealingMapper$LlmSecretRow">
+    <constructor>
+      <idArg column="workspace_id" javaType="java.util.UUID"/>
+      <arg column="chat_api_key" javaType="java.lang.String"/>
+      <arg column="embed_api_key" javaType="java.lang.String"/>
+      <arg column="ocr_api_key" javaType="java.lang.String"/>
+      <arg column="transcribe_api_key" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="connRow" type="tech.seexun.jknow.store.mapper.SealingMapper$ConnRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="conn_string" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="sourceRow" type="tech.seexun.jknow.store.mapper.SealingMapper$SourceRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="config" javaType="com.fasterxml.jackson.databind.JsonNode"/>
+      <arg column="ingest_token" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <!-- sealing.rs:32-39：四把 key 任一非 NULL 且非 enc:v1: 前缀的工作区。 -->
+  <select id="selectPlainLlmSettings" resultMap="llmSecretRow">
+    SELECT workspace_id, chat_api_key, embed_api_key, ocr_api_key, transcribe_api_key
+      FROM llm_settings
+     WHERE (#{only}::uuid IS NULL OR workspace_id = #{only})
+       AND ((chat_api_key IS NOT NULL AND chat_api_key NOT LIKE 'enc:v1:%')
+         OR (embed_api_key IS NOT NULL AND embed_api_key NOT LIKE 'enc:v1:%')
+         OR (ocr_api_key IS NOT NULL AND ocr_api_key NOT LIKE 'enc:v1:%')
+         OR (transcribe_api_key IS NOT NULL AND transcribe_api_key NOT LIKE 'enc:v1:%'))
+  </select>
+
+  <!-- sealing.rs:46-49。 -->
+  <update id="updateLlmSettings">
+    UPDATE llm_settings SET chat_api_key = #{chatApiKey}, embed_api_key = #{embedApiKey},
+            ocr_api_key = #{ocrApiKey}, transcribe_api_key = #{transcribeApiKey}
+      WHERE workspace_id = #{workspaceId}
+  </update>
+
+  <!-- sealing.rs:63-65。 -->
+  <select id="selectPlainDataSources" resultMap="connRow">
+    SELECT id, conn_string FROM data_sources
+     WHERE (#{only}::uuid IS NULL OR id = #{only}) AND conn_string NOT LIKE 'enc:v1:%'
+  </select>
+
+  <!-- sealing.rs:72-74。 -->
+  <update id="updateDataSourceConn">
+    UPDATE data_sources SET conn_string = #{connString} WHERE id = #{id}
+  </update>
+
+  <!-- sealing.rs:84-85：来源表小，整张读回来在 Java 里判。 -->
+  <select id="selectSources" resultMap="sourceRow">
+    SELECT id, config, ingest_token FROM sources WHERE (#{only}::uuid IS NULL OR id = #{only})
+  </select>
+
+  <!-- sealing.rs:103-106。 -->
+  <update id="updateSourceSecrets">
+    UPDATE sources SET config = #{config}, ingest_token = #{ingestToken} WHERE id = #{id}
+  </update>
+</mapper>

@@ -1,0 +1,702 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  文档写族 SQL（逐字搬迁自旧仓库 utopia-0.1.0-rc9/crates/utopia-store/src/documents.rs，
+  引文另注 temporal.rs / materialize.rs——行号以旧仓库 main 为准）。
+  铁律：占位符 $1..$n 改写 #{param} 外 token 流一字不动，每条注明 file:line。
+  数组参数经 typehandler（uuid[]/text[]/timestamptz[] 平行数组见 reviveFacts）。
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.DocumentsWriteMapper">
+
+  <resultMap id="requeuedDoc" type="tech.seexun.jknow.store.mapper.DocumentsWriteMapper$RequeuedDoc">
+    <constructor>
+      <arg column="id" javaType="java.util.UUID"/>
+      <arg column="kb_id" javaType="java.util.UUID"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="documentRow" type="tech.seexun.jknow.store.entity.DocumentRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="kb_id" javaType="java.util.UUID"/>
+      <arg column="source_id" javaType="java.util.UUID"/>
+      <arg column="filename" javaType="java.lang.String"/>
+      <arg column="mime" javaType="java.lang.String"/>
+      <arg column="size_bytes" javaType="_long"/>
+      <arg column="sha256" javaType="java.lang.String"/>
+      <arg column="status" javaType="java.lang.String"/>
+      <arg column="error" javaType="java.lang.String"/>
+      <arg column="doc_time" javaType="java.time.OffsetDateTime"/>
+      <arg column="doc_time_source" javaType="java.lang.String"/>
+      <arg column="time_context" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="time_context_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="graph_status" javaType="java.lang.String"/>
+      <arg column="graph_error" javaType="java.lang.String"/>
+      <arg column="text_len" javaType="_int"/>
+      <arg column="chunk_count" javaType="_int"/>
+      <arg column="tags" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.TextArrayTypeHandler"/>
+      <arg column="external_key" javaType="java.lang.String"/>
+      <arg column="missing_since" javaType="java.time.OffsetDateTime"/>
+      <arg column="deleted_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="purged_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="reader_needed" javaType="java.lang.String"/>
+      <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="updated_at" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+
+  <resultMap id="deletionRow" type="tech.seexun.jknow.store.mapper.DocumentsWriteMapper$DeletionRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="invalidated_facts" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler"/>
+      <arg column="superseded_chunks" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="purgeRow" type="tech.seexun.jknow.store.mapper.DocumentsWriteMapper$PurgeRow">
+    <constructor>
+      <arg column="sha256" javaType="java.lang.String"/>
+      <arg column="deleted_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="purged_at" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="sharedFact" type="tech.seexun.jknow.store.mapper.DocumentsWriteMapper$SharedFact">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="invalidated_at" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="chunkText" type="tech.seexun.jknow.store.mapper.DocumentsWriteMapper$ChunkText">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="text" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <!-- 认领式分块的行形状（records 走构造器映射）。 -->
+  <resultMap id="snapshotRow" type="tech.seexun.jknow.store.mapper.DocumentsWriteMapper$SnapshotRow">
+    <constructor>
+      <arg column="sha256" javaType="java.lang.String"/>
+      <arg column="tombstoned" javaType="_boolean"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="storedChunk" type="tech.seexun.jknow.store.mapper.DocumentsWriteMapper$StoredChunk">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="text" javaType="java.lang.String"/>
+      <arg column="origin" javaType="java.lang.String"/>
+      <arg column="originModel" javaType="java.lang.String"/>
+      <arg column="anchor" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+    </constructor>
+  </resultMap>
+
+  <!-- documents.rs:821-831（requeue_waiting_for_reader）：UPDATE ... FROM ... RETURNING
+       逐字（RETURNING d.id, d.kb_id 的列名不带 d. 前缀）。一个事务里改状态、排任务
+       （enqueue 在 DocumentsWriteService 同事务内），不会有「状态改回 pending、任务
+       却没排上」的半截。 -->
+  <select id="requeueWaitingForReader" resultMap="requeuedDoc">
+    UPDATE documents d SET status = 'pending', error = NULL, reader_needed = NULL,
+            reader_task = NULL, updated_at = now()
+       FROM knowledge_bases k
+      WHERE k.id = d.kb_id AND k.workspace_id = #{workspaceId}
+        AND d.reader_needed = #{reader} AND d.deleted_at IS NULL
+     RETURNING d.id, d.kb_id
+  </select>
+
+  <!-- ============ 上传（D9 消除：documents.rs:79-118 预检 + :121-176 版本 1） ============ -->
+
+  <!-- documents.rs:80-81 逐字：同样的内容回来了，而它只是被删过——复活那一篇，
+       而不是撞 (kb_id, sha256) 的唯一索引（#268）。 -->
+  <select id="selectDeletedIdBySha" resultType="java.util.UUID">
+    SELECT id FROM documents
+     WHERE kb_id = #{kbId} AND sha256 = #{sha256} AND deleted_at IS NOT NULL AND purged_at IS NULL
+  </select>
+
+  <!-- documents.rs:90-93 逐字（doc_time_source 调用方传入：上传识别出日期='content'、
+       其余='none'——没有日期就是没有日期，上传的时刻是记录时间，0045 决定 3/#714）。 -->
+  <select id="insertDocument" resultMap="documentRow">
+    INSERT INTO documents (id, kb_id, filename, mime, size_bytes, sha256, source_id,
+                            doc_time, doc_time_source, external_key)
+    VALUES (#{id}, #{kbId}, #{filename}, #{mime}, #{sizeBytes}, #{sha256}, #{sourceId},
+            #{docTime}, #{docTimeSource}, #{externalKey}) RETURNING *
+  </select>
+
+  <!-- documents.rs:157-160 逐字（版本 1；doc_time 子查询回读主行）。 -->
+  <insert id="insertVersionOne">
+    INSERT INTO document_versions (id, document_id, version, sha256, size_bytes, doc_time)
+     VALUES (#{id}, #{documentId}, 1, #{sha256}, #{sizeBytes},
+             (SELECT doc_time FROM documents WHERE id = #{documentId}))
+  </insert>
+
+  <!-- ============ 内容替换（documents.rs:178-233） ============ -->
+
+  <!-- documents.rs:189 逐字：替换预检（活文档行锁；None→NotFound）。 -->
+  <select id="selectLiveByIdForUpdate" resultType="java.util.UUID">
+    SELECT id FROM documents WHERE id = #{id} AND deleted_at IS NULL FOR UPDATE
+  </select>
+
+  <!-- documents.rs:196-202 逐字（docTime 两处加 ::timestamptz 显式转型——token 流不变，
+       语义不变；不加则空值参数在 `? IS NULL` 位置无法定型号，PG prepare 报
+       could not determine data type of parameter——任务 4 推送 Updated 路径首触的
+       任务 3 隐患）。 -->
+  <update id="updateReplaceContent">
+    UPDATE documents SET filename = #{filename}, mime = #{mime}, size_bytes = #{sizeBytes},
+            sha256 = #{sha256},
+            doc_time = COALESCE(#{docTime,jdbcType=TIMESTAMP}::timestamptz, doc_time),
+            doc_time_source = CASE WHEN #{docTime,jdbcType=TIMESTAMP}::timestamptz IS NULL THEN doc_time_source ELSE 'source' END,
+            status = 'pending', graph_status = 'none', error = NULL,
+            missing_since = NULL, updated_at = now()
+     WHERE id = #{id}
+  </update>
+
+  <!-- documents.rs:212-217 逐字（版本 max+1）。 -->
+  <insert id="insertVersionNext">
+    INSERT INTO document_versions (id, document_id, version, sha256, size_bytes, doc_time)
+     VALUES (#{id}, #{documentId},
+             (SELECT coalesce(max(version), 0) + 1 FROM document_versions WHERE document_id = #{documentId}),
+             #{sha256}, #{sizeBytes}, (SELECT doc_time FROM documents WHERE id = #{documentId}))
+  </insert>
+
+  <!-- ============ 墓碑删除/恢复共用的锁与读（documents.rs:920-1216） ============ -->
+
+  <!-- documents.rs:1228 逐字：锁序第一环 source→document（RSS 顺序，never reverse）。 -->
+  <update id="lockDocumentSource">
+    SELECT id FROM sources WHERE id = (SELECT source_id FROM documents WHERE id = #{id}) FOR UPDATE
+  </update>
+
+  <!-- documents.rs:1130 逐字（恢复路径的文档行锁，无 kb 条件）。 -->
+  <update id="lockDocumentRow">
+    SELECT id FROM documents WHERE id = #{id} FOR UPDATE
+  </update>
+
+  <!-- documents.rs:928-931 逐字：打墓碑。 -->
+  <update id="tombstone">
+    UPDATE documents SET deleted_at = now(), updated_at = now()
+     WHERE id = #{id} AND kb_id = #{kbId} AND deleted_at IS NULL
+  </update>
+
+  <!-- documents.rs:939-942 逐字：分块走 replace_chunks 用了很久的 superseded_at。 -->
+  <select id="supersedeChunks" resultType="java.util.UUID">
+    UPDATE chunks SET superseded_at = now()
+     WHERE document_id = #{id} AND superseded_at IS NULL RETURNING id
+  </select>
+
+  <!-- documents.rs:1083-1086 逐字（cited_sql）：引用这篇文档的现存事实
+       （锁前一遍、锁后再读一遍——#679 第三轮评审）。 -->
+  <select id="selectCitedFacts" resultType="java.util.UUID">
+    SELECT DISTINCT f.id FROM facts f
+     JOIN fact_evidence fe ON fe.fact_id = f.id
+     JOIN chunks c ON c.id = fe.chunk_id
+    WHERE f.kb_id = #{kbId} AND f.invalidated_at IS NULL AND c.document_id = #{documentId}
+  </select>
+
+
+  <!-- temporal 域的锁/放置/reattest 语句 M3 任务 2 起迁至 TemporalMapper（SQL 一字未动）。 -->
+
+  <!-- documents.rs:952-968 逐字：作废「每条出处都已删除」的事实。先打了墓碑再算
+       （$2=本篇、$3=cited 名单）；known_as 本名豁免（0041）。 -->
+  <select id="invalidateFacts" resultType="java.util.UUID">
+    UPDATE facts f SET invalidated_at = now()
+     WHERE f.kb_id = #{kbId} AND f.invalidated_at IS NULL AND f.id = ANY(#{cited,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[])
+       AND EXISTS (SELECT 1 FROM fact_evidence fe
+                   JOIN chunks c ON c.id = fe.chunk_id
+                   WHERE fe.fact_id = f.id AND c.document_id = #{documentId})
+       AND NOT EXISTS (SELECT 1 FROM fact_evidence fe
+                       JOIN chunks c ON c.id = fe.chunk_id
+                       JOIN documents d ON d.id = c.document_id
+                       WHERE fe.fact_id = f.id AND d.deleted_at IS NULL)
+       <!-- 实体的本名不随文档走（0041）：建实体时就记下了这条名字事实，这篇文档只是
+            给它补过出处。删掉出处，实体还叫这个名字，名字栏里不能少了它 -->
+       AND NOT EXISTS (SELECT 1 FROM relation_types nr
+                        JOIN entities ne ON ne.id = f.subject_id
+                       WHERE nr.id = f.predicate_id AND nr.builtin AND nr.key = 'known_as'
+                         AND lower(f.object_value->>'value') = lower(ne.canonical_name))
+     RETURNING f.id
+  </select>
+
+
+
+
+  <!-- documents.rs:980-985 逐字：删除账（名单入账，restore 原路读回）。 -->
+  <insert id="insertDeletion">
+    INSERT INTO document_deletions
+        (id, kb_id, document_id, deleted_by, invalidated_facts, superseded_chunks,
+         external_key, created_at)
+     VALUES (#{id}, #{kbId}, #{documentId}, #{deletedBy},
+             #{invalidatedFacts,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[],
+             #{supersededChunks,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[],
+             (SELECT external_key FROM documents WHERE id = #{documentId}), clock_timestamp())
+  </insert>
+
+  <!-- documents.rs:1134-1138 逐字：最近一条未撤销的删除账。 -->
+  <select id="selectLatestDeletion" resultMap="deletionRow">
+    SELECT id, invalidated_facts, superseded_chunks FROM document_deletions
+     WHERE document_id = #{documentId} AND kb_id = #{kbId} AND reverted_at IS NULL
+     ORDER BY created_at DESC LIMIT 1
+  </select>
+
+  <!-- documents.rs:1147-1149 逐字：清过的没东西可复活。 -->
+  <select id="selectPurgedFlag" resultType="java.lang.Boolean">
+    SELECT purged_at IS NOT NULL FROM documents WHERE id = #{id}
+  </select>
+
+  <!-- documents.rs:1157-1160 逐字：复活主行。 -->
+  <update id="resurrectDocument">
+    UPDATE documents SET deleted_at = NULL, updated_at = now()
+     WHERE id = #{id} AND kb_id = #{kbId} AND deleted_at IS NOT NULL
+  </update>
+
+  <!-- documents.rs:1168 逐字：这次打标的分块复活。 -->
+  <update id="reviveChunks">
+    UPDATE chunks SET superseded_at = NULL WHERE id = ANY(#{chunkIds,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[])
+  </update>
+
+  <!-- documents.rs:1174-1184 逐字：共同作证救援名单（按删除事务留下的作废时间精确
+       匹配——后来另行撤回的事实不能借旧名单复活）。 -->
+  <select id="selectSharedWitness" resultMap="sharedFact">
+    SELECT DISTINCT f.id, f.invalidated_at FROM facts f
+     JOIN fact_evidence fe ON fe.fact_id = f.id
+     JOIN chunks c ON c.id = fe.chunk_id
+    WHERE f.kb_id = #{kbId} AND c.document_id = #{documentId} AND f.invalidated_at IS NOT NULL
+      AND EXISTS (SELECT 1 FROM document_deletions dd
+                  JOIN documents d ON d.id = dd.document_id
+                 WHERE dd.kb_id = #{kbId} AND dd.reverted_at IS NULL
+                   AND f.id = ANY(dd.invalidated_facts)
+                   AND f.invalidated_at = d.deleted_at)
+  </select>
+
+  <!-- documents.rs:1194-1199 逐字：复活事实（名单 OR (id,时间戳) 对——等锁期间若又
+       作废，不覆盖新的决定）。timestamptz[] 平行数组。 -->
+  <update id="reviveFacts">
+    UPDATE facts SET invalidated_at = NULL
+     WHERE invalidated_at IS NOT NULL
+       AND (id = ANY(#{factIds,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[]) OR (id, invalidated_at) IN
+            (SELECT * FROM unnest(#{sharedIds,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[],
+                                  #{sharedStamps,typeHandler=tech.seexun.jknow.store.typehandler.OffsetArrayTypeHandler}::timestamptz[])))
+  </update>
+
+  <!-- documents.rs:1208 逐字：撤销这条删除账。 -->
+  <update id="revertDeletion">
+    UPDATE document_deletions SET reverted_at = now() WHERE id = #{id}
+  </update>
+
+  <!-- documents.rs:1212 逐字：复活后的主行（响应用）。 -->
+  <select id="selectDocumentById" resultMap="documentRow">
+    SELECT * FROM documents WHERE id = #{id}
+  </select>
+
+  <!-- ============ 真删 purge（documents.rs:1242-1310） ============ -->
+
+  <!-- documents.rs:1246-1249 逐字：(sha256, deleted_at, purged_at) 行锁快照。 -->
+  <select id="selectDocumentForPurge" resultMap="purgeRow">
+    SELECT sha256, deleted_at, purged_at FROM documents
+     WHERE id = #{id} AND kb_id = #{kbId} FOR UPDATE
+  </select>
+
+  <!-- documents.rs:1265-1266 逐字：历史版本指纹。 -->
+  <select id="selectVersionShas" resultType="java.lang.String">
+    SELECT DISTINCT sha256 FROM document_versions WHERE document_id = #{id}
+  </select>
+
+  <!-- documents.rs:1273 逐字：分块行删掉（证据引文随外键级联）。 -->
+  <delete id="deleteChunks">
+    DELETE FROM chunks WHERE document_id = #{id}
+  </delete>
+
+  <!-- documents.rs:1278 逐字：版本行删掉。 -->
+  <delete id="deleteVersions">
+    DELETE FROM document_versions WHERE document_id = #{id}
+  </delete>
+
+  <!-- documents.rs:1282-1287 逐字：purged_at 打点、external_key 让出身份
+       （documents_kb_sha_idx 部分唯一索引 WHERE purged_at IS NULL——#516）。 -->
+  <update id="markPurged">
+    UPDATE documents
+       SET purged_at = clock_timestamp(), external_key = NULL, text_len = 0, chunk_count = 0,
+           updated_at = now()
+     WHERE id = #{id}
+  </update>
+
+  <!-- documents.rs:1299-1304 逐字：独占 blob 判定（两 NOT EXISTS，一句话判完所有指纹，
+       必须站在版本行删掉之后的位置——#516）。 -->
+  <select id="selectExclusiveBlobs" resultType="java.lang.String">
+    SELECT s FROM unnest(#{shas,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler}::text[]) WITH ORDINALITY AS u(s, n)
+     WHERE NOT EXISTS (SELECT 1 FROM documents WHERE sha256 = s AND purged_at IS NULL)
+       AND NOT EXISTS (SELECT 1 FROM document_versions WHERE sha256 = s)
+     ORDER BY n
+  </select>
+
+  <!-- ============ 状态推进（documents.rs:774-813/886-898/1605-1616/1814-1824） ============ -->
+
+  <!-- documents.rs:776-779 逐字：重新开始处理——上一次缺的读取模型不再算数。 -->
+  <update id="setStatus">
+    UPDATE documents SET status = #{status}, error = NULL, reader_needed = NULL, updated_at = now()
+     WHERE id = #{id}
+  </update>
+
+  <!-- documents.rs:788-791 逐字。 -->
+  <update id="setFailed">
+    UPDATE documents SET status = 'failed', error = #{error}, reader_task = NULL, updated_at = now()
+     WHERE id = #{id}
+  </update>
+
+  <!-- documents.rs:887-891 逐字。 -->
+  <update id="setReady">
+    UPDATE documents SET status = 'ready', error = NULL, reader_needed = NULL, reader_task = NULL,
+            text_len = #{textLen},
+            chunk_count = #{chunkCount}, updated_at = now() WHERE id = #{id}
+  </update>
+
+  <!-- documents.rs:1607-1610 逐字：抽取状态推进（顺带清空上一轮的失败原因）。 -->
+  <update id="setGraphStatus">
+    UPDATE documents SET graph_status = #{status}, graph_error = NULL, updated_at = now()
+     WHERE id = #{id}
+  </update>
+
+  <!-- documents.rs:1816-1819 逐字：抽取失败（状态与原因一起落库）。 -->
+  <update id="setGraphFailed">
+    UPDATE documents SET graph_status = 'failed', graph_error = #{error}, updated_at = now()
+     WHERE id = #{id}
+  </update>
+
+  <!-- documents.rs:801-810 逐字：缺 reader 降级（停在 failed、记下缺哪一种，配上重新排队）。 -->
+  <update id="setNeedsReader">
+    UPDATE documents SET status = 'failed', error = #{error}, reader_needed = #{reader},
+            reader_task = NULL, updated_at = now()
+     WHERE id = #{id}
+  </update>
+
+  <!-- ============ 认领式分块（documents.rs:1334-1488 replace_chunks_for_snapshot） ============ -->
+
+  <!-- documents.rs:1347-1354 逐字：FOR NO KEY UPDATE（不是 FOR UPDATE——后者挡外键检查的
+       FOR KEY SHARE，这个事务活着时这份文档所有子表插入都被挡住）。 -->
+  <select id="selectSnapshotForChunkUpdate" resultMap="snapshotRow">
+    SELECT sha256, deleted_at IS NOT NULL AS tombstoned
+      FROM documents WHERE id = #{id}
+     FOR NO KEY UPDATE
+  </select>
+
+  <!-- documents.rs:1359-1363 逐字：认领块挂到当前版本号（无版本行时 1）。 -->
+  <select id="selectCurrentVersion" resultType="_int">
+    SELECT COALESCE(MAX(version), 1) FROM document_versions WHERE document_id = #{documentId}
+  </select>
+
+  <!-- documents.rs:1371-1375 逐字：现行块（认领池原料：文本+出处四元组）。 -->
+  <select id="selectCurrentChunks" resultMap="storedChunk">
+    SELECT id, text, origin, origin_model AS "originModel", anchor
+      FROM chunks
+     WHERE document_id = #{documentId} AND superseded_at IS NULL
+  </select>
+
+  <!-- documents.rs:1383-1392 逐字：认领（原行更新 seq/区间/版本/标题）。 -->
+  <update id="updateChunkClaim">
+    UPDATE chunks SET seq = #{seq}, char_start = #{charStart}, char_end = #{charEnd},
+            doc_version = #{version}, heading = #{heading}
+     WHERE id = #{id}
+  </update>
+
+  <!-- documents.rs:1424-1429 逐字：落选旧块软删（向量留着——0019 开放问题②）。
+       keep 为空列表时 NOT (id = ANY('{}')) 恒真 = 全部软删，与 Rust = ANY(&[]) 同义。 -->
+  <update id="supersedeChunksExcept">
+    UPDATE chunks SET superseded_at = now()
+     WHERE document_id = #{documentId} AND superseded_at IS NULL
+       AND NOT (id = ANY(#{keep,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[]))
+  </update>
+
+  <!-- documents.rs:1432-1448 逐字：新块 INSERT（一块一种出处）。 -->
+  <insert id="insertChunk">
+    INSERT INTO chunks
+      (id, kb_id, document_id, seq, text, char_start, char_end, doc_version, heading,
+       origin, origin_model, anchor)
+    VALUES
+      (#{id}, #{kbId}, #{documentId}, #{seq}, #{text}, #{charStart}, #{charEnd}, #{version},
+       #{heading}, #{origin}, #{originModel},
+       #{anchor,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler}::jsonb)
+  </insert>
+
+  <!-- ============ embedding（documents.rs:1619-1650） ============ -->
+
+  <!-- documents.rs:1619-1631 逐字：尚未 embedding 的分块。 -->
+  <select id="selectPendingEmbedding" resultMap="chunkText">
+    SELECT id, text FROM chunks
+     WHERE document_id = #{documentId} AND embedding IS NULL AND superseded_at IS NULL
+     ORDER BY seq
+  </select>
+
+  <!-- documents.rs:1638 逐字（向量文本形态 cast——Rust 绑 Vector，语义同）。 -->
+  <update id="setEmbedding">
+    UPDATE chunks SET embedding = #{vector}::vector WHERE id = #{id}
+  </update>
+
+  <!-- vector_index.rs:153-161 status_on 逐字：这个索引在不在、是否有效。 -->
+  <select id="selectEmbeddingIndexValid" resultType="java.lang.Boolean">
+    SELECT i.indisvalid
+      FROM pg_class c
+      JOIN pg_index i ON i.indexrelid = c.oid
+     WHERE c.relname = #{indexName} AND c.relkind = 'i'
+  </select>
+
+  <!-- documents.rs:527-533 逐字：retry-failed 名单（作用域哨兵串 any/none/uuid 文本）。 -->
+  <select id="failedIds" resultType="java.util.UUID">
+    SELECT id FROM documents
+     WHERE kb_id = #{kbId} AND deleted_at IS NULL AND graph_status = 'failed'
+       AND (#{scope} = 'any'
+            OR (#{scope} = 'none' AND source_id IS NULL)
+            OR source_id::text = #{scope})
+  </select>
+
+  <!-- ============ 抽取排队（documents.rs:1509-1545 单篇 / :1751-1812 批量） ============ -->
+
+  <!-- documents.rs:1511-1514 逐字：清增量标记（单篇，手动 Extract=强制全量）。 -->
+  <update id="clearChunkExtracted">
+    UPDATE chunks SET extracted_at = NULL
+     WHERE document_id = #{documentId} AND superseded_at IS NULL
+  </update>
+
+  <!-- documents.rs:1519-1522 逐字：解雇未开跑的旧任务（payload 文本比较——历史脏
+       payload 无法转 uuid）。 -->
+  <delete id="deleteQueuedExtractJob">
+    DELETE FROM jobs WHERE kind = 'extract_document' AND status = 'queued'
+      AND payload->>'document_id' = #{documentId}
+  </delete>
+
+  <!-- documents.rs:1526-1529 逐字：置 queued + epoch 自增（解雇在跑的那个）。 -->
+  <update id="setGraphQueuedEpoch">
+    UPDATE documents SET graph_status = 'queued', graph_error = NULL,
+            extract_epoch = extract_epoch + 1
+     WHERE id = #{id}
+  </update>
+
+  <!-- documents.rs:1534-1538 逐字：建抽取任务 RETURNING id（整体一个事务——分开做
+       任一步失败都会留下半截状态）。 -->
+  <select id="insertExtractJob" resultType="_long">
+    INSERT INTO jobs (kind, payload)
+     VALUES ('extract_document', jsonb_build_object('document_id', #{documentId}::text))
+     RETURNING id
+  </select>
+
+  <!-- documents.rs:1760-1766 逐字：整库/整源批量名单（ready 活文档；来源说了不抽取
+       的不排——Source::extracts 的 SQL 版，0035 决定 7/#553）。 -->
+  <select id="selectExtractionIds" resultType="java.util.UUID">
+    SELECT d.id FROM documents d
+     LEFT JOIN sources s ON s.id = d.source_id
+    WHERE d.kb_id = #{kbId} AND d.deleted_at IS NULL AND d.status = 'ready'
+      AND (#{sourceId}::uuid IS NULL OR d.source_id = #{sourceId})
+      AND NOT coalesce(s.config -> 'extract' = 'false'::jsonb, false)
+    ORDER BY d.created_at
+  </select>
+
+  <!-- documents.rs:1778-1781 逐字：解雇未开跑的旧任务（批量）。 -->
+  <delete id="deleteQueuedExtractJobsAny">
+    DELETE FROM jobs WHERE kind = 'extract_document' AND status = 'queued'
+      AND payload->>'document_id' = ANY(#{documentIds,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler}::text[])
+  </delete>
+
+  <!-- documents.rs:1785-1788 逐字：清增量标记（批量）。 -->
+  <update id="clearChunkExtractedAny">
+    UPDATE chunks SET extracted_at = NULL
+     WHERE document_id = ANY(#{documentIds,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[]) AND superseded_at IS NULL
+  </update>
+
+  <!-- documents.rs:1792-1795 逐字：置 queued + epoch 自增（批量）。 -->
+  <update id="setGraphQueuedEpochAny">
+    UPDATE documents SET graph_status = 'queued', graph_error = NULL,
+            extract_epoch = extract_epoch + 1
+     WHERE id = ANY(#{documentIds,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[])
+  </update>
+
+  <!-- documents.rs:1801-1807 逐字：建抽取任务（批量，payload 形状与 enqueue 一致）。 -->
+  <insert id="insertExtractJobs">
+    INSERT INTO jobs (kind, payload)
+     SELECT 'extract_document', jsonb_build_object('document_id', id::text)
+     FROM unnest(#{documentIds,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[]) AS t(id)
+  </insert>
+
+  <!-- ============ 恢复后的索引重建原料（documents.rs:1725-1740 chunks_in_document） ============ -->
+
+  <!-- documents.rs:1730-1735 逐字：现行分块（恢复 reindex 的 (chunk_id, text) 对）。 -->
+  <select id="selectChunksInDocument" resultMap="chunkText">
+    SELECT c.id, c.text
+     FROM chunks c JOIN documents d ON d.id = c.document_id
+    WHERE c.kb_id = #{kbId} AND c.document_id = #{documentId} AND c.superseded_at IS NULL
+    ORDER BY c.seq
+  </select>
+
+  <!-- ============ 同步三路判定与 missing 台账（documents.rs:580-780；M2 任务 4 起用） ============ -->
+
+  <!-- documents.rs:584-597 逐字：按来源内逻辑身份查文档（三路判定的主判定）。 -->
+  <select id="findByExternalKey" resultMap="documentRow">
+    SELECT * FROM documents WHERE source_id = #{sourceId} AND external_key = #{externalKey}
+  </select>
+
+  <!-- rss_full_content.rs:496-497（documents.rs:246-253 同形）：hydration 发布事务里的
+       墓碑预检——复用普通恢复事务，不是第二套 RSS 专用的墓碑更新。 -->
+  <select id="selectDeletedIdByKey" resultType="java.util.UUID">
+    SELECT id FROM documents WHERE source_id = #{sourceId} AND external_key = #{externalKey}
+      AND deleted_at IS NOT NULL AND purged_at IS NULL
+  </select>
+
+  <!-- rss_full_content.rs:500-507（documents.rs:255-262 同形）：发布闸内按身份行锁。 -->
+  <select id="findByExternalKeyForUpdate" resultMap="documentRow">
+    SELECT * FROM documents WHERE source_id = #{sourceId} AND external_key = #{externalKey}
+      AND deleted_at IS NULL FOR UPDATE
+  </select>
+
+  <!-- documents.rs:599-612 逐字（改名/移动识别的兜底判定）。 -->
+  <select id="findBySourceSha" resultMap="documentRow">
+    SELECT * FROM documents
+          WHERE source_id = #{sourceId} AND sha256 = #{sha256} AND deleted_at IS NULL LIMIT 1
+  </select>
+
+  <!-- documents.rs:614-630 逐字：迁移前的历史文档（无 external_key）按文件名认领。 -->
+  <select id="findLegacyByFilename" resultMap="documentRow">
+    SELECT * FROM documents
+     WHERE source_id = #{sourceId} AND external_key IS NULL AND filename = #{filename}
+       AND deleted_at IS NULL LIMIT 1
+  </select>
+
+  <!-- documents.rs:632-637 逐字：给历史文档补逻辑身份。 -->
+  <update id="adoptExternalKey">
+    UPDATE documents SET external_key = #{externalKey}, updated_at = now() WHERE id = #{id}
+  </update>
+
+  <!-- documents.rs:675-688 逐字：移动/改名只更新身份（missing 标记一并摘掉），不重跑管道。 -->
+  <update id="updateLocation">
+    UPDATE documents SET filename = #{filename}, external_key = #{externalKey}, missing_since = NULL,
+            updated_at = now() WHERE id = #{id}
+  </update>
+
+  <!-- documents.rs:694-712 逐字：记录内容版本（版本号 max+1；认领时旧内容补记版本 1）。 -->
+  <insert id="recordVersion">
+    INSERT INTO document_versions (id, document_id, version, sha256, size_bytes, doc_time)
+     VALUES (#{id}, #{documentId},
+             (SELECT coalesce(max(version), 0) + 1 FROM document_versions WHERE document_id = #{documentId}),
+             #{sha256}, #{sizeBytes}, (SELECT doc_time FROM documents WHERE id = #{documentId}))
+  </insert>
+
+  <!-- documents.rs:718-731 逐字：全集对账的后半——没见到的打 missing 标记（前半
+       clear_missing_keys 由服务层先调；rss 滑动窗口与 custom 增量不可用此函数）。 -->
+  <update id="markMissingExcept">
+    UPDATE documents SET missing_since = now(), updated_at = now()
+     WHERE source_id = #{sourceId} AND missing_since IS NULL
+       AND external_key IS NOT NULL AND NOT (external_key = ANY(#{seenKeys,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler}::text[]))
+  </update>
+
+  <!-- documents.rs:737-748 逐字：本轮出现的条目清除 missing 标记（失而复得）。 -->
+  <update id="clearMissingKeys">
+    UPDATE documents SET missing_since = NULL, updated_at = now()
+     WHERE source_id = #{sourceId} AND missing_since IS NOT NULL AND external_key = ANY(#{keys,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler}::text[])
+  </update>
+
+  <!-- documents.rs:750-761 逐字：显式墓碑——来源声明删除才打标，绝不因缺席推断。 -->
+  <update id="markMissingKeys">
+    UPDATE documents SET missing_since = now(), updated_at = now()
+     WHERE source_id = #{sourceId} AND missing_since IS NULL AND external_key = ANY(#{keys,typeHandler=tech.seexun.jknow.store.typehandler.TextArrayTypeHandler}::text[])
+  </update>
+
+  <!-- documents.rs:763-771 逐字：该来源下所有已标 missing 的活文档 id。 -->
+  <select id="listMissing" resultType="java.util.UUID">
+    SELECT id FROM documents
+      WHERE source_id = #{sourceId} AND missing_since IS NOT NULL AND deleted_at IS NULL
+  </select>
+
+  <!-- ============ 来源引用（documents_routes.rs:252-262 folder 校验 + models.rs:178-183 extracts） ============ -->
+
+  <!-- 上传目标三键：kb_id/kind（folder 校验）+ extracts（config.extract 缺省 true，
+       谓词与 documents.rs:1765 queue_extraction 的豁免判定同一口径）。 -->
+  <resultMap id="sourceRef" type="tech.seexun.jknow.store.mapper.DocumentsWriteMapper$SourceRef">
+    <constructor>
+      <arg column="kb_id" javaType="java.util.UUID"/>
+      <arg column="kind" javaType="java.lang.String"/>
+      <arg column="extracts" javaType="_boolean"/>
+    </constructor>
+  </resultMap>
+  <select id="selectSourceRef" resultMap="sourceRef">
+    SELECT kb_id, kind, NOT coalesce(config -> 'extract' = 'false'::jsonb, false) AS extracts
+     FROM sources WHERE id = #{id}
+  </select>
+
+  <!-- ============ extraction_drops 写侧（extraction_drops.rs:63-96） ============ -->
+
+  <!-- 记一条丢弃信号（extraction_drops.rs:71-77）：detail 截 120、example 截 200；
+       同 (库, 文档, 原因, 对象) 再撞只计数并补空 example——聚合行按 (文档×原因×对象) 很小。 -->
+  <insert id="insertExtractionDrop">
+    INSERT INTO extraction_drops (kb_id, document_id, reason, detail, example)
+     VALUES (#{kbId}, #{documentId}, #{reason}, left(#{detail}, 120), left(#{example}, 200))
+     ON CONFLICT (kb_id, document_id, reason, detail)
+     DO UPDATE SET count = extraction_drops.count + 1,
+                   example = COALESCE(EXCLUDED.example, extraction_drops.example),
+                   updated_at = now()
+  </insert>
+
+  <!-- 重抽开始时清掉这篇文档的旧信号（extraction_drops.rs:90-93）——本轮要从头讲一遍这篇文档的故事。 -->
+  <delete id="clearExtractionDrops">
+    DELETE FROM extraction_drops WHERE document_id = #{documentId}
+  </delete>
+
+  <!-- ======================= 抽取执行（任务 8） ======================= -->
+
+  <!-- documents.rs:1496-1498 mark_chunk_extracted 逐字。 -->
+  <update id="markChunkExtracted">
+    UPDATE chunks SET extracted_at = now() WHERE id = #{chunkId}
+  </update>
+
+  <resultMap id="chunkForExtract" type="tech.seexun.jknow.store.mapper.DocumentsWriteMapper$ChunkForExtract">
+    <constructor>
+      <arg column="id" javaType="java.util.UUID"/>
+      <arg column="seq" javaType="_int"/>
+      <arg column="text" javaType="java.lang.String"/>
+      <arg column="origin" javaType="java.lang.String"/>
+      <arg column="embedding" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+    </constructor>
+  </resultMap>
+
+  <!-- documents.rs:1573-1587 chunks_for_extraction 逐字（embedding 为 vector 列，以
+       vector_out 文本形态读出——向量数组按 JSON 数组解释；无向量为 null）。 -->
+  <select id="selectChunksForExtraction" resultMap="chunkForExtract">
+    SELECT id, seq, text, origin, embedding::text::jsonb AS embedding FROM chunks
+     WHERE document_id = #{documentId} AND superseded_at IS NULL AND extracted_at IS NULL
+     ORDER BY seq
+  </select>
+
+  <resultMap id="openingChunk" type="tech.seexun.jknow.store.mapper.DocumentsWriteMapper$OpeningChunk">
+    <constructor>
+      <arg column="id" javaType="java.util.UUID"/>
+      <arg column="text" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <!-- documents.rs:1591-1602 opening_chunk 逐字。 -->
+  <select id="selectOpeningChunk" resultMap="openingChunk">
+    SELECT id, text FROM chunks
+     WHERE document_id = #{documentId} AND superseded_at IS NULL
+     ORDER BY seq LIMIT 1
+  </select>
+
+  <!-- documents.rs:642-653 set_time_context 逐字。 -->
+  <update id="setTimeContext">
+    UPDATE documents SET time_context = #{context,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler}, time_context_at = now(), updated_at = now()
+     WHERE id = #{id}
+  </update>
+
+  <!-- documents.rs:658-663 set_content_date 逐字。 -->
+  <update id="setContentDate">
+    UPDATE documents SET doc_time = #{date}, doc_time_source = 'content', updated_at = now()
+     WHERE id = #{id}
+  </update>
+
+  <!-- documents.rs:1826-1834 extract_epoch 逐字。 -->
+  <select id="extractEpoch" resultType="_int">
+    SELECT extract_epoch FROM documents WHERE id = #{id}
+  </select>
+</mapper>

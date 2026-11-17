@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="tech.seexun.jknow.store.mapper.OntologyRegressionsMapper">
+
+    <!-- 人的对齐例子回归（ontology_regressions.rs 逐字搬迁）。record_sql(fresh) 的两形态
+         在 recordExisting / recordForSignature / recordHuman 三条里展开（Rust format! 对等）。 -->
+
+    <resultMap id="case" type="tech.seexun.jknow.store.mapper.OntologyRegressionsMapper$Case">
+        <constructor>
+            <arg column="id" javaType="java.util.UUID"/>
+            <arg column="kb_id" javaType="java.util.UUID"/>
+            <arg column="statement_id" javaType="java.util.UUID"/>
+            <arg column="expected_property_id" javaType="java.util.UUID"/>
+            <arg column="expected_direction" javaType="java.lang.String"/>
+            <arg column="created_by" javaType="java.util.UUID"/>
+            <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+            <arg column="origin" javaType="java.lang.String"/>
+            <arg column="last_checked_at" javaType="java.time.OffsetDateTime"/>
+            <arg column="last_result" javaType="com.fasterxml.jackson.databind.JsonNode"
+                 typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+        </constructor>
+    </resultMap>
+
+    <!-- ontology_regressions.rs:53-68 views -->
+    <select id="selectViews" parameterType="java.util.UUID"
+            resultType="com.fasterxml.jackson.databind.JsonNode">
+        SELECT jsonb_build_object('id', c.id, 'kb_id', c.kb_id, 'statement_id', c.statement_id,
+                'expected_property_id', c.expected_property_id,
+                'expected_direction', c.expected_direction, 'created_by', c.created_by,
+                'created_at', c.created_at, 'origin', c.origin,
+                'last_checked_at', c.last_checked_at, 'last_result', c.last_result,
+                'subject_id', f.subject_id, 'subject_label', s.canonical_name, 'phrase', f.phrase,
+                'object_id', f.object_id, 'object_label', o.canonical_name,
+                'object_value', f.object_value,
+                'expected_property_label', expected.label,
+                'expected_property_key', expected.key,
+                'actual_property_label', actual.label, 'actual_property_key', actual.key,
+                'created_by_label', u.display_name) AS view
+         FROM ontology_regression_cases c
+         JOIN facts f ON f.kb_id=c.kb_id AND f.id=c.statement_id
+         JOIN entities s ON s.kb_id=f.kb_id AND s.id=f.subject_id
+         LEFT JOIN entities o ON o.kb_id=f.kb_id AND o.id=f.object_id
+         JOIN relation_types expected ON expected.kb_id=c.kb_id AND expected.id=c.expected_property_id
+         LEFT JOIN relation_types actual ON actual.kb_id=c.kb_id
+           AND actual.id=(c.last_result->>'actual_property_id')::uuid
+         LEFT JOIN users u ON u.id=c.created_by
+         WHERE c.kb_id=#{kbId} AND f.layer='open' AND f.invalidated_at IS NULL
+         ORDER BY c.created_at DESC,c.id
+    </select>
+
+    <select id="selectList" parameterType="java.util.UUID" resultMap="case">
+        SELECT c.* FROM ontology_regression_cases c WHERE c.kb_id=#{kbId}
+        AND EXISTS(SELECT 1 FROM facts f WHERE f.id=c.statement_id AND f.kb_id=c.kb_id
+          AND f.layer='open' AND f.invalidated_at IS NULL) ORDER BY c.created_at DESC,c.id
+    </select>
+
+    <select id="selectGet" resultMap="case">
+        SELECT * FROM ontology_regression_cases WHERE kb_id=#{kbId} AND id=#{id}
+    </select>
+
+    <!-- ontology_regressions.rs:118-125 -->
+    <select id="selectStatementIsValueForShare" resultType="java.lang.Boolean">
+        SELECT object_id IS NULL FROM facts
+        WHERE kb_id=#{kbId} AND id=#{statementId} AND layer='open' AND invalidated_at IS NULL
+          AND nullif(btrim(phrase),'') IS NOT NULL FOR SHARE
+    </select>
+
+    <!-- ontology_regressions.rs:128-131 -->
+    <select id="selectPropertyKindForShare" resultType="java.lang.String">
+        SELECT kind FROM relation_types WHERE kb_id=#{kbId} AND id=#{propertyId} FOR SHARE
+    </select>
+
+    <!-- ontology_regressions.rs:142-147 DO NOTHING 后 SELECT 观察并发插入者（幂等重试
+         不变成改写原确认）；这里 INSERT ... RETURNING，撞键返回 null 由服务层捡回 -->
+    <select id="insertCase" resultType="java.util.UUID">
+        INSERT INTO ontology_regression_cases
+        (id,kb_id,statement_id,expected_property_id,expected_direction,created_by,origin)
+        VALUES(#{id},#{kbId},#{statementId},#{expectedPropertyId},#{expectedDirection},#{createdBy},#{origin})
+        ON CONFLICT(kb_id,statement_id,expected_property_id,expected_direction) DO NOTHING RETURNING id
+    </select>
+
+    <select id="selectCaseId" resultType="java.util.UUID">
+        SELECT id FROM ontology_regression_cases WHERE kb_id=#{kbId} AND statement_id=#{statementId}
+            AND expected_property_id=#{expectedPropertyId} AND expected_direction=#{expectedDirection}
+    </select>
+
+    <!-- ontology_regressions.rs:164-171 record_sql(false)：既有的判定按它原时刻报 -->
+    <update id="recordExisting">
+        UPDATE ontology_regression_cases c
+        SET last_checked_at=b.decided_at,
+            last_result=jsonb_build_object('passed',coalesce((b.decided_by='person' AND b.status='bound') OR
+              (b.status='bound' AND b.relation_type_id=c.expected_property_id AND b.direction=c.expected_direction),false),
+              'human_bound',b.decided_by='person' AND b.status='bound','actual_property_id',b.relation_type_id,
+              'actual_direction',b.direction,'status',b.status,'decided_at',b.decided_at)
+        FROM facts f JOIN entities s ON s.id=f.subject_id AND s.kb_id=f.kb_id
+        LEFT JOIN entities o ON o.id=f.object_id AND o.kb_id=f.kb_id
+        JOIN phrase_bindings b ON b.kb_id=f.kb_id
+          AND b.phrase=lower(btrim(regexp_replace(f.phrase,'\s+',' ','g')))
+          AND b.subject_type_id IS NOT DISTINCT FROM s.type_id
+          AND b.object_type_id IS NOT DISTINCT FROM o.type_id
+          AND b.object_is_value=(f.object_id IS NULL)
+        WHERE c.kb_id=#{kbId} AND c.statement_id=f.id AND f.kb_id=c.kb_id
+          AND f.layer='open' AND f.invalidated_at IS NULL
+          AND c.id=#{id} AND c.last_checked_at IS NULL
+    </update>
+
+    <!-- ontology_regressions.rs:202-208 record_sql(true) + 签名键过滤 -->
+    <update id="recordForSignature">
+        UPDATE ontology_regression_cases c
+        SET last_checked_at=now(),
+            last_result=jsonb_build_object('passed',coalesce((b.decided_by='person' AND b.status='bound') OR
+              (b.status='bound' AND b.relation_type_id=c.expected_property_id AND b.direction=c.expected_direction),false),
+              'human_bound',b.decided_by='person' AND b.status='bound','actual_property_id',b.relation_type_id,
+              'actual_direction',b.direction,'status',b.status,'decided_at',b.decided_at)
+        FROM facts f JOIN entities s ON s.id=f.subject_id AND s.kb_id=f.kb_id
+        LEFT JOIN entities o ON o.id=f.object_id AND o.kb_id=f.kb_id
+        JOIN phrase_bindings b ON b.kb_id=f.kb_id
+          AND b.phrase=lower(btrim(regexp_replace(f.phrase,'\s+',' ','g')))
+          AND b.subject_type_id IS NOT DISTINCT FROM s.type_id
+          AND b.object_type_id IS NOT DISTINCT FROM o.type_id
+          AND b.object_is_value=(f.object_id IS NULL)
+        WHERE c.kb_id=#{kbId} AND c.statement_id=f.id AND f.kb_id=c.kb_id
+          AND f.layer='open' AND f.invalidated_at IS NULL
+          AND b.phrase=#{phrase}
+          AND b.subject_type_id IS NOT DISTINCT FROM #{subjectTypeId}
+          AND b.object_type_id IS NOT DISTINCT FROM #{objectTypeId}
+          AND b.object_is_value=#{objectIsValue}
+    </update>
+
+    <!-- ontology_regressions.rs:225-229 -->
+    <update id="recordHuman" parameterType="java.util.UUID">
+        UPDATE ontology_regression_cases c
+        SET last_checked_at=now(),
+            last_result=jsonb_build_object('passed',coalesce((b.decided_by='person' AND b.status='bound') OR
+              (b.status='bound' AND b.relation_type_id=c.expected_property_id AND b.direction=c.expected_direction),false),
+              'human_bound',b.decided_by='person' AND b.status='bound','actual_property_id',b.relation_type_id,
+              'actual_direction',b.direction,'status',b.status,'decided_at',b.decided_at)
+        FROM facts f JOIN entities s ON s.id=f.subject_id AND s.kb_id=f.kb_id
+        LEFT JOIN entities o ON o.id=f.object_id AND o.kb_id=f.kb_id
+        JOIN phrase_bindings b ON b.kb_id=f.kb_id
+          AND b.phrase=lower(btrim(regexp_replace(f.phrase,'\s+',' ','g')))
+          AND b.subject_type_id IS NOT DISTINCT FROM s.type_id
+          AND b.object_type_id IS NOT DISTINCT FROM o.type_id
+          AND b.object_is_value=(f.object_id IS NULL)
+        WHERE c.kb_id=#{kbId} AND c.statement_id=f.id AND f.kb_id=c.kb_id
+          AND f.layer='open' AND f.invalidated_at IS NULL
+          AND b.decided_by='person'
+    </update>
+</mapper>

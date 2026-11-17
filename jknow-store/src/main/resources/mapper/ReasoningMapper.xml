@@ -1,0 +1,1154 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  公理检查的取数与落库 SQL（逐字搬迁自旧仓库 utopia-0.1.0-rc9/crates/utopia-store/src/reasoning.rs，
+  每条注明 file:line；铁律：占位符 $1..$n 改写 #{param}（多处出现同名）外 token 流一字不动，
+  禁止顺手优化）。
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.ReasoningMapper">
+
+  <!-- ==================================================================== -->
+  <!-- axioms（reasoning.rs:63-136）：只取声明了至少一位的 relation_types。
+       逆的归一化（p⁻¹=q 回填 q⁻¹=p，人写的优先不覆盖）在服务层——绕过触发器的路
+       不止一条（RDF 导入、直接改表），而载入公理只有这一处，谁也绕不过去。 -->
+
+  <resultMap id="axiomRow" type="tech.seexun.jknow.store.mapper.ReasoningMapper$AxiomRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="is_transitive" javaType="_boolean"/>
+      <arg column="is_symmetric" javaType="_boolean"/>
+      <arg column="is_asymmetric" javaType="_boolean"/>
+      <arg column="is_irreflexive" javaType="_boolean"/>
+      <arg column="functional" javaType="_boolean"/>
+      <arg column="inverse_functional" javaType="_boolean"/>
+      <arg column="inverse_of" javaType="java.util.UUID"/>
+      <arg column="sub_property_of" javaType="java.util.UUID"/>
+    </constructor>
+  </resultMap>
+
+  <select id="selectAxioms" resultMap="axiomRow">
+    SELECT id, is_transitive, is_symmetric, is_asymmetric, is_irreflexive,
+           functional, inverse_functional, inverse_of, sub_property_of
+      FROM relation_types
+     WHERE kb_id = #{kbId}
+       AND (is_transitive OR is_symmetric OR is_asymmetric OR is_irreflexive
+            OR functional OR inverse_functional
+            OR inverse_of IS NOT NULL OR sub_property_of IS NOT NULL)
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- signature_breaks（reasoning.rs:149-188，SQL 逐字）：递归 anc CTE 展开
+       domain/range 祖先；实体有类型且谓词有声明才查（没有公理就没有判据；
+       没有类型是「不知道」，不是「不符合」，0009）。$2 为 NULL（全量）时
+       ($2::uuid[] IS NULL OR ...) 自然放行——与 Rust bind(None) 同一形状。 -->
+
+  <select id="selectSignatureBreaks" resultType="java.util.UUID">
+    WITH RECURSIVE anc(type_id, anc_id) AS (
+         SELECT id, id FROM entity_types WHERE kb_id = #{kbId}
+         UNION
+         SELECT a.type_id, p.parent_id
+           FROM anc a JOIN entity_type_parents p ON p.child_id = a.anc_id
+     )
+     SELECT f.id
+       FROM facts f
+       JOIN relation_types r ON r.id = f.predicate_id
+       JOIN entities s ON s.id = f.subject_id
+       JOIN entities o ON o.id = f.object_id
+      WHERE f.kb_id = #{kbId} AND f.invalidated_at IS NULL
+        AND (#{only,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[] IS NULL
+             OR f.id = ANY(#{only,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[]))
+        AND (
+          (s.type_id IS NOT NULL
+           AND EXISTS (SELECT 1 FROM relation_type_domains d WHERE d.relation_type_id = r.id)
+           AND NOT EXISTS (SELECT 1 FROM relation_type_domains d
+                             JOIN anc a ON a.anc_id = d.entity_type_id
+                            WHERE d.relation_type_id = r.id AND a.type_id = s.type_id))
+          OR
+          (o.type_id IS NOT NULL
+           AND EXISTS (SELECT 1 FROM relation_type_ranges g WHERE g.relation_type_id = r.id)
+           AND NOT EXISTS (SELECT 1 FROM relation_type_ranges g
+                             JOIN anc a ON a.anc_id = g.entity_type_id
+                            WHERE g.relation_type_id = r.id AND a.type_id = o.type_id))
+        )
+      ORDER BY f.recorded_at
+  </select>
+
+  <!-- record_signature_breaks（reasoning.rs:200-203，SQL 逐字）：幂等。 -->
+  <select id="insertSignatureBreak" resultType="java.util.UUID">
+    INSERT INTO axiom_violations (id, kb_id, kind, left_fact, right_fact)
+     VALUES (#{id}, #{kbId}, 'signature', #{fact}, #{fact})
+     ON CONFLICT (kb_id, kind, left_fact, right_fact) WHERE kind &lt;&gt; 'cycle' DO NOTHING
+     RETURNING id
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- timed_edges（reasoning.rs:1289-1347，SQL 逐字）：输入只有断言。派生住在
+       另一张表，所以这里连过滤都不必写——那正是分表买到的东西：忘了排除的后果
+       是推不出东西，不是把自己的输出喂回自己。 -->
+
+  <resultMap id="timedEdgeRow"
+             type="tech.seexun.jknow.store.mapper.ReasoningMapper$TimedEdgeRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="predicate_id" javaType="java.util.UUID"/>
+      <arg column="subject_id" javaType="java.util.UUID"/>
+      <arg column="object_id" javaType="java.util.UUID"/>
+      <arg column="valid_from" javaType="java.time.OffsetDateTime"/>
+      <arg column="valid_to" javaType="java.time.OffsetDateTime"/>
+      <arg column="valid_from_precision" javaType="java.lang.String"/>
+      <arg column="valid_to_precision" javaType="java.lang.String"/>
+      <arg column="confidence" javaType="_float"/>
+      <arg column="attested_from" javaType="java.time.OffsetDateTime"/>
+      <arg column="attested_to" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <select id="selectTimedEdgeRows" resultMap="timedEdgeRow">
+    SELECT id, predicate_id, subject_id, object_id,
+           valid_from, valid_to, valid_from_precision, valid_to_precision, confidence,
+           attested_from, attested_to
+      FROM facts
+     WHERE kb_id = #{kbId}
+       AND invalidated_at IS NULL
+       AND predicate_id IS NOT NULL
+       AND object_id IS NOT NULL
+  </select>
+
+  <resultMap id="temporalRow" type="tech.seexun.jknow.store.mapper.ReasoningMapper$TemporalRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="temporal" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <select id="selectTemporals" resultMap="temporalRow">
+    SELECT id, temporal FROM relation_types WHERE kb_id = #{kbId}
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- settle_violations 两条 upsert（reasoning.rs:411-424，SQL 逐字）。
+       插与更新合成一条语句：从前是插一次再 SELECT 一次，两条语句问的是同一行。
+       xmax = 0 只有真正新插的行才成立。环不走首尾两条的键（#641）：两个环共用
+       最小的那条和收尾那条、中间不同，从前落在同一个键上，后一个覆盖前一个的
+       path——那不是「同一个环换了证据」，是另一个环被吞掉了。环就是它的事实集合，
+       按整条 path 定键（0054）。两条部分唯一索引各管一类，冲突目标要把索引的
+       WHERE 原样写出来才推断得到。 -->
+
+  <resultMap id="upsertRow" type="tech.seexun.jknow.store.mapper.ReasoningMapper$UpsertRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="status" javaType="java.lang.String"/>
+      <arg column="resolution" javaType="java.lang.String"/>
+      <arg column="fresh" javaType="_boolean"/>
+    </constructor>
+  </resultMap>
+
+  <select id="upsertViolationCycle" resultMap="upsertRow">
+    INSERT INTO axiom_violations
+         (id, kb_id, kind, left_fact, right_fact, path, detail)
+     VALUES (#{id}, #{kbId}, #{kind}, #{left}, #{right},
+             #{path,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[],
+             #{detail,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler}::jsonb)
+     ON CONFLICT (kb_id, path) WHERE kind = 'cycle' DO UPDATE
+         SET path = EXCLUDED.path, detail = EXCLUDED.detail
+     RETURNING id, status, resolution, xmax = 0 AS fresh
+  </select>
+
+  <select id="upsertViolationGrouped" resultMap="upsertRow">
+    INSERT INTO axiom_violations
+         (id, kb_id, kind, left_fact, right_fact, path, detail)
+     VALUES (#{id}, #{kbId}, #{kind}, #{left}, #{right},
+             #{path,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[],
+             #{detail,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler}::jsonb)
+     ON CONFLICT (kb_id, kind, left_fact, right_fact) WHERE kind &lt;&gt; 'cycle' DO UPDATE
+         SET path = EXCLUDED.path, detail = EXCLUDED.detail
+     RETURNING id, status, resolution, xmax = 0 AS fresh
+  </select>
+
+  <!-- reasoning.rs:447-451 破约重开（#202）：fact_retracted/fact_closed/axiom_relaxed/
+       criterion_changed 都是「世界会变」的承诺——又算出来了，承诺就是没兑现，
+       那行回到 open，人再看一次。 -->
+  <update id="reopenViolation">
+    UPDATE axiom_violations
+        SET status = 'open', resolution = NULL, decided_by = NULL,
+            decided_at = NULL, detected_at = now()
+      WHERE id = #{id}
+  </update>
+
+  <!-- reasoning.rs:464-469 环没搜完的谓词，上一轮的 open 环不清（#642）：搜不到不等于
+       不存在。撞上上限时报出的是按数据排定的那一批，数据不变就是同一批。 -->
+  <select id="selectKeptCycles" resultType="java.util.UUID">
+    SELECT v.id FROM axiom_violations v
+       JOIN facts f ON f.id = v.left_fact
+      WHERE v.kb_id = #{kbId} AND v.kind = 'cycle' AND v.status = 'open'
+        AND f.predicate_id = ANY(#{predicates,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[])
+  </select>
+
+  <!-- reasoning.rs:578-580 run 的清陈：这一轮没算出来的 open 行是陈的（事实撤了或公理
+       放宽了）；resolved 不动——那是人的决定，不是派生状态。 -->
+  <delete id="deleteStaleOpenViolations">
+    DELETE FROM axiom_violations
+      WHERE kb_id = #{kbId} AND status = 'open'
+        AND NOT (id = ANY(#{fresh,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[]))
+  </delete>
+
+  <!-- ==================================================================== -->
+  <!-- reconcile_ontology（reasoning.rs:643-686）：判据在同一条事务里刚被改过（0062），
+       陈旧的 open 行分档收场。 -->
+
+  <resultMap id="staleRow" type="tech.seexun.jknow.store.mapper.ReasoningMapper$StaleRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="kind" javaType="java.lang.String"/>
+      <arg column="left_fact" javaType="java.util.UUID"/>
+      <arg column="right_fact" javaType="java.util.UUID"/>
+      <arg column="path" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler"/>
+    </constructor>
+  </resultMap>
+
+  <select id="selectOpenViolationsNotIn" resultMap="staleRow">
+    SELECT id, kind, left_fact, right_fact, path FROM axiom_violations
+      WHERE kb_id = #{kbId} AND status = 'open'
+        AND NOT (id = ANY(#{fresh,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[]))
+  </select>
+
+  <update id="markCriterionChanged">
+    UPDATE axiom_violations
+        SET status = 'resolved', resolution = 'criterion_changed',
+            decided_by = NULL, decided_at = now()
+      WHERE id = ANY(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[])
+  </update>
+
+  <delete id="deleteViolations">
+    DELETE FROM axiom_violations
+      WHERE id = ANY(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[])
+  </delete>
+
+  <!-- ==================================================================== -->
+  <!-- accepted_groups（reasoning.rs:700-722，SQL 逐字）：人认可过并存的互斥组。
+       认可说的是「这几条可以同时成立」，所以按事实集合比，不按键比（#624）。 -->
+
+  <resultMap id="acceptedRow" type="tech.seexun.jknow.store.mapper.ReasoningMapper$AcceptedRow">
+    <constructor>
+      <arg column="kind" javaType="java.lang.String"/>
+      <arg column="left_fact" javaType="java.util.UUID"/>
+      <arg column="right_fact" javaType="java.util.UUID"/>
+      <arg column="path" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler"/>
+    </constructor>
+  </resultMap>
+
+  <select id="selectAcceptedGroups" resultMap="acceptedRow">
+    SELECT kind, left_fact, right_fact, path FROM axiom_violations
+      WHERE kb_id = #{kbId} AND status = 'resolved' AND resolution = 'accepted'
+        AND kind IN ('asymmetry', 'functional', 'inverse_functional')
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- 解除/裁决（reasoning.rs:947-998）。 -->
+
+  <select id="selectViolationForRetract" resultMap="staleRow">
+    <!-- Rust 只取 left/right/path；Java 侧补 id/kind 两列以复用 StaleRow 构造映射（服务层不用它们） -->
+    SELECT id, kind, left_fact AS left_fact, right_fact AS right_fact, path
+      FROM axiom_violations
+     WHERE id = #{id} AND kb_id = #{kbId} AND status = 'open'
+  </select>
+
+  <update id="decideViolation">
+    UPDATE axiom_violations
+        SET status = 'resolved', resolution = #{resolution}, decided_by = #{actor},
+            decided_at = now()
+      WHERE id = #{violationId} AND kb_id = #{kbId} AND status = 'open'
+  </update>
+
+  <!-- ==================================================================== -->
+  <!-- 本体自洽的取数与落库（reasoning.rs:1015-1090）。 -->
+
+  <resultMap id="pair" type="tech.seexun.jknow.store.mapper.ReasoningMapper$Pair">
+    <constructor>
+      <arg column="a" javaType="java.util.UUID"/>
+      <arg column="b" javaType="java.util.UUID"/>
+    </constructor>
+  </resultMap>
+
+  <select id="selectParents" resultMap="pair">
+    SELECT child_id AS a, parent_id AS b FROM entity_type_parents p
+                       JOIN entity_types t ON t.id = p.child_id
+                      WHERE t.kb_id = #{kbId}
+  </select>
+
+  <select id="selectDisjoint" resultMap="pair">
+    SELECT a_id AS a, b_id AS b FROM entity_type_disjoint WHERE kb_id = #{kbId}
+  </select>
+
+  <select id="countClasses" resultType="long">
+    SELECT count(*) FROM entity_types WHERE kb_id = #{kbId}
+  </select>
+
+  <select id="selectDefectId" resultType="java.util.UUID">
+    SELECT id FROM ontology_defects
+      WHERE kb_id = #{kbId} AND kind = #{kind} AND subject = #{subject}
+        AND other IS NOT DISTINCT FROM #{other}
+  </select>
+
+  <insert id="insertDefect">
+    INSERT INTO ontology_defects (id, kb_id, kind, subject, other, path)
+     VALUES (#{id}, #{kbId}, #{kind}, #{subject}, #{other},
+             #{path,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[])
+  </insert>
+
+  <delete id="deleteStaleDefects">
+    DELETE FROM ontology_defects
+      WHERE kb_id = #{kbId} AND status = 'open' AND kind &lt;&gt; 'rules_disagree'
+        AND NOT (id = ANY(#{fresh,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[]))
+  </delete>
+
+  <!-- reasoning.rs:2742-2764 decide_defect：fixed=我去改了本体，accepted=看过不必改。
+       改状态不删行——表过态这件事本身要留痕（与 decideViolation 同一约定）。 -->
+  <update id="decideDefect">
+    UPDATE ontology_defects
+        SET status = 'resolved', resolution = #{resolution}, decided_by = #{actor}, decided_at = now()
+      WHERE id = #{defectId} AND kb_id = #{kbId} AND status = 'open'
+  </update>
+
+  <!-- ==================================================================== -->
+  <!-- rules_disagree（reasoning.rs:483-553）：派生之间互撞按规则对进 ontology_defects
+       ——根子是那两条声明，不是哪条事实。同一对谓词上几种撞法合成一行。 -->
+
+  <select id="upsertRulesDisagree" resultType="java.util.UUID">
+    INSERT INTO ontology_defects (id, kb_id, kind, subject, other, path, detail)
+     VALUES (#{id}, #{kbId}, 'rules_disagree', #{subject}, #{other}, '{}',
+             #{detail,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler}::jsonb)
+     ON CONFLICT (kb_id, kind, subject, other) DO UPDATE SET detail = EXCLUDED.detail
+     RETURNING id
+  </select>
+
+  <delete id="deleteStaleRulesDisagree">
+    DELETE FROM ontology_defects
+      WHERE kb_id = #{kbId} AND kind = 'rules_disagree' AND status = 'open'
+        AND NOT (id = ANY(#{fresh,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[]))
+  </delete>
+
+  <!-- names_for 子集（reasoning.rs:774-782）：detail 里要写人读的话，而派生没有落库、
+       没有文本可查——名字在这里补。 -->
+  <resultMap id="labelRow" type="tech.seexun.jknow.store.mapper.ReasoningMapper$LabelRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="label" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <select id="selectPredicateLabels" resultMap="labelRow">
+    SELECT id, label FROM relation_types
+     WHERE id = ANY(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[])
+  </select>
+
+  <select id="selectEntityNames" resultMap="labelRow">
+    SELECT id, canonical_name AS label FROM entities
+     WHERE id = ANY(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[])
+  </select>
+
+  <!-- ==================================================================== -->
+  <!-- 推理物化（M3 任务 6：reasoning.rs:1096-2407 + 读侧 + 调度）。SQL 逐字搬迁，
+       每条注明 file:line；拼接谓词（record/world 两轴）与 Rust format! 同形态。 -->
+
+  <!-- reasoning.rs:1486-1488 compile_rules：INSERT ... ON CONFLICT (kb_id, predicate_id, kind)
+       DO NOTHING——身份取三元组，重编译认得出「还是那条规则」，历史不断。 -->
+  <insert id="insertRule">
+    INSERT INTO rules (id, kb_id, predicate_id, kind)
+    VALUES (#{id}, #{kbId}, #{predicateId}, #{kind})
+    ON CONFLICT (kb_id, predicate_id, kind) DO NOTHING
+  </insert>
+
+  <!-- reasoning.rs:1495-1497 -->
+  <select id="selectRuleId" resultType="java.util.UUID">
+    SELECT id FROM rules WHERE kb_id = #{kbId} AND predicate_id = #{predicateId} AND kind = #{kind}
+  </select>
+
+  <resultMap id="ruleDefRow" type="tech.seexun.jknow.store.mapper.ReasoningMapper$RuleDefRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="subject_type_id" javaType="java.util.UUID"/>
+      <arg column="conclusion" javaType="java.lang.String"/>
+      <arg column="conclude_type_id" javaType="java.util.UUID"/>
+      <arg column="conclude_predicate_id" javaType="java.util.UUID"/>
+      <arg column="conclude_value" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="conclude_expr" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="iri" javaType="java.lang.String"/>
+      <arg column="key" javaType="java.lang.String"/>
+      <arg column="join_predicate_id" javaType="java.util.UUID"/>
+      <arg column="version_id" javaType="java.util.UUID"/>
+    </constructor>
+  </resultMap>
+
+  <!-- reasoning.rs:1584-1594 **按 r.id 排序**：规则撞同一结论时留先到的证明，
+       「先到」不该由 HashMap 顺序决定（0029/0030）。 -->
+  <select id="selectAttributeRules" resultMap="ruleDefRow">
+    SELECT r.id, r.subject_type_id, r.conclusion,
+           r.conclude_type_id, r.conclude_predicate_id, r.conclude_value,
+           r.conclude_expr, ct.iri, ct.key, r.join_predicate_id,
+           (SELECT v.id FROM attribute_rule_versions v
+             WHERE v.rule_id = r.id AND v.superseded_at IS NULL) AS version_id
+      FROM attribute_rules r
+      LEFT JOIN entity_types ct ON ct.id = r.conclude_type_id
+     WHERE r.kb_id = #{kbId} AND r.enabled
+     ORDER BY r.id
+  </select>
+
+  <resultMap id="typeRow" type="tech.seexun.jknow.store.mapper.ReasoningMapper$TypeRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="iri" javaType="java.lang.String"/>
+      <arg column="key" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <!-- reasoning.rs:1609 -->
+  <select id="selectEntityTypes" resultMap="typeRow">
+    SELECT id, iri, key FROM entity_types WHERE kb_id = #{kbId}
+  </select>
+
+  <!-- reasoning.rs:1623-1626 -->
+  <select id="selectIsAPredicate" resultType="java.util.UUID">
+    SELECT id FROM relation_types WHERE kb_id = #{kbId} AND key = 'is_a'
+  </select>
+
+  <resultMap id="ruleConditionRow" type="tech.seexun.jknow.store.mapper.ReasoningMapper$RuleConditionRow">
+    <constructor>
+      <idArg column="rule_id" javaType="java.util.UUID"/>
+      <arg column="group_seq" javaType="_int"/>
+      <arg column="predicate_id" javaType="java.util.UUID"/>
+      <arg column="op" javaType="java.lang.String"/>
+      <arg column="operand" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="subject_side" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <!-- reasoning.rs:1631-1636 -->
+  <select id="selectRuleConditions" resultMap="ruleConditionRow">
+    SELECT rule_id, group_seq, predicate_id, op, operand, subject_side
+      FROM attribute_rule_conditions
+     WHERE rule_id = ANY(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[])
+     ORDER BY rule_id, group_seq, seq
+  </select>
+
+  <!-- reasoning.rs:1795-1802 -->
+  <select id="selectDescendantTypes" resultType="java.util.UUID">
+    WITH RECURSIVE sub AS (
+         SELECT id FROM entity_types WHERE id = #{root} AND kb_id = #{kbId}
+         UNION
+         SELECT p.child_id FROM entity_type_parents p JOIN sub ON p.parent_id = sub.id
+     )
+    SELECT id FROM sub
+  </select>
+
+  <resultMap id="attrFactRow" type="tech.seexun.jknow.store.mapper.ReasoningMapper$AttrFactRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="subject_id" javaType="java.util.UUID"/>
+      <arg column="predicate_id" javaType="java.util.UUID"/>
+      <arg column="object_value" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="valid_from" javaType="java.time.OffsetDateTime"/>
+      <arg column="valid_to" javaType="java.time.OffsetDateTime"/>
+      <arg column="valid_from_precision" javaType="java.lang.String"/>
+      <arg column="valid_to_precision" javaType="java.lang.String"/>
+      <arg column="confidence" javaType="_float"/>
+      <arg column="type_id" javaType="java.util.UUID"/>
+      <arg column="attested_from" javaType="java.time.OffsetDateTime"/>
+      <arg column="attested_to" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <!-- reasoning.rs:1840-1851 与 timed_edges 对偶：字面值通道（object_value IS NOT NULL）。 -->
+  <select id="selectAttributeFacts" resultMap="attrFactRow">
+    SELECT f.id, f.subject_id, f.predicate_id, f.object_value,
+           f.valid_from, f.valid_to, f.valid_from_precision, f.valid_to_precision,
+           f.confidence, e.type_id, f.attested_from, f.attested_to
+      FROM facts f
+      JOIN entities e ON e.id = f.subject_id
+     WHERE f.kb_id = #{kbId}
+       AND f.invalidated_at IS NULL
+       AND f.predicate_id IS NOT NULL
+       AND f.object_value IS NOT NULL
+       AND e.merged_into IS NULL
+  </select>
+
+  <resultMap id="acceptedClashRow" type="tech.seexun.jknow.store.mapper.ReasoningMapper$AcceptedClashRow">
+    <constructor>
+      <idArg column="left_fact" javaType="java.util.UUID"/>
+      <arg column="detail" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+    </constructor>
+  </resultMap>
+
+  <!-- reasoning.rs:1354-1357 -->
+  <select id="selectAcceptedClashes" resultMap="acceptedClashRow">
+    SELECT left_fact, detail FROM axiom_violations
+     WHERE kb_id = #{kbId} AND kind = 'derived_contradiction' AND resolution = 'accepted'
+  </select>
+
+  <!-- reasoning.rs:2492-2493 -->
+  <update id="updateRuleCapped">
+    UPDATE attribute_rules SET capped_at_last_run = #{capped} WHERE id = #{ruleId}
+  </update>
+
+  <resultMap id="liveDerivedRow" type="tech.seexun.jknow.store.mapper.ReasoningMapper$LiveDerivedRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="subject_id" javaType="java.util.UUID"/>
+      <arg column="predicate_id" javaType="java.util.UUID"/>
+      <arg column="object_id" javaType="java.util.UUID"/>
+      <arg column="object_value" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="valid_from" javaType="java.time.OffsetDateTime"/>
+      <arg column="valid_to" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <!-- reasoning.rs:2501-2505 -->
+  <select id="selectLiveDerived" resultMap="liveDerivedRow">
+    SELECT id, subject_id, predicate_id, object_id, object_value, valid_from, valid_to
+      FROM derived_facts
+     WHERE kb_id = #{kbId} AND invalidated_at IS NULL
+  </select>
+
+  <!-- reasoning.rs:2538 -->
+  <update id="invalidateDerived">
+    UPDATE derived_facts SET invalidated_at = now()
+     WHERE id = ANY(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[])
+  </update>
+
+  <!-- reasoning.rs:2570-2593 新行 14 列（精度清空规则在 Java 侧：锚点端无精度）。 -->
+  <insert id="insertDerived">
+    INSERT INTO derived_facts (id, kb_id, subject_id, predicate_id, object_id,
+                               object_value, valid_from, valid_to,
+                               valid_from_precision, valid_to_precision,
+                               confidence, rule_id, attribute_rule_id,
+                               attribute_rule_version_id)
+    VALUES (#{id}, #{kbId}, #{subjectId}, #{predicateId}, #{objectId},
+            #{objectValue,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler}::jsonb,
+            #{validFrom}, #{validTo}, #{validFromPrecision}, #{validToPrecision},
+            #{confidence}, #{ruleId}, #{attributeRuleId}, #{attributeRuleVersionId})
+  </insert>
+
+  <!-- reasoning.rs:2603-2606 IS DISTINCT FROM：版本一样时不数不写。 -->
+  <update id="updateDerivedVersion">
+    UPDATE derived_facts SET attribute_rule_version_id = #{versionId}
+     WHERE id = #{id} AND attribute_rule_version_id IS DISTINCT FROM #{versionId}
+  </update>
+
+  <resultMap id="storedPremiseRow" type="tech.seexun.jknow.store.mapper.ReasoningMapper$StoredPremiseRow">
+    <constructor>
+      <idArg column="derived_fact_id" javaType="java.util.UUID"/>
+      <arg column="premise_fact_id" javaType="java.util.UUID"/>
+      <arg column="premise_derived_id" javaType="java.util.UUID"/>
+    </constructor>
+  </resultMap>
+
+  <!-- reasoning.rs:2621-2624 -->
+  <select id="selectStoredPremises" resultMap="storedPremiseRow">
+    SELECT derived_fact_id, premise_fact_id, premise_derived_id
+      FROM fact_derivations
+     WHERE derived_fact_id = ANY(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[])
+     ORDER BY derived_fact_id, seq
+  </select>
+
+  <!-- reasoning.rs:2651 -->
+  <delete id="deleteDerivations">
+    DELETE FROM fact_derivations WHERE derived_fact_id = #{derivedFactId}
+  </delete>
+
+  <!-- reasoning.rs:2656-2659 / 2679-2683 -->
+  <insert id="insertDerivation">
+    INSERT INTO fact_derivations (derived_fact_id, premise_fact_id, premise_derived_id, seq)
+    VALUES (#{derivedFactId}, #{premiseFactId}, #{premiseDerivedId}, #{seq})
+  </insert>
+
+  <resultMap id="premiseRow" type="tech.seexun.jknow.store.mapper.ReasoningMapper$PremiseRow">
+    <constructor>
+      <idArg column="seq" javaType="_int"/>
+      <arg column="premise_fact_id" javaType="java.util.UUID"/>
+      <arg column="premise_derived_id" javaType="java.util.UUID"/>
+    </constructor>
+  </resultMap>
+
+  <!-- reasoning.rs:2830-2833 -->
+  <select id="selectPremiseRows" resultMap="premiseRow">
+    SELECT seq, premise_fact_id, premise_derived_id
+      FROM fact_derivations WHERE derived_fact_id = #{derivedFactId} ORDER BY seq
+  </select>
+
+  <resultMap id="proofStepRow" type="tech.seexun.jknow.store.mapper.ReasoningMapper$ProofStepRow">
+    <constructor>
+      <idArg column="seq" javaType="_long"/>
+      <arg column="fact_id" javaType="java.util.UUID"/>
+      <arg column="subject_id" javaType="java.util.UUID"/>
+      <arg column="subject" javaType="java.lang.String"/>
+      <arg column="predicate_id" javaType="java.util.UUID"/>
+      <arg column="predicate" javaType="java.lang.String"/>
+      <arg column="object_id" javaType="java.util.UUID"/>
+      <arg column="object" javaType="java.lang.String"/>
+      <arg column="valid_from" javaType="java.time.OffsetDateTime"/>
+      <arg column="valid_to" javaType="java.time.OffsetDateTime"/>
+      <arg column="confidence" javaType="_float"/>
+      <arg column="retracted" javaType="_boolean"/>
+    </constructor>
+  </resultMap>
+
+  <!-- reasoning.rs:2963-2973 前提按传入序展开（unnest WITH ORDINALITY），证据逐条另查。 -->
+  <select id="selectStepsFor" resultMap="proofStepRow">
+    SELECT x.ord - 1 AS seq, f.id AS fact_id, f.subject_id, s.canonical_name AS subject,
+           f.predicate_id, r.label AS predicate, f.object_id, o.canonical_name AS object,
+           f.valid_from, f.valid_to, f.confidence,
+           f.invalidated_at IS NOT NULL AS retracted
+      FROM unnest(#{premises,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[]) WITH ORDINALITY AS x(id, ord)
+      JOIN facts f ON f.id = x.id
+      JOIN entities s ON s.id = f.subject_id
+      LEFT JOIN relation_types r ON r.id = f.predicate_id
+      LEFT JOIN entities o ON o.id = f.object_id
+     ORDER BY x.ord
+  </select>
+
+  <resultMap id="derivedStepRow" type="tech.seexun.jknow.store.mapper.ReasoningMapper$DerivedStepRow">
+    <constructor>
+      <idArg column="fact_id" javaType="java.util.UUID"/>
+      <arg column="subject_id" javaType="java.util.UUID"/>
+      <arg column="subject" javaType="java.lang.String"/>
+      <arg column="predicate_id" javaType="java.util.UUID"/>
+      <arg column="predicate" javaType="java.lang.String"/>
+      <arg column="object_id" javaType="java.util.UUID"/>
+      <arg column="object" javaType="java.lang.String"/>
+      <arg column="valid_from" javaType="java.time.OffsetDateTime"/>
+      <arg column="valid_to" javaType="java.time.OffsetDateTime"/>
+      <arg column="confidence" javaType="_float"/>
+      <arg column="retracted" javaType="_boolean"/>
+    </constructor>
+  </resultMap>
+
+  <!-- reasoning.rs:2888-2902 派生没有原句：它的「证据」就是下面那一层前提。 -->
+  <select id="selectDerivedStep" resultMap="derivedStepRow">
+    SELECT d.id AS fact_id, d.subject_id, s.canonical_name AS subject,
+           d.predicate_id, r.label AS predicate, d.object_id,
+           COALESCE(o.canonical_name, ct.label,
+                    d.object_value ->> 'class',
+                    d.object_value #>> '{value}') AS object,
+           d.valid_from, d.valid_to, d.confidence,
+           d.invalidated_at IS NOT NULL AS retracted
+      FROM derived_facts d
+      JOIN entities s ON s.id = d.subject_id
+      LEFT JOIN relation_types r ON r.id = d.predicate_id
+      LEFT JOIN entities o ON o.id = d.object_id
+      LEFT JOIN attribute_rules ar ON ar.id = d.attribute_rule_id
+      LEFT JOIN entity_types ct ON ct.id = ar.conclude_type_id
+     WHERE d.id = #{id}
+  </select>
+
+  <!-- reasoning.rs:3071-3074（Rust 读的是 (Vec&lt;Uuid&gt;,)，Java 侧 unnest 成行） -->
+  <select id="selectViolationPath" resultType="java.util.UUID">
+    SELECT p FROM axiom_violations, unnest(path) AS p
+     WHERE id = #{id} AND kb_id = #{kbId} AND kind = 'derived_contradiction'
+  </select>
+
+  <select id="selectViolationExists" resultType="_int">
+    SELECT 1 FROM axiom_violations
+     WHERE id = #{id} AND kb_id = #{kbId} AND kind = 'derived_contradiction'
+  </select>
+
+  <!-- reasoning.rs:3034-3057 blocked_for_entity：没落地的派生里与这个实体有关、当时还开着的
+       那些（0017 §3）。violation_open_at 的 None/Some 两形态与 record_axis.rs:60-68 同一拼接。 -->
+  <select id="selectBlockedForEntity" resultType="java.util.HashMap">
+    SELECT v.id AS violation_id,
+           (v.detail->>'subject_id')::uuid AS subject_id,
+           COALESCE(v.detail->>'subject', '?') AS subject,
+           (v.detail->>'object_id')::uuid AS object_id,
+           COALESCE(v.detail->>'object', '?') AS object,
+           COALESCE(v.detail->>'predicate', '?') AS predicate,
+           COALESCE(v.detail->>'rule', '?') AS rule,
+           COALESCE(v.detail->>'via_label', '?') AS via_label,
+           (v.detail->>'valid_from')::timestamptz AS valid_from,
+           (v.detail->>'valid_to')::timestamptz AS valid_to,
+           v.left_fact AS against_fact,
+           s.canonical_name || ' · '
+             || COALESCE(r.label, fact_surface_predicate(f.id), '?') || ' · '
+             || COALESCE(o.canonical_name, '?') AS against_text,
+           v.path AS premises
+      FROM axiom_violations v
+      JOIN facts f ON f.id = v.left_fact
+      JOIN entities s ON s.id = f.subject_id
+      LEFT JOIN relation_types r ON r.id = f.predicate_id
+      LEFT JOIN entities o ON o.id = f.object_id
+     WHERE v.kb_id = #{kbId} AND v.kind = 'derived_contradiction' AND
+    <choose>
+      <when test="asOf != null">
+           v.detected_at &lt;= coalesce(#{asOf}, now())
+           AND (v.status = 'open' OR v.decided_at &gt; coalesce(#{asOf}, now()))
+      </when>
+      <otherwise>
+           v.status = 'open'
+      </otherwise>
+    </choose>
+       AND (v.detail->>'subject_id' = #{entityId}::text OR v.detail->>'object_id' = #{entityId}::text)
+     ORDER BY v.detected_at DESC
+  </select>
+
+  <resultMap id="derivedFactView" type="tech.seexun.jknow.store.mapper.ReasoningMapper$DerivedFactView">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="predicate_id" javaType="java.util.UUID"/>
+      <arg column="object_value" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="rule_id" javaType="java.util.UUID"/>
+      <arg column="attribute_rule_id" javaType="java.util.UUID"/>
+      <arg column="invalidated_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="valid_from_precision" javaType="java.lang.String"/>
+      <arg column="valid_to_precision" javaType="java.lang.String"/>
+      <arg column="subject_id" javaType="java.util.UUID"/>
+      <arg column="subject" javaType="java.lang.String"/>
+      <arg column="object_id" javaType="java.util.UUID"/>
+      <arg column="object" javaType="java.lang.String"/>
+      <arg column="predicate" javaType="java.lang.String"/>
+      <arg column="rule" javaType="java.lang.String"/>
+      <arg column="rule_name" javaType="java.lang.String"/>
+      <arg column="rule_version" javaType="java.lang.Integer"/>
+      <arg column="rule_definition" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="valid_from" javaType="java.time.OffsetDateTime"/>
+      <arg column="valid_to" javaType="java.time.OffsetDateTime"/>
+      <arg column="confidence" javaType="_float"/>
+      <arg column="derived_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="premises" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.TextArrayTypeHandler"/>
+    </constructor>
+  </resultMap>
+
+  <!-- reasoning.rs:3091-3129 derived_one：失效的也取（证明要能回看）。 -->
+  <select id="selectDerivedOne" resultMap="derivedFactView">
+    SELECT d.id, d.predicate_id, d.object_value, d.rule_id, d.attribute_rule_id,
+           d.invalidated_at, d.valid_from_precision, d.valid_to_precision,
+           d.subject_id, s.canonical_name AS subject,
+           d.object_id,
+           COALESCE(o.canonical_name, ct.label,
+                    d.object_value ->> 'class',
+                    d.object_value #>> '{value}',
+                    d.object_value #>> '{}') AS object,
+           r.label AS predicate,
+           COALESCE(ru.kind, 'business') AS rule,
+           ar.name AS rule_name,
+           v.seq AS rule_version, v.definition AS rule_definition,
+           d.valid_from, d.valid_to, d.confidence, d.derived_at,
+           COALESCE(
+               (SELECT array_agg(
+                           ps.canonical_name || ' · '
+                           || COALESCE(pr.label, '?') || ' · '
+                           || COALESCE(po.canonical_name,
+                                       fd.object_value #>> '{value}',
+                                       fd.object_value #>> '{class}',
+                                       '?')
+                           ORDER BY fd.seq)
+                  FROM derivation_premises fd
+                  JOIN entities ps    ON ps.id = fd.subject_id
+                  LEFT JOIN relation_types pr ON pr.id = fd.predicate_id
+                  LEFT JOIN entities po ON po.id = fd.object_id
+                 WHERE fd.derived_fact_id = d.id),
+               ARRAY[]::text[]
+           ) AS premises
+      FROM derived_facts d
+      JOIN entities s ON s.id = d.subject_id
+      LEFT JOIN entities o ON o.id = d.object_id
+      JOIN relation_types r ON r.id = d.predicate_id
+      LEFT JOIN rules ru ON ru.id = d.rule_id
+      LEFT JOIN attribute_rules ar ON ar.id = d.attribute_rule_id
+      LEFT JOIN attribute_rule_versions v ON v.id = d.attribute_rule_version_id
+      LEFT JOIN entity_types ct ON ct.id = ar.conclude_type_id
+     WHERE d.kb_id = #{kbId} AND d.id = #{id}
+  </select>
+
+  <!-- reasoning.rs:3157-3199 derived_for_entity：**宾语与规则两侧都是 LEFT JOIN**——表拓宽之后
+       一条派生的宾语可能是字面值、规则可能是业务规则，内连接会把这两种结论静默抹掉。
+       derived_hold（世界轴）/ derived_held（记录轴）与 world_axis.rs:95-102 / record_axis.rs:51-53
+       同一拼接；None 形态退化单支（保部分索引）。 -->
+  <select id="selectDerivedForEntity" resultMap="derivedFactView">
+    SELECT d.id, d.predicate_id, d.object_value, d.rule_id, d.attribute_rule_id,
+           d.invalidated_at, d.valid_from_precision, d.valid_to_precision,
+           d.subject_id, s.canonical_name AS subject,
+           d.object_id,
+           COALESCE(o.canonical_name,
+                    ct.label,
+                    d.object_value ->> 'class',
+                    d.object_value #>> '{value}',
+                    d.object_value #>> '{}') AS object,
+           r.label AS predicate,
+           COALESCE(ru.kind, 'business') AS rule,
+           ar.name AS rule_name,
+           v.seq AS rule_version, v.definition AS rule_definition,
+           d.valid_from, d.valid_to, d.confidence, d.derived_at,
+           COALESCE(
+               (SELECT array_agg(
+                           ps.canonical_name || ' · '
+                           || COALESCE(pr.label, '?') || ' · '
+                           || COALESCE(po.canonical_name,
+                                       fd.object_value #>> '{value}',
+                                       fd.object_value #>> '{class}',
+                                       '?')
+                           ORDER BY fd.seq)
+                  FROM derivation_premises fd
+                  JOIN entities ps    ON ps.id = fd.subject_id
+                  LEFT JOIN relation_types pr ON pr.id = fd.predicate_id
+                  LEFT JOIN entities po ON po.id = fd.object_id
+                 WHERE fd.derived_fact_id = d.id),
+               ARRAY[]::text[]
+           ) AS premises
+      FROM derived_facts d
+      JOIN entities s ON s.id = d.subject_id
+      LEFT JOIN entities o ON o.id = d.object_id
+      JOIN relation_types r ON r.id = d.predicate_id
+      LEFT JOIN rules ru ON ru.id = d.rule_id
+      LEFT JOIN attribute_rules ar ON ar.id = d.attribute_rule_id
+      LEFT JOIN attribute_rule_versions v ON v.id = d.attribute_rule_version_id
+      LEFT JOIN entity_types ct ON ct.id = ar.conclude_type_id
+     WHERE d.kb_id = #{kbId} AND
+    <choose>
+      <when test="asOf != null">
+           d.derived_at &lt;= coalesce(#{asOf}, now())
+           AND (d.invalidated_at IS NULL OR d.invalidated_at &gt; coalesce(#{asOf}, now()))
+      </when>
+      <otherwise>
+           d.invalidated_at IS NULL
+      </otherwise>
+    </choose>
+       AND (d.subject_id = #{entityId} OR d.object_id = #{entityId})
+       AND (#{at}::timestamptz IS NULL
+            OR ((d.valid_from IS NULL OR d.valid_from &lt;= #{at})
+                AND (d.valid_to IS NULL OR d.valid_to &gt; #{at})))
+     ORDER BY d.derived_at DESC
+  </select>
+
+  <!-- reasoning.rs:2770-2779 到点该重推的库（从没推过的算到期）。 -->
+  <select id="selectDueForInference" resultType="java.util.UUID">
+    SELECT id FROM knowledge_bases
+     WHERE materialize_inferences
+       AND (last_inference_at IS NULL
+            OR last_inference_at &lt; now()
+               - make_interval(mins => inference_interval_minutes))
+  </select>
+
+  <!-- reasoning.rs:2787 -->
+  <update id="markInferenceRan">
+    UPDATE knowledge_bases SET last_inference_at = now() WHERE id = #{kbId}
+  </update>
+
+  <!-- ==================================================================== -->
+  <!-- 业务规则（business_rules.rs） -->
+
+  <!-- business_rules.rs:170-176 -->
+  <insert id="insertAttributeRule">
+    INSERT INTO attribute_rules
+         (id, kb_id, name, description, subject_type_id, conclusion,
+          conclude_type_id, conclude_predicate_id, conclude_value, conclude_expr,
+          join_predicate_id)
+    VALUES (#{id}, #{kbId}, #{name}, #{description}, #{subjectTypeId}, #{conclusion},
+            #{concludeTypeId}, #{concludePredicateId},
+            #{concludeValue,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler}::jsonb,
+            #{concludeExpr,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler}::jsonb,
+            #{joinPredicateId})
+  </insert>
+
+  <!-- business_rules.rs:786-794 seq 在组内编号 -->
+  <insert id="insertRuleCondition">
+    INSERT INTO attribute_rule_conditions
+         (id, rule_id, group_seq, seq, predicate_id, op, operand, subject_side)
+    VALUES (#{id}, #{ruleId}, #{groupSeq}, #{seq}, #{predicateId}, #{op},
+            #{operand,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler}::jsonb,
+            #{subjectSide})
+  </insert>
+
+  <!-- business_rules.rs:240-249 update 的旧行回读（enabled 与否都要看）。 -->
+  <select id="selectRuleDef" resultMap="ruleDefRow">
+    SELECT r.id, r.subject_type_id, r.conclusion,
+           r.conclude_type_id, r.conclude_predicate_id, r.conclude_value,
+           r.conclude_expr, ct.iri, ct.key, r.join_predicate_id,
+           (SELECT v.id FROM attribute_rule_versions v
+             WHERE v.rule_id = r.id AND v.superseded_at IS NULL) AS version_id
+      FROM attribute_rules r
+      LEFT JOIN entity_types ct ON ct.id = r.conclude_type_id
+     WHERE r.id = #{ruleId} AND r.kb_id = #{kbId}
+  </select>
+
+  <!-- business_rules.rs:300-302 update 的条件整组替换（先删后插，没有「改到一半」）。 -->
+  <delete id="deleteRuleConditions" parameterType="java.util.UUID">
+    DELETE FROM attribute_rule_conditions WHERE rule_id = #{ruleId}
+  </delete>
+
+  <!-- business_rules.rs:338-350 DEFINITION_SQL（与迁移 0076 回填一字不差：版本变没变
+       拿这份 JSON 比出来，两处形状不一样会把没改的规则也开成新版本）。 -->
+  <select id="selectRuleDefinition" resultType="com.fasterxml.jackson.databind.JsonNode">
+    SELECT jsonb_build_object(
+           'subject_type_id', r.subject_type_id,
+           'conclusion', r.conclusion,
+           'conclude_type_id', r.conclude_type_id,
+           'conclude_predicate_id', r.conclude_predicate_id,
+           'conclude_value', r.conclude_value,
+           'conclude_expr', r.conclude_expr,
+           'join_predicate_id', r.join_predicate_id,
+           'conditions', COALESCE((SELECT jsonb_agg(jsonb_build_object(
+                   'group', c.group_seq, 'seq', c.seq, 'side', c.subject_side,
+                   'predicate_id', c.predicate_id, 'op', c.op, 'operand', c.operand)
+                   ORDER BY c.group_seq, c.seq)
+               FROM attribute_rule_conditions c WHERE c.rule_id = r.id), '[]'::jsonb))
+      FROM attribute_rules r WHERE r.id = #{ruleId}
+  </select>
+
+  <resultMap id="versionRow" type="tech.seexun.jknow.store.mapper.ReasoningMapper$VersionRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="seq" javaType="_int"/>
+      <arg column="definition" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+    </constructor>
+  </resultMap>
+
+  <!-- business_rules.rs:366-371 -->
+  <select id="selectCurrentVersion" resultMap="versionRow">
+    SELECT id, seq, definition FROM attribute_rule_versions
+     WHERE rule_id = #{ruleId} AND superseded_at IS NULL
+  </select>
+
+  <!-- business_rules.rs:376-377 -->
+  <update id="supersedeVersion">
+    UPDATE attribute_rule_versions SET superseded_at = now() WHERE id = #{id}
+  </update>
+
+  <!-- business_rules.rs:385-389 -->
+  <insert id="insertVersion">
+    INSERT INTO attribute_rule_versions (id, kb_id, rule_id, seq, definition)
+    VALUES (#{id}, #{kbId}, #{ruleId}, #{seq},
+            #{definition,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler}::jsonb)
+  </insert>
+
+  <!-- business_rules.rs:270-281 结论给了就三格一起换（CASE 显式清空——COALESCE 做不到
+       「把 typing 改成 attribute 时把 conclude_type_id 置回 NULL」）。 -->
+  <update id="updateAttributeRule">
+    UPDATE attribute_rules
+       SET name = COALESCE(#{name}::text, name),
+           description = COALESCE(#{description}::text, description),
+           enabled = COALESCE(#{enabled}::boolean, enabled),
+           conclusion = COALESCE(#{conclusion}::text, conclusion),
+           conclude_type_id      = CASE WHEN #{conclusion}::text IS NULL THEN conclude_type_id      ELSE #{concludeTypeId} END,
+           conclude_predicate_id = CASE WHEN #{conclusion}::text IS NULL THEN conclude_predicate_id ELSE #{concludePredicateId} END,
+           conclude_value        = CASE WHEN #{conclusion}::text IS NULL THEN conclude_value        ELSE #{concludeValue,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler}::jsonb END,
+           conclude_expr         = CASE WHEN #{conclusion}::text IS NULL THEN conclude_expr         ELSE #{concludeExpr,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler}::jsonb END,
+           join_predicate_id     = CASE WHEN #{conclusion}::text IS NULL THEN join_predicate_id     ELSE #{joinPredicateId} END,
+           updated_at = now()
+     WHERE id = #{ruleId} AND kb_id = #{kbId}
+  </update>
+
+  <!-- business_rules.rs:308-315 事务内终检：没有连接的规则读了 y 侧（#1109）。 -->
+  <select id="selectReadsYWithoutJoin" resultType="_boolean">
+    SELECT EXISTS (
+         SELECT 1 FROM attribute_rules r
+         JOIN attribute_rule_conditions c ON c.rule_id = r.id
+          WHERE r.kb_id = #{kbId} AND r.id = #{ruleId}
+            AND r.join_predicate_id IS NULL AND c.subject_side = 'y'
+    )
+  </select>
+
+  <!-- business_rules.rs:494 -->
+  <delete id="deleteAttributeRule">
+    DELETE FROM attribute_rules WHERE id = #{ruleId} AND kb_id = #{kbId}
+  </delete>
+
+  <resultMap id="ruleListRow" type="tech.seexun.jknow.store.mapper.ReasoningMapper$RuleListRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="name" javaType="java.lang.String"/>
+      <arg column="description" javaType="java.lang.String"/>
+      <arg column="subject_type_id" javaType="java.util.UUID"/>
+      <arg column="subject_label" javaType="java.lang.String"/>
+      <arg column="conclusion" javaType="java.lang.String"/>
+      <arg column="conclude_type_id" javaType="java.util.UUID"/>
+      <arg column="conclude_type_label" javaType="java.lang.String"/>
+      <arg column="conclude_predicate_id" javaType="java.util.UUID"/>
+      <arg column="conclude_predicate_label" javaType="java.lang.String"/>
+      <arg column="conclude_value" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="conclude_expr" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="enabled" javaType="_boolean"/>
+      <arg column="join_predicate_id" javaType="java.util.UUID"/>
+      <arg column="join_predicate_label" javaType="java.lang.String"/>
+      <arg column="version" javaType="java.lang.Integer"/>
+      <arg column="derived_count" javaType="_long"/>
+      <arg column="capped" javaType="_int"/>
+    </constructor>
+  </resultMap>
+
+  <!-- business_rules.rs:507-527 -->
+  <select id="selectRuleList" resultMap="ruleListRow">
+    SELECT r.id, r.name, r.description, r.subject_type_id,
+           st.label AS subject_label,
+           r.conclusion, r.conclude_type_id, ct.label AS conclude_type_label,
+           r.conclude_predicate_id, cp.label AS conclude_predicate_label,
+           r.conclude_value, r.conclude_expr, r.enabled,
+           r.join_predicate_id, jp.label AS join_predicate_label,
+           (SELECT v.seq FROM attribute_rule_versions v
+             WHERE v.rule_id = r.id AND v.superseded_at IS NULL) AS version,
+           (SELECT count(*) FROM derived_facts d
+             WHERE d.attribute_rule_id = r.id AND d.invalidated_at IS NULL)
+               AS derived_count,
+           r.capped_at_last_run AS capped
+      FROM attribute_rules r
+      JOIN entity_types st ON st.id = r.subject_type_id
+      LEFT JOIN entity_types ct ON ct.id = r.conclude_type_id
+      LEFT JOIN relation_types cp ON cp.id = r.conclude_predicate_id
+      LEFT JOIN relation_types jp ON jp.id = r.join_predicate_id
+     WHERE r.kb_id = #{kbId}
+     ORDER BY r.created_at
+  </select>
+
+  <resultMap id="ruleListConditionRow" type="tech.seexun.jknow.store.mapper.ReasoningMapper$RuleListConditionRow">
+    <constructor>
+      <idArg column="rule_id" javaType="java.util.UUID"/>
+      <arg column="group_seq" javaType="_int"/>
+      <arg column="predicate_id" javaType="java.util.UUID"/>
+      <arg column="predicate_label" javaType="java.lang.String"/>
+      <arg column="op" javaType="java.lang.String"/>
+      <arg column="operand" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="subject_side" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <!-- business_rules.rs:535-542 -->
+  <select id="selectRuleListConditions" resultMap="ruleListConditionRow">
+    SELECT c.rule_id, c.group_seq, c.predicate_id, p.label AS predicate_label, c.op,
+           c.operand, c.subject_side
+      FROM attribute_rule_conditions c
+      JOIN relation_types p ON p.id = c.predicate_id
+     WHERE c.rule_id = ANY(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[])
+     ORDER BY c.rule_id, c.group_seq, c.seq
+  </select>
+
+  <!-- business_rules.rs:646-648 -->
+  <select id="countMatches" resultType="_long">
+    SELECT count(*) FROM derived_facts d
+     WHERE d.kb_id = #{kbId} AND d.attribute_rule_id = #{ruleId} AND d.invalidated_at IS NULL
+  </select>
+
+  <resultMap id="matchRow" type="tech.seexun.jknow.store.mapper.ReasoningMapper$MatchRow">
+    <constructor>
+      <idArg column="derived_id" javaType="java.util.UUID"/>
+      <arg column="entity_id" javaType="java.util.UUID"/>
+      <arg column="entity" javaType="java.lang.String"/>
+      <arg column="object_id" javaType="java.util.UUID"/>
+      <arg column="object_entity" javaType="java.lang.String"/>
+      <arg column="concluded" javaType="java.lang.String"/>
+      <arg column="relation_predicate" javaType="java.lang.String"/>
+      <arg column="valid_from" javaType="java.time.OffsetDateTime"/>
+      <arg column="valid_to" javaType="java.time.OffsetDateTime"/>
+      <arg column="valid_from_precision" javaType="java.lang.String"/>
+      <arg column="valid_to_precision" javaType="java.lang.String"/>
+      <arg column="premises" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.TextArrayTypeHandler"/>
+    </constructor>
+  </resultMap>
+
+  <!-- business_rules.rs:661-686 结论读出来要是人看的名字（label / 值 / 类）。 -->
+  <select id="selectMatches" resultMap="matchRow">
+    SELECT d.id AS derived_id, e.id AS entity_id, e.canonical_name AS entity,
+           o.id AS object_id, o.canonical_name AS object_entity,
+           COALESCE(ct.label,
+                    d.object_value #>> '{value}',
+                    d.object_value ->> 'class') AS concluded,
+           rp.label AS relation_predicate,
+           d.valid_from, d.valid_to, d.valid_from_precision, d.valid_to_precision,
+           COALESCE(
+               (SELECT array_agg(
+                           COALESCE(pr.label, '?') || ' = '
+                           || COALESCE(fd.object_value #>> '{value}',
+                                       fd.object_value #>> '{class}', '?')
+                           ORDER BY fd.seq)
+                  FROM derivation_premises fd
+                  LEFT JOIN relation_types pr ON pr.id = fd.predicate_id
+                 WHERE fd.derived_fact_id = d.id),
+               ARRAY[]::text[]
+           ) AS premises
+      FROM derived_facts d
+      JOIN entities e ON e.id = d.subject_id
+      LEFT JOIN entities o ON o.id = d.object_id
+      JOIN attribute_rules ar ON ar.id = d.attribute_rule_id
+      LEFT JOIN entity_types ct ON ct.id = ar.conclude_type_id
+      LEFT JOIN relation_types rp ON rp.id = d.predicate_id
+     WHERE d.kb_id = #{kbId} AND d.attribute_rule_id = #{ruleId} AND d.invalidated_at IS NULL
+     ORDER BY e.canonical_name, d.valid_from, d.id
+     LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <!-- business_rules.rs:832-835 -->
+  <select id="selectPredicateKind" resultType="java.lang.String">
+    SELECT kind FROM relation_types WHERE id = #{id} AND kb_id = #{kbId}
+  </select>
+
+  <!-- business_rules.rs:974-977 exists（表名由调用方枚举常量传入）。 -->
+  <select id="selectExistsIn" resultType="_int">
+    SELECT 1 FROM ${table} WHERE id = #{id} AND kb_id = #{kbId}
+  </select>
+
+  <!-- business_rules.rs:20-27 -->
+  <select id="selectPredicateIdByKey" resultType="java.util.UUID">
+    SELECT id FROM relation_types WHERE kb_id = #{kbId} AND key = #{key}
+  </select>
+
+  <!-- business_rules.rs:29-34 -->
+  <insert id="insertIsAPredicate">
+    INSERT INTO relation_types (id, kb_id, key, label, kind, datatype, builtin, description)
+    VALUES (#{id}, #{kbId}, #{key}, 'is a', 'attribute', 'text', TRUE, #{description})
+    ON CONFLICT (kb_id, key) DO NOTHING
+  </insert>
+
+  <!-- ==================== versions（business_rules.rs:400-501；M4 任务 6） ==================== -->
+
+  <!-- business_rules.rs:417-427 一条规则的定义史（此刻凭它成立的结论条数在子查询）。 -->
+  <resultMap id="ruleVersionRow" type="tech.seexun.jknow.store.mapper.ReasoningMapper$RuleVersionRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="seq" javaType="_int"/>
+      <arg column="definition" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="recorded_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="superseded_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="derived_count" javaType="_long"/>
+    </constructor>
+  </resultMap>
+  <!-- 子查询补 AS derived_count：Rust sqlx 按位置绑定，MyBatis 按列名——别名是
+       映射适配（语义同列），SQL 其余 token 流照源。 -->
+  <select id="selectRuleVersions" resultMap="ruleVersionRow">
+    SELECT v.id, v.seq, v.definition, v.recorded_at, v.superseded_at,
+           (SELECT count(*) FROM derived_facts d
+             WHERE d.attribute_rule_version_id = v.id AND d.invalidated_at IS NULL)
+             AS derived_count
+      FROM attribute_rule_versions v
+     WHERE v.kb_id = #{kbId} AND v.rule_id = #{ruleId}
+     ORDER BY v.seq DESC
+  </select>
+
+  <!-- business_rules.rs:433-436 规则存在性（$2/$1 参数序照源；不在本库返回 null） -->
+  <select id="selectRuleIdInKb" resultType="java.util.UUID">
+    SELECT id FROM attribute_rules WHERE id = #{ruleId} AND kb_id = #{kbId}
+  </select>
+
+  <!-- business_rules.rs:462-463 标签回查（表名由调用方枚举传入——selectExistsIn 同法） -->
+  <resultMap id="idLabel" type="tech.seexun.jknow.store.mapper.ReasoningMapper$IdLabel">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="label" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+  <select id="selectIdLabels" resultMap="idLabel">
+    SELECT id, label FROM ${table} WHERE id = ANY(#{ids,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[])
+  </select>
+</mapper>

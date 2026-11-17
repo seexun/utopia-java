@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  任务队列表 SQL（逐字搬迁自旧仓库 utopia-0.1.0-rc9/crates/utopia-store/src/jobs.rs）。
+  铁律：占位符 $1..$n 改写 #{param} 外 token 流一字不动，每条注明 file:line。
+  JDBC 方言差异两处（M1 审计 mapper 同款约定）：
+  1) JSONB 存在算子 ? 在 pgjdbc 里与占位符冲突，按驱动转义书写为 ??（发到服务端仍是 ?）；
+  2) XML 保留字 <> 写作 &lt;&gt;。
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.JobsMapper">
+
+  <resultMap id="job" type="tech.seexun.jknow.store.entity.Job">
+    <constructor>
+      <idArg column="id" javaType="_long"/>
+      <arg column="kind" javaType="java.lang.String"/>
+      <arg column="payload" javaType="com.fasterxml.jackson.databind.JsonNode"/>
+      <arg column="attempts" javaType="_int"/>
+      <arg column="max_attempts" javaType="_int"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="jobStatus" type="tech.seexun.jknow.store.entity.JobStatus">
+    <constructor>
+      <idArg column="id" javaType="_long"/>
+      <arg column="kind" javaType="java.lang.String"/>
+      <arg column="status" javaType="java.lang.String"/>
+      <arg column="attempts" javaType="_int"/>
+      <arg column="max_attempts" javaType="_int"/>
+      <arg column="last_error" javaType="java.lang.String"/>
+      <arg column="run_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="updated_at" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <!-- 库范围谓词（jobs.rs:266-273 KB_SCOPE 逐字）：任务表没有 kb 列，payload 只带
+       kb_id / document_id / source_id 三种之一，各自解到库。requeue_failed /
+       failed_count / status_in_kb 三处共用同一份。$KB → #{kbId}。 -->
+  <sql id="kbScope">
+    (
+       (j.payload ?? 'kb_id' AND j.payload->>'kb_id' = #{kbId}::text)
+    OR (j.payload ?? 'document_id' AND EXISTS (
+            SELECT 1 FROM documents d
+             WHERE d.id::text = j.payload->>'document_id' AND d.kb_id = #{kbId}))
+    OR (j.payload ?? 'source_id' AND EXISTS (
+            SELECT 1 FROM sources s
+             WHERE s.id::text = j.payload->>'source_id' AND s.kb_id = #{kbId})))
+  </sql>
+
+  <!-- jobs.rs:46-53 enqueue_unless_pending 的 INSERT：挡 queued+running（「正在跑」那一半
+       是批量编辑防撞的关键），after 是去抖（一批编辑只让第一条真排）。行未插入=无 RETURNING 行=null。 -->
+  <select id="insertUnlessPending" resultType="java.lang.Long">
+    INSERT INTO jobs (kind, payload, run_at)
+     SELECT #{kind}, #{payload}, now() + make_interval(secs => #{afterSecs}::float8)
+      WHERE NOT EXISTS (SELECT 1 FROM jobs
+                         WHERE kind = #{kind} AND payload = #{payload}
+                           AND status IN ('queued', 'running'))
+     RETURNING id
+  </select>
+
+  <!-- jobs.rs:85-90 enqueue_unless_queued_tx 的 INSERT：只挡排着的，不挡在跑的。 -->
+  <select id="insertUnlessQueuedTx" resultType="java.lang.Long">
+    INSERT INTO jobs (kind, payload)
+     SELECT #{kind}, #{payload}
+      WHERE NOT EXISTS (SELECT 1 FROM jobs WHERE kind = #{kind} AND payload = #{payload} AND status = 'queued')
+     RETURNING id
+  </select>
+
+  <!-- jobs.rs:110-116 enqueue_unless_queued_after 的 INSERT：挡的只是排着的，不挡在跑的。 -->
+  <select id="insertUnlessQueuedAfter" resultType="java.lang.Long">
+    INSERT INTO jobs (kind, payload, run_at)
+     SELECT #{kind}, #{payload}, now() + make_interval(secs => #{afterSecs}::float8)
+      WHERE NOT EXISTS (SELECT 1 FROM jobs WHERE kind = #{kind} AND payload = #{payload} AND status = 'queued')
+     RETURNING id
+  </select>
+
+  <!-- jobs.rs:131-136 pending_for_kb（按 payload 里的 kb_id 看，不比整份 payload）。 -->
+  <select id="selectPendingForKb" resultType="java.lang.Boolean">
+    SELECT EXISTS (SELECT 1 FROM jobs
+                     WHERE kind = #{kind} AND status IN ('queued', 'running')
+                       AND payload->>'kb_id' = #{kbId})
+  </select>
+
+  <!-- jobs.rs:177-184 enqueue_with_max_attempts_tx 的 INSERT（1..=32 校验在 Service）。 -->
+  <select id="insertWithMaxAttemptsTx" resultType="long">
+    INSERT INTO jobs (kind, payload, max_attempts) VALUES (#{kind}, #{payload}, #{maxAttempts}) RETURNING id
+  </select>
+
+  <!-- jobs.rs:192-198 notify_worker_tx：只叫醒空闲 worker，且 NOTIFY 在提交时投递——
+       worker 不可能在它要认领的行可见之前醒来。用 update 通道执行（pg_notify 无结果集）。 -->
+  <update id="notifyWorker">
+    SELECT pg_notify(#{channel}, '')
+  </update>
+
+  <!-- jobs.rs:345-355 claim_one：SKIP LOCKED 认领（attempts 先加再 RETURNING）。 -->
+  <select id="claimOne" resultMap="job">
+    UPDATE jobs SET status = 'running', locked_at = now(),
+            attempts = attempts + 1, updated_at = now()
+     WHERE id = (
+         SELECT id FROM jobs
+          WHERE status = 'queued' AND run_at &lt;= now()
+          ORDER BY run_at
+          FOR UPDATE SKIP LOCKED
+          LIMIT 1
+     )
+     RETURNING id, kind, payload, attempts, max_attempts
+  </select>
+
+  <!-- jobs.rs:367-370 mark_done：成功要把上一次的错清掉（重试成功后 last_error 仍留
+       失败那次的原文会误导查问题的人）。 -->
+  <update id="markDone">
+    UPDATE jobs SET status = 'done', last_error = NULL, updated_at = now() WHERE id = #{id}
+  </update>
+
+  <!-- jobs.rs:424-428 Terminal 落 failed：一次就到此为止（#195）。 -->
+  <update id="markFailedTerminal">
+    UPDATE jobs SET status = 'failed', last_error = #{error}, updated_at = now() WHERE id = #{id}
+  </update>
+
+  <!-- jobs.rs:446-462 Deferred 挂回 queued（#526）：attempts 退回不烧预算；等待从第一次
+       挂回算起（deferred_since）超过窗口就不再挂（WHERE 不满足 → 0 行 → Service 落普通退避）。 -->
+  <update id="markFailedDeferred">
+    UPDATE jobs SET status = 'queued', last_error = #{error},
+            attempts = GREATEST(0, attempts - 1),
+            run_at = now() + make_interval(secs => #{secs}::float8),
+            payload = payload || jsonb_build_object('deferred_since',
+                COALESCE(payload->>'deferred_since', now()::text)),
+            updated_at = now()
+     WHERE id = #{id}
+       AND COALESCE((payload->>'deferred_since')::timestamptz, now())
+       > now() - make_interval(secs => #{windowSecs}::float8)
+  </update>
+
+  <!-- jobs.rs:477-482 普通失败：30s×attempts² 退避后挂回 queued。 -->
+  <update id="markFailedBackoff">
+    UPDATE jobs SET status = 'queued', last_error = #{error},
+            run_at = now() + make_interval(secs => #{backoffSecs}::float8),
+            updated_at = now()
+     WHERE id = #{id}
+  </update>
+
+  <!-- jobs.rs:468-470 预算耗尽（或 Terminal）落 failed。 -->
+  <update id="markFailedExhausted">
+    UPDATE jobs SET status = 'failed', last_error = #{error}, updated_at = now() WHERE id = #{id}
+  </update>
+
+  <!-- jobs.rs:282-289 requeue_failed：attempts 归零、立即到期。RSS hydration 除外——
+       它的重试由来源准入策略拥有；其他处理器都幂等（启动回收孤儿就靠这一点）。 -->
+  <update id="requeueFailed">
+    UPDATE jobs j
+        SET status = 'queued', attempts = 0, run_at = now(), updated_at = now()
+      WHERE j.status = 'failed' AND j.kind &lt;&gt; 'hydrate_rss_entry'
+        AND (#{kind}::text IS NULL OR j.kind = #{kind})
+        AND (#{failedSince}::timestamptz IS NULL OR j.updated_at >= #{failedSince})
+        AND (#{kbId}::uuid IS NULL OR
+        <include refid="kbScope"/>
+        )
+  </update>
+
+  <!-- jobs.rs:307-309 failed_count：设置页那一行「N 个失败任务」。 -->
+  <select id="failedCount" resultType="long">
+    SELECT count(*) FROM jobs j
+      WHERE j.status = 'failed' AND (#{kbId}::uuid IS NULL OR
+      <include refid="kbScope"/>
+      )
+  </select>
+
+  <!-- jobs.rs:331-334 status_in_kb：任务属于这个库才答，别的库的 id 猜对了也只得 null
+       （路由层 404），与看不见的文档一个口径。 -->
+  <select id="statusInKb" resultMap="jobStatus">
+    SELECT j.id, j.kind, j.status, j.attempts, j.max_attempts, j.last_error, j.run_at, j.updated_at
+       FROM jobs j WHERE j.id = #{id} AND
+       <include refid="kbScope"/>
+  </select>
+
+  <!-- jobs.rs:503-505 孤儿回收：单进程部署下启动时仍 running 的必是上次进程退出遗留
+       （处理器均幂等，重跑无害）。 -->
+  <update id="recoverOrphans">
+    UPDATE jobs SET status = 'queued', locked_at = NULL, updated_at = now()
+     WHERE status = 'running'
+  </update>
+</mapper>

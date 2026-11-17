@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  告警中心读 SQL（逐字搬迁自旧仓库 utopia-0.1.0-rc9/crates/utopia-store/src/alerts.rs）。
+  Rust 侧 format! 拼装，四个 SQL 文本片段常量在各语句原位内联（内嵌换行与缩进原样）：
+
+  · VISIBLE（alerts.rs:125-136，可见性谓词只写这一份；$1=user_id、$2=is_admin、
+    $3=可见 kb 数组、$4=对应角色的秩）：
+    CASE
+        WHEN a.kb_id IS NULL THEN $2::bool
+        ELSE EXISTS (
+            SELECT 1 FROM unnest($3::uuid[], $4::int[]) AS v(kb, rank)
+            WHERE v.kb = a.kb_id
+              AND v.rank >= CASE a.min_role
+                    WHEN 'viewer' THEN 0
+                    WHEN 'editor' THEN 1
+                    WHEN 'admin'  THEN 2
+                    ELSE 3 END)
+    END
+  · SEARCH（alerts.rs:143-147，搜的是库名/对象详情/kind 代号，不是界面标题）：
+    ($5::text IS NULL
+     OR a.kind ILIKE '%' || $5 || '%'
+     OR COALESCE(k.name, '') ILIKE '%' || $5 || '%'
+     OR a.detail::text ILIKE '%' || $5 || '%')
+  · ISLANDS（alerts.rs:188-193，相邻同类折叠 gaps-and-islands：全局序号减同 (kb,kind) 内
+    序号，连着的同类差值相同；PARTITION BY kb_id 把 NULL 当相等，系统级自然成组）：
+    SELECT v.*,
+           row_number() OVER (ORDER BY v.created_at DESC, v.id DESC)
+         - row_number() OVER (PARTITION BY v.kb_id, v.kind
+                              ORDER BY v.created_at DESC, v.id DESC) AS grp
+    FROM v
+  · base（alerts.rs:206-215，两段 CTE 拼装头）：
+    WITH v AS (
+         SELECT a.id, a.kb_id, k.name AS kb_name, a.severity, a.kind,
+                a.detail, a.created_at, (r.user_id IS NOT NULL) AS read
+         FROM alerts a
+         LEFT JOIN knowledge_bases k ON k.id = a.kb_id
+         LEFT JOIN alert_reads r ON r.alert_id = a.id AND r.user_id = $1
+         WHERE ({VISIBLE}) AND ({SEARCH})
+    ),
+    isl AS ({ISLANDS})
+  · GROUP_LINES=5（alerts.rs:175）内联为 [1:5]。
+
+  占位符改写：$1→#{userId}、$2→#{isAdmin}、$3→#{kbIds}（UuidArrayTypeHandler）、
+  $4→#{kbRanks}（IntegerArrayTypeHandler）、$5→#{q}、$6→#{limit}、$7→#{offset}。
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.AlertsMapper">
+
+  <!-- alerts.rs:40-49 raise 的 INSERT 逐字（任务 8：out_of_credit 的告警面需要写路径；
+       此前只有读侧） -->
+  <insert id="insertAlert" parameterType="map" useGeneratedKeys="false">
+    INSERT INTO alerts
+         (id, kb_id, severity, kind, min_role, subject_type, subject_id, detail)
+    VALUES (#{id}, #{kbId}, #{severity}, #{kind}, #{minRole}, #{subjectType}, #{subjectId},
+            #{detail, typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler}::jsonb)
+  </insert>
+
+  <resultMap id="alertGroup" type="tech.seexun.jknow.store.entity.AlertGroup">
+    <constructor>
+      <arg column="kb_id" javaType="java.util.UUID"/>
+      <arg column="kb_name" javaType="java.lang.String"/>
+      <arg column="kind" javaType="java.lang.String"/>
+      <arg column="severity" javaType="java.lang.String"/>
+      <arg column="count" javaType="_long"/>
+      <arg column="unread" javaType="_long"/>
+      <arg column="latest_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="earliest_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="lines" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeArrayTypeHandler"/>
+    </constructor>
+  </resultMap>
+
+  <!-- alerts.rs:196-243（list_groups 主体：组聚合 + 明细前 5 条，按组分页） -->
+  <select id="selectGroups" resultMap="alertGroup">
+    WITH v AS (
+         SELECT a.id, a.kb_id, k.name AS kb_name, a.severity, a.kind,
+                a.detail, a.created_at, (r.user_id IS NOT NULL) AS read
+         FROM alerts a
+         LEFT JOIN knowledge_bases k ON k.id = a.kb_id
+         LEFT JOIN alert_reads r ON r.alert_id = a.id AND r.user_id = #{userId}
+         WHERE (CASE
+        WHEN a.kb_id IS NULL THEN #{isAdmin}::bool
+        ELSE EXISTS (
+            SELECT 1 FROM unnest(#{kbIds,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[], #{kbRanks,typeHandler=tech.seexun.jknow.store.typehandler.IntegerArrayTypeHandler}::int[]) AS v(kb, rank)
+            WHERE v.kb = a.kb_id
+              AND v.rank >= CASE a.min_role
+                    WHEN 'viewer' THEN 0
+                    WHEN 'editor' THEN 1
+                    WHEN 'admin'  THEN 2
+                    ELSE 3 END)
+    END) AND ((#{q}::text IS NULL
+     OR a.kind ILIKE '%' || #{q} || '%'
+     OR COALESCE(k.name, '') ILIKE '%' || #{q} || '%'
+     OR a.detail::text ILIKE '%' || #{q} || '%'))
+    ),
+    isl AS (SELECT v.*,
+           row_number() OVER (ORDER BY v.created_at DESC, v.id DESC)
+         - row_number() OVER (PARTITION BY v.kb_id, v.kind
+                              ORDER BY v.created_at DESC, v.id DESC) AS grp
+    FROM v)
+
+         SELECT kb_id, max(kb_name) AS kb_name, kind,
+                -- severity 按轻重取最大，不能按字典序：那样 warning 会压过 error
+                CASE max(CASE severity WHEN 'error' THEN 3 WHEN 'warning' THEN 2 ELSE 1 END)
+                    WHEN 3 THEN 'error' WHEN 2 THEN 'warning' ELSE 'info' END AS severity,
+                count(*) AS count,
+                count(*) FILTER (WHERE NOT read) AS unread,
+                max(created_at) AS latest_at,
+                min(created_at) AS earliest_at,
+                (array_agg(detail ORDER BY created_at DESC))[1:5] AS lines
+         FROM isl
+         GROUP BY kb_id, kind, grp
+         ORDER BY max(created_at) DESC, kb_id, kind, grp
+         LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <!-- alerts.rs:243-253（总组数：同一 base CTE，翻页控件数的是组不是行） -->
+  <select id="countGroups" resultType="_long">
+    WITH v AS (
+         SELECT a.id, a.kb_id, k.name AS kb_name, a.severity, a.kind,
+                a.detail, a.created_at, (r.user_id IS NOT NULL) AS read
+         FROM alerts a
+         LEFT JOIN knowledge_bases k ON k.id = a.kb_id
+         LEFT JOIN alert_reads r ON r.alert_id = a.id AND r.user_id = #{userId}
+         WHERE (CASE
+        WHEN a.kb_id IS NULL THEN #{isAdmin}::bool
+        ELSE EXISTS (
+            SELECT 1 FROM unnest(#{kbIds,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[], #{kbRanks,typeHandler=tech.seexun.jknow.store.typehandler.IntegerArrayTypeHandler}::int[]) AS v(kb, rank)
+            WHERE v.kb = a.kb_id
+              AND v.rank >= CASE a.min_role
+                    WHEN 'viewer' THEN 0
+                    WHEN 'editor' THEN 1
+                    WHEN 'admin'  THEN 2
+                    ELSE 3 END)
+    END) AND ((#{q}::text IS NULL
+     OR a.kind ILIKE '%' || #{q} || '%'
+     OR COALESCE(k.name, '') ILIKE '%' || #{q} || '%'
+     OR a.detail::text ILIKE '%' || #{q} || '%'))
+    ),
+    isl AS (SELECT v.*,
+           row_number() OVER (ORDER BY v.created_at DESC, v.id DESC)
+         - row_number() OVER (PARTITION BY v.kb_id, v.kind
+                              ORDER BY v.created_at DESC, v.id DESC) AS grp
+    FROM v) SELECT count(*) FROM (SELECT 1 FROM isl GROUP BY kb_id, kind, grp) g
+  </select>
+
+  <!-- alerts.rs:295-310（unread_count：角标；可见且无已读行） -->
+  <select id="selectUnreadCount" resultType="_long">
+    SELECT count(*) FROM alerts a
+         LEFT JOIN alert_reads r ON r.alert_id = a.id AND r.user_id = #{userId}
+         WHERE (CASE
+        WHEN a.kb_id IS NULL THEN #{isAdmin}::bool
+        ELSE EXISTS (
+            SELECT 1 FROM unnest(#{kbIds,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[], #{kbRanks,typeHandler=tech.seexun.jknow.store.typehandler.IntegerArrayTypeHandler}::int[]) AS v(kb, rank)
+            WHERE v.kb = a.kb_id
+              AND v.rank >= CASE a.min_role
+                    WHEN 'viewer' THEN 0
+                    WHEN 'editor' THEN 1
+                    WHEN 'admin'  THEN 2
+                    ELSE 3 END)
+    END) AND r.user_id IS NULL
+  </select>
+
+  <!-- alerts.rs:261-298（mark_group_read：把一整组标已读。**逐人**——读过不等于问题没了，
+       别人的未读不受影响。按时间区间圈而不是发 id 列表：一组可能有几百条。可见性照查，
+       猜一个 kind 也标不掉自己看不见的东西）。 -->
+  <insert id="markGroupRead">
+    INSERT INTO alert_reads (alert_id, user_id)
+    SELECT a.id, #{userId} FROM alerts a
+    WHERE a.kb_id IS NOT DISTINCT FROM #{kbId}
+      AND a.kind = #{kind}
+      AND a.created_at BETWEEN #{from} AND #{to}
+      AND (CASE
+        WHEN a.kb_id IS NULL THEN #{isAdmin}::bool
+        ELSE EXISTS (
+            SELECT 1 FROM unnest(#{kbIds,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[], #{kbRanks,typeHandler=tech.seexun.jknow.store.typehandler.IntegerArrayTypeHandler}::int[]) AS v(kb, rank)
+            WHERE v.kb = a.kb_id
+              AND v.rank >= CASE a.min_role
+                    WHEN 'viewer' THEN 0
+                    WHEN 'editor' THEN 1
+                    WHEN 'admin'  THEN 2
+                    ELSE 3 END)
+    END)
+      AND NOT EXISTS (SELECT 1 FROM alert_reads r
+                       WHERE r.alert_id = a.id AND r.user_id = #{userId})
+    ON CONFLICT DO NOTHING
+  </insert>
+
+  <!-- alerts.rs:316-332（mark_all_read：全部已读，同一可见性谓词） -->
+  <insert id="markAllRead">
+    INSERT INTO alert_reads (alert_id, user_id)
+    SELECT a.id, #{userId} FROM alerts a
+    WHERE (CASE
+        WHEN a.kb_id IS NULL THEN #{isAdmin}::bool
+        ELSE EXISTS (
+            SELECT 1 FROM unnest(#{kbIds,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[], #{kbRanks,typeHandler=tech.seexun.jknow.store.typehandler.IntegerArrayTypeHandler}::int[]) AS v(kb, rank)
+            WHERE v.kb = a.kb_id
+              AND v.rank >= CASE a.min_role
+                    WHEN 'viewer' THEN 0
+                    WHEN 'editor' THEN 1
+                    WHEN 'admin'  THEN 2
+                    ELSE 3 END)
+    END)
+    ON CONFLICT DO NOTHING
+  </insert>
+</mapper>

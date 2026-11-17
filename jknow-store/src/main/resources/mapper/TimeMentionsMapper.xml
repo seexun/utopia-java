@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  时间提及 SQL（逐字搬迁自旧仓库 crates/utopia-store/src/time_mentions.rs；占位符
+  $1..$n 改写 #{param} 外 token 流一字不动，每条注明 file:line）。
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.TimeMentionsMapper">
+
+  <resultMap id="mention" type="tech.seexun.jknow.store.mapper.TimeMentionsMapper$TimeMentionRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="fact_id" javaType="java.util.UUID"/>
+      <arg column="chunk_id" javaType="java.util.UUID"/>
+      <arg column="text" javaType="java.lang.String"/>
+      <arg column="char_start" javaType="_int"/>
+      <arg column="role" javaType="java.lang.String"/>
+      <arg column="shape" javaType="java.lang.String"/>
+      <arg column="reference" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="granularity" javaType="java.lang.String"/>
+      <arg column="grade" javaType="java.lang.String"/>
+      <arg column="resolved_from" javaType="java.time.OffsetDateTime"/>
+      <arg column="resolved_from_precision" javaType="java.lang.String"/>
+      <arg column="resolved_to" javaType="java.time.OffsetDateTime"/>
+      <arg column="resolved_to_precision" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <select id="insertMention" resultType="java.util.UUID">
+    INSERT INTO time_mentions (id, kb_id, fact_id, chunk_id, text, char_start, role)
+     VALUES (#{id}, #{kbId}, #{factId}, #{chunkId}, #{text}, #{charStart}, #{role})
+     ON CONFLICT (fact_id, chunk_id, char_start, role) DO UPDATE SET text = time_mentions.text
+     RETURNING id
+  </select>
+
+  <select id="selectForFacts" resultMap="mention">
+    SELECT id, fact_id, chunk_id, text, char_start, role, shape, reference, granularity,
+                       grade, resolved_from, resolved_from_precision, resolved_to,
+                       resolved_to_precision
+     FROM time_mentions
+      WHERE fact_id = ANY(#{factIds,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler}::uuid[])
+      ORDER BY fact_id, chunk_id, char_start, role
+  </select>
+
+  <resultMap id="mentionToResolve" type="tech.seexun.jknow.store.mapper.TimeMentionsMapper$MentionToResolveRow">
+    <constructor>
+      <arg column="id" javaType="java.util.UUID"/>
+      <arg column="fact_id" javaType="java.util.UUID"/>
+      <arg column="chunk_id" javaType="java.util.UUID"/>
+      <arg column="text" javaType="java.lang.String"/>
+      <arg column="char_start" javaType="_int"/>
+      <arg column="role" javaType="java.lang.String"/>
+      <arg column="sentence" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <!-- time_mentions.rs:117-130 for_document 逐字。 -->
+  <select id="selectForDocument" resultMap="mentionToResolve">
+    SELECT m.id, m.fact_id, m.chunk_id, m.text, m.char_start, m.role,
+           COALESCE(fe.quote, c.text) AS sentence
+      FROM time_mentions m
+      JOIN chunks c ON c.id = m.chunk_id
+      JOIN facts f ON f.id = m.fact_id
+      LEFT JOIN fact_evidence fe ON fe.fact_id = m.fact_id AND fe.chunk_id = m.chunk_id
+     WHERE c.document_id = #{documentId} AND c.superseded_at IS NULL
+       AND f.layer = 'open' AND f.invalidated_at IS NULL
+     ORDER BY c.seq, m.char_start, m.role
+  </select>
+
+  <!-- time_mentions.rs:133-145 set_interpretation 逐字。 -->
+  <update id="setInterpretation">
+    UPDATE time_mentions SET shape = #{shape}, reference = #{reference,typeHandler=tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler}, granularity = #{granularity} WHERE id = #{id}
+  </update>
+
+  <!-- time_mentions.rs:147-166 set_resolution 逐字。 -->
+  <update id="setResolution">
+    UPDATE time_mentions
+       SET grade = #{grade}, resolved_from = #{from}, resolved_from_precision = #{fromPrecision},
+           resolved_to = #{to}, resolved_to_precision = #{toPrecision}, resolved_at = now()
+     WHERE id = #{id}
+  </update>
+</mapper>

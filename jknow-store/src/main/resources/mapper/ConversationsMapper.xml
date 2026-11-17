@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  会话读 SQL（逐字搬迁自旧仓库 utopia-0.1.0-rc9/crates/utopia-store/src/conversations.rs）。
+
+  Rust format! 片段：
+  · list 的 WHERE（conversations.rs:38-43，标题与消息正文两处可搜）：
+    WHERE c.kb_id = $1 AND c.user_id = $2
+           AND ($3::text IS NULL
+                OR c.title ILIKE '%' || $3 || '%'
+                OR EXISTS (SELECT 1 FROM conversation_messages m
+                            WHERE m.conversation_id = c.id
+                              AND m.content ILIKE '%' || $3 || '%'))
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.ConversationsMapper">
+
+  <resultMap id="conversationView" type="tech.seexun.jknow.store.entity.ConversationView">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="title" javaType="java.lang.String"/>
+      <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="updated_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="message_count" javaType="_long"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="conversationMessage" type="tech.seexun.jknow.store.entity.ConversationMessage">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="role" javaType="java.lang.String"/>
+      <arg column="content" javaType="java.lang.String"/>
+      <arg column="steps" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="sources" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="stopped" javaType="_boolean"/>
+      <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <!-- conversations.rs:32-56（list：message_count 相关子查询；updated_at 倒序） -->
+  <select id="selectConversations" resultMap="conversationView">
+    SELECT c.id, c.title, c.created_at, c.updated_at,
+                (SELECT count(*) FROM conversation_messages m
+                 WHERE m.conversation_id = c.id) AS message_count
+         FROM conversations c
+         WHERE c.kb_id = #{kbId} AND c.user_id = #{userId}
+           AND (#{q}::text IS NULL
+                OR c.title ILIKE '%' || #{q} || '%'
+                OR EXISTS (SELECT 1 FROM conversation_messages m
+                            WHERE m.conversation_id = c.id
+                              AND m.content ILIKE '%' || #{q} || '%'))
+         ORDER BY c.updated_at DESC, c.id DESC
+         LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <!-- conversations.rs:58-66（list 总数：同一 WHERE） -->
+  <select id="countConversations" resultType="_long">
+    SELECT count(*) FROM conversations c WHERE c.kb_id = #{kbId} AND c.user_id = #{userId}
+           AND (#{q}::text IS NULL
+                OR c.title ILIKE '%' || #{q} || '%'
+                OR EXISTS (SELECT 1 FROM conversation_messages m
+                            WHERE m.conversation_id = c.id
+                              AND m.content ILIKE '%' || #{q} || '%'))
+  </select>
+
+  <!-- conversations.rs:88-100（require_owned：会话必须属于本 KB 本人） -->
+  <select id="selectOwned" resultType="java.util.UUID">
+    SELECT id FROM conversations WHERE id = #{conversationId} AND kb_id = #{kbId} AND user_id = #{userId}
+  </select>
+
+  <!-- conversations.rs:102-112（messages：历史回放，created_at 序） -->
+  <select id="selectMessages" resultMap="conversationMessage">
+    SELECT id, role, content, steps, sources, stopped, created_at
+         FROM conversation_messages WHERE conversation_id = #{conversationId} ORDER BY created_at
+  </select>
+
+  <!-- ======== 写路径（M5 任务 4，conversations.rs:9-338 逐字） ======== -->
+
+  <!-- conversations.rs:9-19 create：标题=第一问截 80 字（chars().take(80)，字符非字节） -->
+  <insert id="insertConversation">
+    INSERT INTO conversations (id, kb_id, user_id, title) VALUES (#{id}, #{kbId}, #{userId}, #{title})
+  </insert>
+
+  <!-- conversations.rs:83-92 rename：本人本库才改得到，0 行 → 404 -->
+  <update id="renameConversation">
+    UPDATE conversations SET title = #{title}
+      WHERE id = #{conversationId} AND kb_id = #{kbId} AND user_id = #{userId}
+  </update>
+
+  <!-- conversations.rs:327-334 delete：消息随外键级联删 -->
+  <delete id="deleteConversation">
+    DELETE FROM conversations WHERE id = #{conversationId} AND kb_id = #{kbId} AND user_id = #{userId}
+  </delete>
+
+  <!-- conversations.rs:297-312 append_message 的消息 INSERT；updated_at 触碰同事务 -->
+  <insert id="insertMessage">
+    INSERT INTO conversation_messages
+         (id, conversation_id, role, content, steps, sources, resolved, tool_exchange, stopped)
+     VALUES (#{id}, #{conversationId}, #{role}, #{content}, #{steps}, #{sources}, #{resolved},
+             #{toolExchange}, #{stopped})
+  </insert>
+
+  <!-- conversations.rs:313-317：新答案让会话浮到列表顶上 -->
+  <update id="touchConversation">
+    UPDATE conversations SET updated_at = now() WHERE id = #{conversationId}
+  </update>
+
+  <!-- conversations.rs:145-151 retry_target：last = 后面什么也没有（created_at 同刻再按 id） -->
+  <resultMap id="retryTargetRow" type="tech.seexun.jknow.store.entity.RetryTargetRow">
+    <constructor>
+      <arg column="role" javaType="java.lang.String"/>
+      <arg column="content" javaType="java.lang.String"/>
+      <arg column="last" javaType="_boolean"/>
+    </constructor>
+  </resultMap>
+  <select id="selectRetryTarget" resultMap="retryTargetRow">
+    SELECT m.role, m.content, NOT EXISTS (
+         SELECT 1 FROM conversation_messages later
+          WHERE later.conversation_id = m.conversation_id
+            AND (later.created_at, later.id) &gt; (m.created_at, m.id)) AS last
+       FROM conversation_messages m
+      WHERE m.id = #{messageId} AND m.conversation_id = #{conversationId}
+  </select>
+
+  <!-- conversations.rs:207-215 recent_context：最近 n 条倒取正拼（rows.reverse()） -->
+  <resultMap id="contextRow" type="tech.seexun.jknow.store.entity.ContextRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="role" javaType="java.lang.String"/>
+      <arg column="content" javaType="java.lang.String"/>
+      <arg column="resolved" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="tool_exchange" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="sources" javaType="com.fasterxml.jackson.databind.JsonNode"
+           typeHandler="tech.seexun.jknow.store.typehandler.JsonNodeTypeHandler"/>
+      <arg column="stopped" javaType="_boolean"/>
+    </constructor>
+  </resultMap>
+  <select id="selectRecentContext" resultMap="contextRow">
+    SELECT id, role, content, resolved, tool_exchange, sources, stopped FROM conversation_messages
+     WHERE conversation_id = #{conversationId} ORDER BY created_at DESC LIMIT #{limit}
+  </select>
+</mapper>

@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  名字域 SQL（逐字搬迁自旧仓库 utopia-0.1.0-rc9/crates/utopia-store/src/names.rs；
+  铁律：占位符改写 #{param} 外 token 流一字不动，每条注明 file:line）。
+  名字是关于实体的一条事实（0041 决定 1）：object_value = {"value": 名字}、object_id 为空。
+  has_name_in / not_a_name / has_name_like 是 SQL 片段生成器（消解候选召回要用），
+  落在 NamesService 的静态方法里——这里只有整条语句。
+-->
+<mapper namespace="tech.seexun.jknow.store.mapper.NamesMapper">
+
+  <!-- 取（没有就建）这个库的 known_as 属性（names.rs:28-33）：与 is_a 同一个做法——
+       builtin = TRUE，建库时不铺，第一次要时建。 -->
+  <select id="selectKnownAs" resultType="java.util.UUID">
+    SELECT id FROM relation_types WHERE kb_id = #{kbId} AND key = #{key}
+  </select>
+
+  <!-- names.rs:37-45 建（ON CONFLICT 命中说明并发建过了，取回那一条）。 -->
+  <insert id="insertKnownAs">
+    INSERT INTO relation_types (id, kb_id, key, label, kind, datatype, temporal, builtin, description)
+     VALUES (#{id}, #{kbId}, #{key}, 'known as', 'attribute', 'text', 'state', TRUE, #{description})
+     ON CONFLICT (kb_id, key) DO NOTHING
+  </insert>
+
+  <!-- 一个实体的名字栏（names.rs:150-172 for_entity）：本名在前，其余按首次记下的先后。
+       owner_at/facts_held_at 的 as_of 两形态与 GraphMapper 同一套展开（record_axis.rs）：
+       None 退化单支保部分索引；Some(p) 走 fact_owner_at/双支谓词。 -->
+  <select id="selectNamesForEntity" resultMap="nameView">
+    SELECT f.id AS fact_id, f.object_value->>'value' AS name,
+           lower(f.object_value->>'value') = lower(e.canonical_name) AS canonical,
+           f.recorded_at, f.valid_from, f.valid_from_precision, f.valid_to, f.valid_to_precision,
+           ARRAY(SELECT DISTINCT fe.document_id FROM fact_evidence fe
+                  WHERE fe.fact_id = f.id AND fe.document_id IS NOT NULL
+                  ORDER BY fe.document_id) AS document_ids,
+           (SELECT count(*) FROM fact_evidence fe WHERE fe.fact_id = f.id) AS evidence_count
+      FROM facts f
+      JOIN relation_types r ON r.id = f.predicate_id
+      JOIN entities e ON e.id = #{entityId}
+     WHERE f.kb_id = #{kbId} AND r.builtin AND r.key = 'known_as'
+       AND f.subject_id = #{entityId} AND f.invalidated_at IS NULL
+     ORDER BY canonical DESC, f.recorded_at
+  </select>
+
+  <!-- 同上的 as_of 形态（names.rs:164-165 owner_at/facts_held_at 各带 $3）：主语按
+       fact_owner_at 回放（三月合并掉的名字在二月还挂在它自己身上），held 双支谓词。 -->
+  <select id="selectNamesForEntityAsOf" resultMap="nameView">
+    SELECT f.id AS fact_id, f.object_value->>'value' AS name,
+           lower(f.object_value->>'value') = lower(e.canonical_name) AS canonical,
+           f.recorded_at, f.valid_from, f.valid_from_precision, f.valid_to, f.valid_to_precision,
+           ARRAY(SELECT DISTINCT fe.document_id FROM fact_evidence fe
+                  WHERE fe.fact_id = f.id AND fe.document_id IS NOT NULL
+                  ORDER BY fe.document_id) AS document_ids,
+           (SELECT count(*) FROM fact_evidence fe WHERE fe.fact_id = f.id) AS evidence_count
+      FROM facts f
+      JOIN relation_types r ON r.id = f.predicate_id
+      JOIN entities e ON e.id = #{entityId}
+     WHERE f.kb_id = #{kbId} AND r.builtin AND r.key = 'known_as'
+       AND fact_owner_at(f.id, f.subject_id, #{asOf}, false) = #{entityId}
+       AND f.recorded_at &lt;= coalesce(#{asOf}, now())
+       AND (f.invalidated_at IS NULL OR f.invalidated_at &gt; coalesce(#{asOf}, now()))
+     ORDER BY canonical DESC, f.recorded_at
+  </select>
+
+  <!-- 别名撞车排队（names.rs:193-208 pair_shared_name 的候选查询）：别的实体已经在用
+       这个名字、类型一方为空或两边相同才配；已经判过「不是一个」的对不再排。 -->
+  <select id="selectSharedNameOthers" resultType="java.util.UUID">
+    SELECT DISTINCT e.id
+      FROM entities e
+      JOIN entities me ON me.id = #{entityId}
+      JOIN facts nf ON nf.subject_id = e.id AND nf.kb_id = #{kbId}
+                   AND nf.invalidated_at IS NULL AND nf.object_value IS NOT NULL
+      JOIN relation_types nr ON nr.id = nf.predicate_id AND nr.builtin AND nr.key = #{knownAs}
+     WHERE e.kb_id = #{kbId} AND e.merged_into IS NULL AND e.id &lt;&gt; #{entityId}
+       AND lower(nf.object_value->>'value') = lower(#{name})
+       AND (e.type_id IS NULL OR me.type_id IS NULL OR e.type_id = me.type_id)
+       AND NOT EXISTS (
+           SELECT 1 FROM resolution_reviews rr
+            WHERE rr.kb_id = #{kbId} AND rr.status = 'kept'
+              AND least(rr.left_id, rr.right_id) = least(e.id, #{entityId})
+              AND greatest(rr.left_id, rr.right_id) = greatest(e.id, #{entityId}))
+     LIMIT 4
+  </select>
+
+  <resultMap id="nameView" type="tech.seexun.jknow.store.entity.NameView">
+    <constructor>
+      <idArg column="fact_id" javaType="java.util.UUID"/>
+      <arg column="name" javaType="java.lang.String"/>
+      <arg column="canonical" javaType="_boolean"/>
+      <arg column="recorded_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="valid_from" javaType="java.time.OffsetDateTime"/>
+      <arg column="valid_from_precision" javaType="java.lang.String"/>
+      <arg column="valid_to" javaType="java.time.OffsetDateTime"/>
+      <arg column="valid_to_precision" javaType="java.lang.String"/>
+      <arg column="document_ids" javaType="java.util.List" typeHandler="tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler"/>
+      <arg column="evidence_count" javaType="_long"/>
+    </constructor>
+  </resultMap>
+</mapper>

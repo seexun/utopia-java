@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- PAT SQL（逐字搬迁自旧仓库 utopia-store/src/tokens.rs；写/鉴权面 M5 任务 6 落位）。 -->
+<mapper namespace="tech.seexun.jknow.store.mapper.TokensMapper">
+
+  <resultMap id="tokenView" type="tech.seexun.jknow.store.entity.TokenView">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="name" javaType="java.lang.String"/>
+      <arg column="token_prefix" javaType="java.lang.String"/>
+      <arg column="scope" javaType="java.lang.String"/>
+      <arg column="kb_ids" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler"/>
+      <arg column="expires_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="last_used_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="revoked_at" javaType="java.time.OffsetDateTime"/>
+      <arg column="created_at" javaType="java.time.OffsetDateTime"/>
+    </constructor>
+  </resultMap>
+
+  <!-- tokens.rs:119-128（list：created_at 倒序；kb_ids NULL=这个人能进的全部库） -->
+  <select id="selectTokens" resultMap="tokenView">
+    SELECT id, name, token_prefix, scope, kb_ids, expires_at,
+                    last_used_at, revoked_at, created_at
+               FROM personal_tokens WHERE user_id = #{userId} ORDER BY created_at DESC
+  </select>
+
+  <!-- tokens.rs:98-117（issue：明文只在响应里出现一次，库里只有哈希） -->
+  <select id="insertToken" resultMap="tokenView">
+    INSERT INTO personal_tokens
+             (id, user_id, name, token_hash, token_prefix, scope, kb_ids, expires_at)
+         VALUES (#{id}, #{userId}, #{name}, #{tokenHash}, #{tokenPrefix}, #{scope},
+                 #{kbIds,typeHandler=tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler},
+                 #{expiresAt})
+         RETURNING id, name, token_prefix, scope, kb_ids, expires_at,
+                   last_used_at, revoked_at, created_at
+  </select>
+
+  <!-- tokens.rs:132-145（revoke：打戳不删行——「这把钥匙存在过」要查得到） -->
+  <update id="stampRevoked">
+    UPDATE personal_tokens SET revoked_at = now()
+      WHERE id = #{id} AND user_id = #{userId} AND revoked_at IS NULL
+  </update>
+
+  <!-- tokens.rs:159-169（authenticate：过期/撤销在 SQL 里判 + last_used_at 顺手写）；
+       kb_ids 是 uuid[]——resultType 缺省映射会把它当 JSON 解析（前导零炸），
+       走 resultMap 显式挂 UuidArrayTypeHandler -->
+  <resultMap id="authRow" type="tech.seexun.jknow.store.mapper.TokensMapper$AuthRow">
+    <constructor>
+      <idArg column="id" javaType="java.util.UUID"/>
+      <arg column="user_id" javaType="java.util.UUID"/>
+      <arg column="scope" javaType="java.lang.String"/>
+      <arg column="kb_ids" javaType="java.util.List"
+           typeHandler="tech.seexun.jknow.store.typehandler.UuidArrayTypeHandler"/>
+    </constructor>
+  </resultMap>
+
+  <select id="authenticate" resultMap="authRow">
+    UPDATE personal_tokens SET last_used_at = now()
+      WHERE token_hash = #{tokenHash}
+        AND revoked_at IS NULL
+        AND (expires_at IS NULL OR expires_at > now())
+    RETURNING id, user_id, scope, kb_ids
+  </select>
+</mapper>
