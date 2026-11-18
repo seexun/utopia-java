@@ -52,7 +52,31 @@ export default defineConfig(({ mode, command }) => {
         output: {
           chunkFileNames: 'static/js/[name]-[hash].js',
           entryFileNames: 'static/js/[name]-[hash].js',
-          assetFileNames: 'static/[ext]/[name]-[hash].[ext]'
+          assetFileNames: 'static/[ext]/[name]-[hash].[ext]',
+          // 供应商拆包（P3 遗留票）：单 index 巨 chunk（2MB+/gzip 683KB）改按
+          // 依赖域分桶——vue 全家桶/EP/图渲染/markdown 管线/工具箱各自独立缓存，
+          // 业务发版不动 vendor hash，回访命中强缓存；单桶也压在 500KB 级，
+          // 首屏不再一次性拉整坨（页面级动态 import 只取用到的桶）
+          manualChunks: {
+            'vendor-vue': ['vue', 'vue-router', 'pinia'],
+            'vendor-ep': ['element-plus', '@element-plus/icons-vue'],
+            'vendor-graph': [
+              'sigma',
+              'graphology',
+              'graphology-layout',
+              'graphology-layout-forceatlas2',
+              '@sigma/edge-curve',
+              '@sigma/node-border'
+            ],
+            'vendor-md': [
+              'remark-parse',
+              'remark-rehype',
+              'remark-gfm',
+              'rehype-highlight',
+              'unified'
+            ],
+            'vendor-utils': ['axios', 'dayjs', '@vueuse/core', 'echarts', 'qs']
+          }
         }
       }
     },

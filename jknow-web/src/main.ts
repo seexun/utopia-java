@@ -15,7 +15,8 @@ import Cookies from 'js-cookie'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import 'element-plus/theme-chalk/dark/css-vars.css'
-import locale from 'element-plus/es/locale/lang/zh-cn'
+import zhCnLocale from 'element-plus/es/locale/lang/zh-cn'
+import enLocale from 'element-plus/es/locale/lang/en'
 
 // 知识库词条 i18n（对齐源仓 utopia-web：词典在 src/i18n/dicts，en 定结构 zh 补齐；
 // locale 从 localStorage 读（src/i18n 的 detect()，键 utopia.lang，默认 zh），fallback zh）。
@@ -120,9 +121,12 @@ app.component('svg-icon', SvgIcon)
 directive(app)
 
 // 使用element-plus 并且设置全局的大小
+// EP 内建文案（分页/空态/日期面板等）随界面语言：启动时按 i18n 当前 locale
+// 取值——user-menu 切语言是整页 reload（源语义），reload 后这里取到新值即闭环，
+// 无需 watch。词典语言默认 zh（src/i18n 的 detect），非 en 一律回落 zh-cn 包。
 // @ts-ignore
 app.use(ElementPlus, {
-  locale: locale,
+  locale: i18n.global.locale.value === 'en' ? enLocale : zhCnLocale,
   // 支持 large、default、small
   size: Cookies.get('size') || 'default'
 })

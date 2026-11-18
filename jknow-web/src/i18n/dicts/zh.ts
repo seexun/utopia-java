@@ -312,6 +312,14 @@ export const zh: Strings = {
     missingBody: "它已被删除，或者链接抄错了。下面是你自己的库。",
     myKbs: "我的知识库"
   },
+  /* 菜单入口的引导卡（P3）：kb-entry 解析不出工作区/库（无工作区且非管理员/
+     建库 403——fetchKbsForWorkspace 静默回落空表）时，等待 8s 后以引导卡替代
+     静默的「加载中」。状态一句话，动作在按钮上。 */
+  kbEntry: {
+    guideTitle: "尚未加入任何工作区",
+    guideBody: "请联系管理员创建，或切换账号后重试",
+    retry: "重新加载"
+  },
   nav: {
     workspaceLabel: "工作区",
     kbLabel: "知识库",

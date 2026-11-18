@@ -357,6 +357,15 @@ export const en = {
       "It was deleted, or the link was mistyped. Your own bases are listed below.",
     myKbs: "My knowledge bases"
   },
+  /* 菜单入口的引导卡（P3）：kb-entry 解析不出工作区/库（无工作区且非管理员/
+     建库 403——fetchKbsForWorkspace 静默回落空表）时，等待 8s 后以引导卡替代
+     静默的「加载中」。状态一句话，动作在按钮上。 */
+  kbEntry: {
+    guideTitle: "You are not in any workspace yet",
+    guideBody:
+      "Ask an administrator to create one, or sign in with a different account and try again",
+    retry: "Reload"
+  },
   nav: {
     workspaceLabel: "Workspace",
     kbLabel: "Knowledge base",
