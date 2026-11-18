@@ -17,7 +17,8 @@
         <div class="bullshit__info">
           对不起，您正在寻找的页面不存在。尝试检查URL的错误，然后按浏览器上的刷新按钮或尝试在我们的应用程序中找到其他内容。
         </div>
-        <router-link to="/index" class="bullshit__return-home">
+        <!-- 首页语义统一（menu-ia T2）：'/' 经根记录 redirect 直达当前库图谱（原 /index 落若依默认首页） -->
+        <router-link to="/" class="bullshit__return-home">
           返回首页
         </router-link>
       </div>

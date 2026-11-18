@@ -88,7 +88,10 @@ service.interceptors.response.use((res: any) => {
         ElMessageBox.confirm('登录状态已过期，您可以继续留在该页面，或者重新登录', '系统提示', { confirmButtonText: '重新登录', cancelButtonText: '取消', type: 'warning' }).then(() => {
           isRelogin.show = false
           useUserStore().logOut().then(() => {
-            location.href = '/index'
+            // 首页直达链（menu-ia T2 审查 Important）：401 重登落点 '/'——原 '/index'
+            // 会把 redirect=/index 带进登录回跳，再登录落回若依默认首页而非当前库图谱
+            // （与 Navbar 登出同款洞）；'/' → /login?redirect=/graph → 登录直达图谱
+            location.href = '/'
           })
       }).catch(() => {
         isRelogin.show = false

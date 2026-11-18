@@ -7,14 +7,16 @@ interface LockState {
 }
 
 export const useLockStore = defineStore('lock', {
+  // 首页语义统一（menu-ia T2）：lockPath 兜底/回落 '/'——解锁后回首页 = 直达当前库
+  // 图谱（原 '/index' 落若依默认首页；记录的是真实当前路径，兜底仅在无路径时用）
   state: (): LockState => ({
     isLock: JSON.parse(localStorage.getItem(LOCK_KEY) || 'false'),
-    lockPath: localStorage.getItem(LOCK_PATH_KEY) || '/index'
+    lockPath: localStorage.getItem(LOCK_PATH_KEY) || '/'
   }),
   actions: {
     // 锁定屏幕，同时记录当前路径
     lockScreen(currentPath: string) {
-      this.lockPath = currentPath || '/index'
+      this.lockPath = currentPath || '/'
       localStorage.setItem(LOCK_PATH_KEY, this.lockPath)
       this.isLock = true
       localStorage.setItem(LOCK_KEY, 'true')
@@ -23,8 +25,8 @@ export const useLockStore = defineStore('lock', {
     unlockScreen() {
       this.isLock = false
       localStorage.setItem(LOCK_KEY, 'false')
-      this.lockPath = '/index'
-      localStorage.setItem(LOCK_PATH_KEY, '/index')
+      this.lockPath = '/'
+      localStorage.setItem(LOCK_PATH_KEY, '/')
     }
   }
 })

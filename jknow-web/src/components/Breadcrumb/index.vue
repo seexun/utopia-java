@@ -32,9 +32,9 @@ function getBreadcrumb(): void {
   } else {
     matched = route.matched.filter((item: any) => item.meta && item.meta.title)
   }
-  // 判断是否为首页
+  // 判断是否为首页（首页语义统一 menu-ia T2：合成屑指 '/'——直达当前库图谱，原 /index 落若依默认首页）
   if (!isDashboard(matched[0])) {
-    matched = [{ path: "/index", meta: { title: "首页" } }].concat(matched)
+    matched = [{ path: "/", meta: { title: "首页" } }].concat(matched)
   }
   levelList.value = matched.filter(item => item.meta && item.meta.title && (item.meta.breadcrumb as boolean) !== false)
 }
