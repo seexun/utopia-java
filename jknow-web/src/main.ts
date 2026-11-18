@@ -42,6 +42,10 @@ const i18n = createI18n({
   }
 })
 
+// 设计令牌单源（gvdata tokens.scss 原样迁入）：先于 index.scss/tailwind/业务样式，
+// 对齐 gvdata main.js 的引入序（tokens 先入、主题层殿后）——静态覆盖 element 的
+// --el-color-primary 色阶（#2563eb），运行时主题色阶见 store/modules/settings.ts。
+import '@/style/tokens.scss'
 import '@/assets/styles/index.scss' // global css
 // tailwind4 入口（必须在 main.ts 引入，避免 vite 每次 hmr 重新请求整个 scss 入口）
 import '@/style/tailwind.css'

@@ -33,7 +33,9 @@ const useSettingsStore = defineStore(
   {
     state: (): SettingsState => ({
       title: '',
-      theme: storageSetting.theme || '#409EFF',
+      // 主题色收敛 #2563eb（对齐 tokens.scss 单源）：旧默认 #409EFF 的缓存值视同
+      // 未选色一并迁移，避免运行时 handleThemeStyle 内联色阶回流旧蓝。
+      theme: !storageSetting.theme || storageSetting.theme === '#409EFF' ? '#2563eb' : storageSetting.theme,
       sideTheme: storageSetting.sideTheme || sideTheme,
       showSettings: showSettings,
       navType: storageSetting.navType === undefined ? navType : storageSetting.navType,

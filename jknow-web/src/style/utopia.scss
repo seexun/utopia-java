@@ -12,16 +12,17 @@
    （antd 蓝主色全局生效）——收敛到 .knowledge-page（T3 页面根元素提供该类），
    令牌只在知识图谱页面子树内生效；类选择器作用于最近祖先，继承语义等价。 */
 .knowledge-page {
-  /* 品牌主色：antd 蓝 #1677ff（国内企业软件事实标准；2026-11 侧栏国内风格重设计
-     全站迁移，色阶映射见 docs/superpowers/specs/2026-11-16-sidebar-cn-style-design.md） */
-  --el-color-primary: #1677ff;
-  /* EP dark-2（按压/深档文字）= antd blue-7；悬停语义对齐 antd 走变亮（light-3 = blue-5） */
-  --el-color-primary-dark-2: #0958d9;
-  --el-color-primary-light-3: #4096ff;
-  --el-color-primary-light-5: #69b1ff;
-  --el-color-primary-light-7: #91caff;
-  --el-color-primary-light-8: #bae0ff;
-  --el-color-primary-light-9: #e6f4ff; /* antd blue-1，soft 选中底 */
+  /* 品牌主色：2026-11-18 令牌层迁入（tokens.scss 单源，全站 #2563eb），antd 蓝
+     色阶退役、本块改引 token 别名（light-3..8 与 tokens.scss 的 #2563eb 静态色阶
+     同值）；沿革见 docs/superpowers/specs/2026-11-16-sidebar-cn-style-design.md */
+  --el-color-primary: var(--color-primary);
+  /* EP dark-2（按压/深档文字）= 主色深档 token；悬停语义对齐 antd 走变亮（light-3） */
+  --el-color-primary-dark-2: var(--color-primary-hover);
+  --el-color-primary-light-3: #6692f1;
+  --el-color-primary-light-5: #92b1f5;
+  --el-color-primary-light-7: #bed0f9;
+  --el-color-primary-light-8: #d3e0fb;
+  --el-color-primary-light-9: var(--color-primary-soft); /* soft 选中底 */
 
   /* 语义色（旧 success/warning/danger 三件套） */
   --el-color-success: #10b981;
@@ -114,7 +115,7 @@ body[layout="vertical"] .app-wrapper.openSidebar {
   font-weight: 800;
   color: var(--el-color-white);
   border-radius: 8px;
-  background: linear-gradient(135deg, #1677ff, #06b6d4);
+  background: var(--gradient-brand); /* tokens.scss 品牌渐变（#2563eb→#06b6d4） */
 }
 
 .logo-name {
@@ -351,7 +352,7 @@ body[layout="vertical"] .app-wrapper .sidebar-container {
   color: var(--el-color-white);
   user-select: none;
   border-radius: 50%;
-  background: linear-gradient(135deg, #1677ff, #06b6d4);
+  background: var(--gradient-brand); /* tokens.scss 品牌渐变（#2563eb→#06b6d4） */
 }
 
 /* 告警铃的未读点（旧壳：角标是个点不是数字——"有事没看"是二元的） */

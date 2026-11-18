@@ -7,7 +7,8 @@ html[data-theme="light"] {
   --pure-theme-menu-text: rgb(0 0 0 / 60%);
   --pure-theme-sidebar-logo: #fff;
   --pure-theme-menu-title-hover: #000;
-  --pure-theme-menu-active-before: #1677ff;
+  /* 主题色收敛（2026-11-18）：antd 蓝 → tokens.scss 单源 --color-primary（#2563eb） */
+  --pure-theme-menu-active-before: var(--color-primary);
 }
 
 /* 道奇蓝 */

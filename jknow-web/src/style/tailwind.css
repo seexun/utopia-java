@@ -55,13 +55,15 @@
    逐字同名——bg-card / border-line / text-ink-2 / text-sub / rounded-card /
    shadow-pop……视觉对齐由此「按构造」成立。画布（domain/pages/graphVisuals
    的 refreshPalette）在运行时读的正是这里的 :root 变量，所以值用字面量。
-   --color-primary 已在上面映射 EP 变量（同值 #1677ff），不重复声明。
+   2026-11-18 令牌层迁入后主色族单源在 tokens.scss（无层级 @layer，级联压过
+   本文件的 @layer theme）；@theme 仅保留注册（bg-primary-soft 等工具类生成
+   依赖），主色三值与 tokens.scss 同值（#2563eb 系）。
    ============================================================ */
 @theme {
   /* 语义三件套 */
-  --color-primary-hover: #4096ff;
-  --color-primary-soft: #e6f4ff;
-  --color-primary-text: #0958d9;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-soft: #eff4fe;
+  --color-primary-text: #1d4ed8;
   --color-success: #10b981;
   --color-success-soft: #ecfdf5;
   --color-success-text: #047857;
