@@ -89,7 +89,17 @@
 
 ## 五、T4 演练两 findings（清卷环境首次全量跑出的真发现）
 
-1. **全仓 mvn test 的共享库热身态**：清卷空库首跑 3 例错——GraphApiTests/OntologyApiTests fixture `SELECT id FROM organizations ORDER BY created_at LIMIT 1` 0 行、GraphStoreTests.emptyKbOverviewAndSearchAreZero 缺 `name='General'` 库。前提溯源：两者是源仓注册流遗产（jknow 无建行路径），累积开发库天然满足、清卷库没有。处置：插入热身态（1 组织 + 1 工作区 + 空 General 库，固定 uuid …00f0/00f1/00f2）后复跑全绿 1330/0/0/9。**非代码回归**；README 验证节已注，长期去向：测试自足化（fixture 自建前提）或 V0103 种子化（产品决策）。
+1. **全仓 mvn test 的共享库热身态**：清卷空库首跑 3 例错——GraphApiTests/OntologyApiTests fixture `SELECT id FROM organizations ORDER BY created_at LIMIT 1` 0 行、GraphStoreTests.emptyKbOverviewAndSearchAreZero 缺 `name='General'` 库。前提溯源：两者是源仓注册流遗产（jknow 无建行路径），累积开发库天然满足、清卷库没有。处置：插入热身态三行（下 SQL，演练原样）后复跑全绿 1330/0/0/9。**非代码回归**；README 验证节已注，长期去向：测试自足化（fixture 自建前提）或 V0103 种子化（产品决策）。
+
+```sql
+-- mvn 共享库热身态（清卷空库复跑 mvn -q test 前执行一次；幂等性：固定 uuid，重跑请先删）
+INSERT INTO organizations (id, name, created_at)
+VALUES ('0190d3e0-0000-7d5a-8000-0000000000f0', '默认组织', '2026-10-01T00:00:00Z');
+INSERT INTO workspaces (id, org_id, name, created_at)
+VALUES ('0190d3e0-0000-7d5a-8000-0000000000f1', '0190d3e0-0000-7d5a-8000-0000000000f0', '默认工作区', '2026-10-02T00:00:00Z');
+INSERT INTO knowledge_bases (id, workspace_id, name, visibility, created_at)
+VALUES ('0190d3e0-0000-7d5a-8000-0000000000f2', '0190d3e0-0000-7d5a-8000-0000000000f1', 'General', 'restricted', '2026-10-02T00:00:01Z');
+```
 2. **ES 索引重建时点**：检索路径自 M1 起不做逐查对账（ensureFresh 撤为启动 runner——`JKNOW_ES_RECONCILE=1` 或 `--reindex`）。清卷演练中「先起后端后 seed」的顺序会让索引空置、检索空结果；调序为 seed 后重启后端即触发 `全文索引是空的，从库里重建：5 条分块`→`索引重建完成`。走查按此闭环（README 快速开始第 2 步已带该环境变量）。
 
 ## 六、chunk 对比表（T3 拆包，T4 复跑 build:prod 数值一致）
@@ -115,9 +125,9 @@
 | `t4-01-login.png` | 登录页（admin/admin123） | 地址栏 localhost/login，表单齐 |
 | `t4-02-home.png` | 登录后若依首页 | 菜单树含「知识图谱」 |
 | `t4-03-libraries.png` | 库列表（工作空间页） | 「演示：智造产业链」行：所有者/2 文档/2 成员 |
-| `t4-04-graph.png` | 图谱（实体+关系） | 18 实体·24 事实·23 现行；人物/公司节点+任职于/投资了/合作等边+图例 |
+| `t4-04-graph.png` | 图谱（实体+关系） | 图像复核：人物/公司节点+任职于/投资了/合作等边+图例。计数「18 实体·24 事实·23 现行」出自走查时页 DOM 文本（截图视口未含该行，系侧栏折叠面板）；同口径经 smoke-p1 seed 态图谱邻域断言（`"nodes":[{` 非空）复核 |
 | `t4-05-graph-filter.png` | 图谱筛选 | 搜索「星辰」命中星辰智造+星辰苏州研究院 |
-| `t4-06-search-es.png` | 检索（真 ES+IK） | q=星辰智造 蓝海能源 战略合作；两文档 5 现行段全召回带引文（地址栏含 ?q=） |
+| `t4-06-search-es.png` | 检索（真 ES+IK） | q=星辰智造 蓝海能源 战略合作；截图视口可见 3 张结果卡带引文（供应链·第 2 段等）；走查 DOM 抓取全量 5 现行段（供应链 2/3/4 段+人事 2/3 段，含滚动视口外 2 卡），ES 侧 `_cat/indices` 索引 5 docs 对账（地址栏含 ?q=） |
 | `t4-07-ingest.png` | 摄取（上传） | p3-t4-upload.md 上传→「就绪 1 文本块」（worker 开启后分块完成） |
 | `t4-08-doc-viewer.png` | 上传文档详情 | 正文渲染（1 段·1KB·上传于 2026/11/18） |
 | `t4-09-review.png` | 审查队列总览 | 待审核 3/实体消解 2/知识冲突 1/低置信度 3 等+裁决史+库成色 44 事实 |

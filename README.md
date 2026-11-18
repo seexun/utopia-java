@@ -97,7 +97,7 @@ pnpm dev                                              # http://localhost（vite 
 
 ## 部署要点
 
-- **ES-IK 镜像构建**：`utopia-es-ik:8.14.3` 由 es-ik-build 工程产出（elasticsearch 8.14.3 + analysis-ik 同版插件）。缺镜像时 `cd es-ik-build && docker build -t utopia-es-ik:8.14.3 .`。宿主 9200 被占时改用 `docker-compose.es.yml` 备选形态（端口 19200 + `JKNOW_ES_URL=http://localhost:19200` 覆盖，文件头注释有说明）。容器内存限 `ES_JAVA_OPTS=-Xms512m -Xmx512m`，数据落独立卷 `jknow-es-data`。
+- **ES-IK 镜像构建**：`utopia-es-ik:8.14.3` 由仓内 `docker/es-ik/` 构建（`elasticsearch:8.14.3` 基镜像 + 同版 analysis-ik 插件，zip 4.5MB 已入仓，与 .gitignore 无冲突）。缺镜像时 `docker build -t utopia-es-ik:8.14.3 docker/es-ik`（需能拉取 docker.io 基镜像）。宿主 9200 被占时改用 `docker-compose.es.yml` 备选形态（端口 19200 + `JKNOW_ES_URL=http://localhost:19200` 覆盖，文件头注释有说明）。容器内存限 `ES_JAVA_OPTS=-Xms512m -Xmx512m`，数据落独立卷 `jknow-es-data`。
 - **端口约定**：PG 15432 / Redis 36379 / ES 9200 / 后端 19080 / 前端 80；均可用环境变量覆盖（`JKNOW_PG_PORT`/`SERVER_PORT`/`JKNOW_ES_URL` 等）。
 - **LLM 配置指引（不随部署伪造）**：对话/语义检索需先配模型——登录后右上角进「管理 → 模型」（`/admin`，即 Settings→Models）：OpenAI 兼容协议，DeepSeek/SiliconFlow/Qwen/Ollama/OpenAI 预置模板，填接口地址+模型+API 密钥后「测试连接→保存」；向量模型可选（启用语义检索），另有 OCR/录音转写位。未配模型时检索走 BM25 关键词（真 ES+IK），对话面给出引导提示（不伪造流）。
 - **jobs worker 开关**：`JKNOW_JOBS_WORKER=true` 才会有摄取解析/抽取 worker（默认 false——双打期写路径所有权信号；上传文档在关态停在「排队中」）。演示闭环起后端时建议一并带上。
@@ -113,12 +113,12 @@ pnpm dev                                              # http://localhost（vite 
 ./scripts/smoke-p0.sh                                  # ALL PASS 20/20
 ./scripts/smoke-p1.sh                                  # ALL PASS (PASS=67 SKIP=1)
 mvn -q test                                            # 全仓 1330 run / 0 fail / 9 skip
-cd jknow-web && pnpm test && pnpm typecheck && pnpm build:prod   # 418 passed / 0 / 0
+cd jknow-web && pnpm test && pnpm typecheck && pnpm build:prod   # test 418 passed；typecheck 与 build 均零错零告警退出 0
 ```
 
 清卷重建（全新环境从零到闭环）：`docker compose -f docker-compose.dev.yml down -v && docker compose -f docker-compose.dev.yml up -d` → 起后端（Flyway 103 自动建）→ seed → 上述全部闸门照跑（P3 已演练，见 p3-report）。
 
-注：**全仓 `mvn -q test` 的共享库热身态**——两处只读测试前提依赖共享库里「至少一个组织」与「空 General 库」各一行（源仓注册流遗产，jknow 无建行路径；累积开发库天然满足）。清卷后的空库先执行一次热身（p3-report §五有现成 SQL），否则 3 例因前提缺失报错（非代码回归）。
+注：**全仓 `mvn -q test` 的共享库热身态**——两处只读测试前提依赖共享库里「至少一个组织」与「空 General 库」各一行（源仓注册流遗产，jknow 无建行路径；累积开发库天然满足）。清卷后的空库先执行一次热身（p3-report §五-1 有三行 INSERT 全文可直接照抄），否则 3 例因前提缺失报错（非代码回归）。
 
 ## 迁移四阶段索引
 
