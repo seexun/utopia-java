@@ -24,7 +24,7 @@ function walk(dir: string, exts: string[], out: string[] = []): string[] {
 }
 
 const offlineIconSrc = readFileSync(
-  join(root, "src/components/ReIcon/src/offlineIcon.ts"),
+  join(root, "src/components/knowledge/ReIcon/offlineIcon.ts"),
   "utf-8"
 );
 const registered = new Set(
@@ -44,10 +44,20 @@ describe("页面级 Icon 必须走离线运行时与离线注册表", () => {
   it("页面静态使用的每个图标键都在 offlineIcon.ts 注册过", () => {
     // 领域代码里带冒号的**非图标**字面量白名单（Vue emit 名 / SSE 事件名）；
     // 出现新的非图标冒号字面量时在此显式登记，避免静默漏网
-    const NON_ICON_KEYS = new Set(["update:open", "chat:draft"]);
+    const NON_ICON_KEYS = new Set([
+      "update:open",
+      "chat:draft",
+      // 若依视图的 v-model emit 名（walk 面扩到 src/views 全体后浮现）
+      "update:visible",
+      // jknow 侧若依视图的内联样式字面量（walk 面扩到 src/views 全体后浮现）
+      "cursor:pointer",
+      "float:right",
+      // offlineIcon.ts 自身头注里的示例键（文件落位 knowledge 后进了扫描面）
+      "lucide:xxx"
+    ]);
     const files = [
       ...walk(join(root, "src/views"), [".vue", ".tsx", ".ts"]),
-      ...walk(join(root, "src/components/utopia"), [".vue", ".tsx", ".ts"])
+      ...walk(join(root, "src/components/knowledge"), [".vue", ".tsx", ".ts"])
     ];
     const missing: { key: string; file: string }[] = [];
     for (const f of files) {

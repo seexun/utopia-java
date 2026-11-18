@@ -5,9 +5,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { VueQueryPlugin } from "@tanstack/vue-query";
-import { queryClient } from "@/store/query";
+import { queryClient } from "@/store/knowledge/query";
 import ElementPlus from "element-plus";
-import { SourceEditModal } from "@/views/utopia/library/source-edit-modal";
+import { SourceEditModal } from "@/views/jknow/knowledge/library/source-edit-modal";
 import { updateSource, deleteSource } from "@/api/knowledge/sources";
 import { S } from "@/i18n";
 import type { SourceView } from "@/api/knowledge/types";

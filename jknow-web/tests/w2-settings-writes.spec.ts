@@ -7,11 +7,11 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { createRouter, createMemoryHistory, type Router } from "vue-router";
 import { VueQueryPlugin } from "@tanstack/vue-query";
 import ElementPlus from "element-plus";
-import { queryClient } from "@/store/query";
-import { store as globalPinia } from "@/store";
-import KbSettings from "@/views/utopia/kb-settings/index.vue";
-import Mappings from "@/views/utopia/mappings/index.vue";
-import { parentOptions } from "@/views/utopia/ontology/dialogs";
+import { queryClient } from "@/store/knowledge/query";
+import { store as globalPinia } from "@/store/knowledge";
+import KbSettings from "@/views/jknow/knowledge/kb-settings/index.vue";
+import Mappings from "@/views/jknow/knowledge/mappings/index.vue";
+import { parentOptions } from "@/views/jknow/knowledge/ontology/dialogs";
 import type { EntityTypeView } from "@/api/knowledge/types";
 import { S } from "@/i18n";
 

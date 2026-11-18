@@ -4,7 +4,7 @@
    收敛、不足一页自动隐藏（旧仓 Pager 三语义逐一对照）。 */
 import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import { UPager, pageSlice } from "@/components/utopia/kit";
+import { UPager, pageSlice } from "@/components/knowledge/kit";
 import { S } from "@/i18n";
 
 describe("本体左栏 UPager：旧仓 Pager 三语义", () => {

@@ -11,6 +11,14 @@
 
     // 严格性和类型检查相关配置
     "strict": true,
+    // jknow T3：知识页面/组件族随源仓（tsconfig strict:false）迁入，回调参数
+    // 大量隐式 any（源仓同款写法，且 vue 替换式声明下收据面本就是 any——逐处
+    // 标注不增安全）；RuoYi 自有面本就 noImplicitAny 干净，此处仅收这一子开关，
+    // null 安全等其余 strict 位保持全开
+    "noImplicitAny": false,
+    // 知识页面族的 tsx 组件（源仓 tsconfig 同款）
+    "jsx": "preserve",
+    "jsxImportSource": "vue",
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
 
@@ -26,7 +34,12 @@
     "noEmit": true,
 
     // 类型声明相关配置
-    "types": ["node", "vite/client", "element-plus/global"]
+    "types": [
+      "node",
+      "vite/client",
+      "element-plus/global",
+      "unplugin-icons/types/vue"
+    ]
   },
   "include": [
     "src/**/*.ts",

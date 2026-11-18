@@ -1,6 +1,6 @@
 // useKbRole：当前库角色判定（对照旧仓 kb.tsx / 各页 my_role 门控口径）。
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { useKbContextHook } from "@/store/modules/kb";
+import { useKbContextHook } from "@/store/knowledge/modules/kb";
 import { useKbRole } from "@/composables/useKbRole";
 
 // M-2（审查收口）：网络层 mock——store.load 走真实现，kbDetail 打桩

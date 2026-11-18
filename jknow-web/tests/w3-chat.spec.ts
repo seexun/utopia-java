@@ -11,11 +11,11 @@ import { createRouter, createMemoryHistory, type Router } from "vue-router";
 import { ref } from "vue";
 import { VueQueryPlugin } from "@tanstack/vue-query";
 import ElementPlus from "element-plus";
-import { queryClient } from "@/store/query";
-import { store as globalPinia } from "@/store";
-import { useKbContextHook } from "@/store/modules/kb";
+import { queryClient } from "@/store/knowledge/query";
+import { store as globalPinia } from "@/store/knowledge";
+import { useKbContextHook } from "@/store/knowledge/modules/kb";
 import { S } from "@/i18n";
-import Chat from "@/views/utopia/chat/index.vue";
+import Chat from "@/views/jknow/knowledge/chat/index.vue";
 import type { ConversationMessage, ConversationRow } from "@/api/knowledge/types";
 
 const m = vi.hoisted(() => ({

@@ -2,7 +2,7 @@
    8 条封顶、markdown 记号剥离）、tocOf（h2/h3 提取、锚点与 slugify 同一函数）、
    docBySlug 兜底。对照旧仓 pages/Docs.tsx 纯逻辑面（搬运时逐字，用例新建钉行为）。 */
 import { describe, expect, it } from "vitest";
-import { DOCS, docBySlug, searchDocs, slugify, tocOf } from "@/views/utopia/docs/docsContent";
+import { DOCS, docBySlug, searchDocs, slugify, tocOf } from "@/views/jknow/knowledge/docs/docsContent";
 
 describe("searchDocs：客户端全文检索", () => {
   it("少于两字的查询直接空表（门槛）", () => {

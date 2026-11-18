@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
 import { buildHierarchyTree } from "@/utils/tree";
-import ReCol from "@/components/ReCol";
+import ReCol from "@/components/knowledge/ReCol";
 
 describe("W0 冒烟：基座在 vitest 下可用", () => {
   it("纯工具函数 buildHierarchyTree（router 机制使用）", () => {

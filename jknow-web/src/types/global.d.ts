@@ -37,11 +37,37 @@ declare module 'vue' {
   export function watchEffect(...args: any[]): any
   export function onScopeDispose(...args: any[]): any
   export function toValue(...args: any[]): any
+  // jknow T3：页面/组件族随迁代码的 ESM 具名导入面（同上口径：泛型 + any 闭合）
+  export function createApp<T>(...args: any[]): any
+  export function shallowRef<T>(...args: any[]): any
+  export function nextTick(...args: any[]): any
+  export function onMounted(...args: any[]): any
+  export function onBeforeUnmount(...args: any[]): any
+  export function onUnmounted(...args: any[]): any
+  export function h(...args: any[]): any
+  export function provide(...args: any[]): any
+  export function inject<T>(...args: any[]): T
+  // defineComponent：重载面第一签名单对象恒等返回（vue-tsc 的 SFC 合成与
+  // .tsx 组件定义走它——any 返回会把模板上下文砸成 {}，恒等返回保住形状），
+  // 并交一个构造签名（.tsx 里 <URow/> 这类 JSX 元素位要认得出它是组件）；
+  // 其余形态（泛型组件/构造器重载）落 any 兜底
+  export function defineComponent<O extends object>(
+    options: O
+  ): O & (new (...args: any[]) => any)
+  export function defineComponent(...args: any[]): any
   export type Ref<T = any> = any
   export type ComputedRef<T = any> = any
   export type MaybeRefOrGetter<T = any> = any
   export type App = any
   export type VNode = any
+  export type Component = any
+  export type VNodeRef = any
+  // PropType：any（替换式声明下无 ExtractPropTypes 管线，保形直通会让 .tsx 的
+  // props 面落 unknown；any 与源仓 strict:false 的实际检查面等价）
+  export type PropType<T> = any
+  export type CSSProperties = any
+  export const Teleport: any
+  export const Fragment: any
 }
 
 // nprogress

@@ -7,9 +7,9 @@ import { defineComponent, h, nextTick } from "vue";
 import { createRouter, createMemoryHistory, type Router } from "vue-router";
 import { VueQueryPlugin } from "@tanstack/vue-query";
 import ElementPlus from "element-plus";
-import { queryClient } from "@/store/query";
-import { store as globalPinia } from "@/store";
-import Review from "@/views/utopia/review/index.vue";
+import { queryClient } from "@/store/knowledge/query";
+import { store as globalPinia } from "@/store/knowledge";
+import Review from "@/views/jknow/knowledge/review/index.vue";
 import { S } from "@/i18n";
 import type { ReviewCounts } from "@/api/knowledge/types";
 

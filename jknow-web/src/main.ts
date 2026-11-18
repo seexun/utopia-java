@@ -1,5 +1,15 @@
 import { createApp } from 'vue'
 
+// 服务端状态层（源仓 main.ts 的 QueryClientProvider 对等物）：vue-query 承担
+// react-query 的职责——切库与 KB 事件流的失效面都打在它的 queryClient 上。
+// 客户端是模块单例（store/knowledge/query.ts）：会话边界的清缓存拿同一实例。
+import { VueQueryPlugin } from '@tanstack/vue-query'
+import { queryClient } from '@/store/knowledge/query'
+// 知识页面级离线图标注册表（@iconify/vue/dist/offline 的 addIcon 面；源仓在
+// layout/index.vue 加载——若依壳下收口到 main.ts，页面 Icon 走 dist/offline 同一注册表）
+import '@/components/knowledge/ReIcon/offlineIcon'
+import ToastHost from '@/components/knowledge/ToastHost.vue'
+
 import Cookies from 'js-cookie'
 
 import ElementPlus from 'element-plus'
@@ -101,6 +111,8 @@ app.component('Editor', Editor)
 app.use(router)
 app.use(store)
 app.use(i18n)
+// 知识页面族的服务端状态层（views 里不带显式 client 的 useQuery 走它）
+app.use(VueQueryPlugin, { queryClient })
 app.use(plugins)
 app.use(elementIcons)
 app.component('svg-icon', SvgIcon)
@@ -116,3 +128,11 @@ app.use(ElementPlus, {
 })
 
 app.mount('#app')
+
+// 知识域 toast 宿主（源仓 App.vue 同位）：独立微应用挂到 body 上的专属容器。
+// 不并进 App.vue——router-view 与兄弟节点并存（fragment 根）会让 RouterView
+// 的锚点更新静默失效（T3 冒烟实证：kb 页渲染成空 #app）；toast 总线
+// （domain/toast）是模块单例，第二实例只做渲染面，两侧同源。
+const toastHostEl = document.createElement('div')
+document.body.appendChild(toastHostEl)
+createApp(ToastHost).mount(toastHostEl)

@@ -10,15 +10,15 @@ import {
   type Router
 } from "vue-router";
 import { VueQueryPlugin } from "@tanstack/vue-query";
-import { queryClient } from "@/store/query";
+import { queryClient } from "@/store/knowledge/query";
 import { samePageInKb } from "@/domain/kbContext";
 import { utopiaMenus } from "@/router/utopia-menu";
-import { useKbContextHook } from "@/store/modules/kb";
-import { usePermissionStoreHook } from "@/store/modules/permission";
+import { useKbContextHook } from "@/store/knowledge/modules/kb";
+import { usePermissionStoreHook } from "@/store/knowledge/modules/permission";
 import { STREAM_KEYS } from "@/domain/queryDefaults";
 import { useKbContext } from "@/composables/useKbContext";
 import { S } from "@/i18n";
-import { store as globalPinia } from "@/store";
+import { store as globalPinia } from "@/store/knowledge";
 
 beforeEach(() => {
   localStorage.clear();

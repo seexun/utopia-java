@@ -7,9 +7,9 @@ import { defineComponent, h, nextTick } from "vue";
 import { createRouter, createMemoryHistory, type Router } from "vue-router";
 import { VueQueryPlugin } from "@tanstack/vue-query";
 import ElementPlus from "element-plus";
-import { queryClient } from "@/store/query";
-import { store as globalPinia } from "@/store";
-import Library from "@/views/utopia/library/index.vue";
+import { queryClient } from "@/store/knowledge/query";
+import { store as globalPinia } from "@/store/knowledge";
+import Library from "@/views/jknow/knowledge/library/index.vue";
 import { S } from "@/i18n";
 
 const { documentsMock, sourcesMock, dropsMock } = vi.hoisted(() => ({

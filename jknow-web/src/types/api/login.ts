@@ -17,6 +17,8 @@ export interface UserInfoResult extends AjaxResult {
   permissions: string[]
   /** 初始密码是否提醒修改 */
   isDefaultModifyPwd?: boolean
+  /** 密码可输入字符类型（SysLoginController.getInfo 的 pwdChrtype 键） */
+  pwdChrtype?: string
   /** 密码是否过期 */
   isPasswordExpired?: boolean
 }

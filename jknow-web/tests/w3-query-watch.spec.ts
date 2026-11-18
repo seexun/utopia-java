@@ -7,9 +7,9 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { createRouter, createMemoryHistory, type Router } from "vue-router";
 import { VueQueryPlugin } from "@tanstack/vue-query";
 import ElementPlus from "element-plus";
-import { queryClient } from "@/store/query";
-import { store as globalPinia } from "@/store";
-import MyKbs from "@/views/utopia/account/my-kbs.vue";
+import { queryClient } from "@/store/knowledge/query";
+import { store as globalPinia } from "@/store/knowledge";
+import MyKbs from "@/views/jknow/knowledge/account/my-kbs.vue";
 import { S } from "@/i18n";
 
 const { myKbsMock, wsRoleMock, meMock, packsMock } = vi.hoisted(() => ({

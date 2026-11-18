@@ -4,10 +4,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { VueQueryPlugin } from "@tanstack/vue-query";
-import { queryClient } from "@/store/query";
-import { store as globalPinia } from "@/store";
+import { queryClient } from "@/store/knowledge/query";
+import { store as globalPinia } from "@/store/knowledge";
 import ElementPlus from "element-plus";
-import ModelsTab from "@/views/utopia/admin/models-tab.vue";
+import ModelsTab from "@/views/jknow/knowledge/admin/models-tab.vue";
 import { S } from "@/i18n";
 
 const m = vi.hoisted(() => ({

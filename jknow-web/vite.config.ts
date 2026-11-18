@@ -3,6 +3,8 @@ import { defineConfig, loadEnv } from 'vite'
 import path from 'path'
 import vue from '@vitejs/plugin-vue'
 import vueJsx from '@vitejs/plugin-vue-jsx'
+import Icons from 'unplugin-icons/vite'
+import autoImport from 'unplugin-auto-import/vite'
 import tailwindcss from '@tailwindcss/vite'
 import createVitePlugins from './vite/plugins'
 
@@ -17,7 +19,17 @@ export default defineConfig(({ mode, command }) => {
     // 默认情况下，vite 会假设你的应用是被部署在一个域名的根路径上
     // 例如 https://www.ruoyi.vip/。如果应用被部署在一个子路径下，你就需要用这个选项指定子路径。例如，如果你的应用被部署在 https://www.ruoyi.vip/admin/，则设置 baseUrl 为 /admin/。
     base: VITE_APP_ENV === 'production' ? '/' : '/',
-    plugins: [tailwindcss(), ...createVitePlugins(env, command === 'build')],
+    plugins: [
+      tailwindcss(),
+      // 知识图谱组件族的 tsx（源仓 build/plugins.ts 同款；若依面无 tsx，故不在
+      // vite/plugins 里挂）——不挂则 .tsx 走默认 JSX（React classic），
+      // 运行时 ReferenceError: React is not defined（T3 冒烟实证）
+      vueJsx(),
+      // 知识图谱页面族的图标按需加载（源仓 build/plugins.ts 同款配置）：
+      // ~icons/lucide|ri|ep/<name> 虚拟模块 + ?raw/svg 变体
+      Icons({ compiler: 'vue3', scale: 1 }),
+      ...createVitePlugins(env, command === 'build')
+    ],
     resolve: {
       // https://cn.vitejs.dev/config/#resolve-alias
       alias: {
@@ -50,11 +62,16 @@ export default defineConfig(({ mode, command }) => {
       host: true,
       open: true,
       proxy: {
-        // https://cn.vitejs.dev/config/#server-proxy
+        // https://cn.vitejs.dev/config/server-proxy
         '/dev-api': {
           target: baseUrl,
           changeOrigin: true,
           rewrite: (p) => p.replace(/^\/dev-api/, '')
+        },
+        // 知识图谱 API 面（baseURL /api，后端路径就是 /api/v1/...——不 rewrite）
+        '/api': {
+          target: baseUrl,
+          changeOrigin: true
         },
          // springdoc proxy
          '^/v3/api-docs/(.*)': {
@@ -92,7 +109,17 @@ export default defineConfig(({ mode, command }) => {
           resolve: {
             alias: { '@': path.resolve(__dirname, './src') }
           },
-          plugins: [vue(), vueJsx()],
+          // unplugin-icons：知识页面族/壳组件的 ~icons/lucide|ri|ep/* 虚拟模块
+          // （源仓 vitest.config.ts 同款；spec 挂载视图需要同一套转换）；
+          // AutoImport：若依 src 面（store/index、layout 链）依赖 unplugin-auto-import
+          // 的全局 API（createPinia/ref/...），spec 经 @/router 拖进若依代码时需
+          // 同一套转换（T2 报告预告项；dts 关闭防测试运行写盘）
+          plugins: [
+            vue(),
+            vueJsx(),
+            Icons({ compiler: 'vue3', scale: 1 }),
+            autoImport({ imports: ['vue', 'vue-router', 'pinia'], dts: false })
+          ],
           test: {
             name: 'app',
             environment: 'jsdom',

@@ -20,25 +20,13 @@ import { samePageInKb } from "@/domain/kbContext";
 import * as kbsApi from "@/api/knowledge/kbs";
 import * as workspacesApi from "@/api/knowledge/workspaces";
 import type { Kb, Workspace } from "@/api/knowledge/types";
-// —— jknow T2 类型桩（源仓 @/store/modules/kb、@/store/query、@/router/utils 属
-// pure-admin 基建，未随 T2 迁移；T3 随 store/菜单基建接线后还原为真实 import）——
-import type { QueryClient } from "@tanstack/vue-query";
-interface KbContextStore {
-  kbId: string;
-  workspaceId: string;
-  kbDetail: Kb | null;
-  loading: boolean;
-  load(kbId: string): Promise<Kb | null>;
-  remember(kbId: string): void;
-  reset(): void;
-}
-const useKbContextHook: () => KbContextStore = () => {
-  throw new Error("T3 TODO：utopia pinia store（@/store/modules/kb）未随 T2 迁移");
-};
-const queryClient = undefined as unknown as QueryClient;
-const initRouter: () => void = () => {
-  throw new Error("T3 TODO：菜单重组（@/router/utils initRouter）未随 T2 迁移");
-};
+// T3 接线：源仓 @/store/modules/kb、@/store/query 落位 src/store/knowledge/
+//（与若依 store 并存，共用同一枚 pinia 实例）；源仓 @/router/utils 的
+// initRouter（pure-admin 菜单管线）不迁——菜单组装逻辑内联进 rebuildMenus。
+import { useKbContextHook } from "@/store/knowledge/modules/kb";
+import { queryClient } from "@/store/knowledge/query";
+import { usePermissionStoreHook } from "@/store/knowledge/modules/permission";
+import { utopiaMenus } from "@/router/utopia-menu";
 
 /** 空工作区自动创建 General 的取数函数（#580：空着起步，不带包；非管理员 403
  *  就静默等管理员来创建——现实中首个用户即管理员，General 总在）。 */
@@ -160,10 +148,20 @@ export function useKbContext(): {
     () => workspacesQuery.isFetched.value && (!workspace.value || kbsQuery.isFetched.value)
   );
 
-  /** 用当前上下文重组侧栏菜单。initRouter 是纯菜单组装（无网络请求），
-   *  重复调用只换掉 wholeMenus 数组。 */
+  /** 用当前上下文重组侧栏菜单（源仓 initRouter 的知识域部分内联——pure-admin
+   *  的 wholeMenus 管线由 knowledge permission store 的直赋承担，重复调用只
+   *  换掉 wholeMenus 数组；kbId 取 URL 参数优先，否则回落记忆，my_role 只在
+   *  kb 详情接口里、详情没回来时缺省放行（与 useKbRole 口径一致）） */
   function rebuildMenus() {
-    initRouter();
+    const kbStore = useKbContextHook();
+    const routeKbId = (
+      route.params as { kbId?: string } | undefined
+    )?.kbId;
+    const kbId = routeKbId ?? kbStore.kbId;
+    const canWrite = kbStore.kbDetail?.my_role !== "viewer";
+    usePermissionStoreHook().handleWholeMenus(
+      utopiaMenus(kbId, canWrite) as never[]
+    );
   }
 
   /** **换库是一次导航，不只是记一笔。** 只写 store 的话，值变了、组件也重渲染了，
@@ -181,7 +179,12 @@ export function useKbContext(): {
     rebuildMenus();
     const currentKbId = routeKbId.value;
     if (currentKbId && currentKbId !== id) {
-      router.push(samePageInKb(route.path, currentKbId, id));
+      // 源仓的菜单重组在 pure-admin 守卫里随每轮导航重跑（router/index.ts 的
+      // initRouter）；若依守卫不认知域菜单——push 落定后补一次重组（此刻
+      // route.params.kbId 已是新库），语义对齐源仓
+      router
+        .push(samePageInKb(route.path, currentKbId, id))
+        .then(() => rebuildMenus());
     }
   }
 

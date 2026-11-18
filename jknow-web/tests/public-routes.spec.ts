@@ -1,46 +1,83 @@
-// 审查 I-3：公开页不进壳——/docs /docs/:slug /privacy /terms 在 remaining.ts
-// （与 /login 同款独立路由，不经 formatTwoStageRoutes 拍到 Home(Layout) 之下）。
-// 匿名访问渲染独立整页：不起壳、不发 workspaces/health/unread（结构保证：
-// 不在 Home 之下就不会渲染 Layout，壳的查询链根本不创建）。
-// W3 补：/docs 改重定向记录（→ /docs/ingest，M-3 收口）——重定向记录无
-// components，单独断言 redirect 指向（其余公开页照旧断言真组件）。
+// kb 动态路由注册面（源仓 public-routes.spec 的 jknow 对等物）。
+// 源仓断言「公开页在壳外」（remaining.ts 不进 pure-admin 拍平树）；jknow 的路由
+// 体系换若依 router——T3 的等价语义是「kb 动态路由全部落在 constantRoutes、
+// hidden 不进菜单、页面为独立整页路由（不经若依 Layout 拍平）」：
+//   - 8 个 /kb/:kbId/* 页各有真组件；/kb 是纯重定向记录（→ /library）；
+//   - 旧路径族（/graph /search /chat /library /ontology /mappings /review
+//     /kb-settings）挂 KbRedirect 兜底组件（源仓 LegacyX 同构）；
+//   - /docs 是重定向记录（→ /docs/ingest，源仓 M-3 同款），slug 页有真组件。
+// 登录校验统一交若依 permission.ts 的 beforeEach（未登录 → /login?redirect=）。
 import { describe, it, expect } from "vitest";
-import { router, constantRoutes } from "@/router";
+import router, { constantRoutes } from "@/router";
 
-const PUBLIC_PATHS = ["/privacy", "/terms", "/docs/ingest"];
+function routeOf(path: string) {
+  return constantRoutes.find(r => r.path === path);
+}
 
-describe("公开页在壳外（审查 I-3）", () => {
-  it.each(PUBLIC_PATHS)(
-    "%s 的 matched 链不含 Home/Layout——独立整页路由",
-    path => {
-      const m = router.resolve({ path });
+const KB_PAGES = [
+  "/kb/:kbId/graph",
+  "/kb/:kbId/search",
+  "/kb/:kbId/ontology",
+  "/kb/:kbId/review",
+  "/kb/:kbId/settings",
+  "/kb/:kbId/chat/:conversationId?",
+  "/kb/:kbId/docs",
+  "/docs/:slug"
+];
+
+const LEGACY_PATHS = [
+  "/graph",
+  "/search",
+  "/chat",
+  "/library",
+  "/ontology",
+  "/mappings",
+  "/review",
+  "/kb-settings"
+];
+
+describe("kb 动态路由在 constantRoutes（hidden 独立整页）", () => {
+  it.each(KB_PAGES)("%s 已注册、hidden、带真组件", path => {
+    const r = routeOf(path);
+    expect(r, `constantRoutes 缺 ${path}`).toBeDefined();
+    expect(r!.hidden).toBe(true);
+    expect(r!.component).toBeDefined();
+  });
+
+  it.each(["/kb", "/docs"])("%s 是重定向记录（不带组件）", path => {
+    const r = routeOf(path);
+    expect(r, `constantRoutes 缺 ${path}`).toBeDefined();
+    expect(r!.component).toBeUndefined();
+    expect(String(r!.redirect)).toBe(path === "/kb" ? "/library" : "/docs/ingest");
+  });
+
+  it.each(LEGACY_PATHS)("%s 挂 KbRedirect 兜底组件（源仓 LegacyX 同构）", path => {
+    const r = routeOf(path);
+    expect(r, `constantRoutes 缺 ${path}`).toBeDefined();
+    expect(r!.hidden).toBe(true);
+    expect(r!.component).toBeDefined();
+  });
+
+  it("resolve 面：kb 页不在任何 Layout 壳之下（matched 链长 1）", () => {
+    const m = router.resolve({ path: "/kb/k1/graph" });
+    expect(m.matched).toHaveLength(1);
+    expect(m.matched[0].components?.default).toBeDefined();
+  });
+
+  it("resolve 面：旧路径与 /docs slug 同为独立整页", () => {
+    for (const p of ["/library", "/graph", "/docs/ingest"]) {
+      const m = router.resolve({ path: p });
       expect(m.matched).toHaveLength(1);
-      expect(m.matched[0].name).not.toBe("Home");
       expect(m.matched[0].components?.default).toBeDefined();
     }
-  );
-
-  it("/docs 是重定向记录（→ /docs/ingest，M-3）：不在壳下且不带组件", () => {
-    const m = router.resolve({ path: "/docs" });
-    expect(m.matched).toHaveLength(1);
-    expect(m.matched[0].name).not.toBe("Home");
-    expect(m.matched[0].components?.default).toBeUndefined();
-    expect(String(m.matched[0].redirect)).toBe("/docs/ingest");
   });
 
-  it("对照组：kb 页仍挂在 Home(Layout) 壳之下", () => {
-    const m = router.resolve({ path: "/kb/k1/graph" });
-    expect(m.matched.length).toBeGreaterThan(1);
-    expect(m.matched[0].name).toBe("Home");
-  });
-
-  it("拍平树（Home 的 children）里没有公开路由路径", () => {
-    const home = constantRoutes.find(r => r.path === "/");
-    const paths = (home?.children ?? []).map(c => c.path);
-    for (const p of ["/privacy", "/terms", "/docs"]) {
-      expect(paths).not.toContain(p);
-    }
-    // kb 作用域页仍应在拍平树里（壳的宿主）
-    expect(paths).toContain("/kb/:kbId/graph");
+  it("hidden 语义对齐：kb 路由不进菜单（全部 hidden:true，菜单开启在 V0102/T4）", () => {
+    const kbRoutes = constantRoutes.filter(
+      r => r.path.startsWith("/kb") || LEGACY_PATHS.includes(r.path)
+    );
+    // 7 个 /kb/:kbId/* + /kb 重定向 + 8 条旧路径（/kb-settings 同前缀只计一次）
+    expect(kbRoutes.length).toBe(16);
+    expect(kbRoutes.every(r => r.hidden === true)).toBe(true);
   });
 });

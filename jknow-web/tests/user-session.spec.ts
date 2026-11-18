@@ -6,7 +6,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { AxiosError as AxiosError_ } from "axios";
 import { storageLocal } from "@pureadmin/utils";
-import { useUserStoreHook } from "@/store/modules/user";
+import { useUserStoreHook } from "@/store/knowledge/modules/user";
 import { http, navigation, PureHttp } from "@/api/knowledge/client";
 
 const { meMock, loginMock, registerMock, logoutMock } = vi.hoisted(() => ({
@@ -127,7 +127,7 @@ describe("401 一次性闸门（I-2）：登录成功后复位", () => {
     vi.spyOn(navigation, "to").mockImplementation(url => redirectSpy(url));
     loginMock.mockReset();
     meMock.mockReset();
-    window.history.replaceState({}, "", "/#/graph");
+    window.history.replaceState({}, "", "/graph");
   });
 
   afterEach(() => {
@@ -138,12 +138,12 @@ describe("401 一次性闸门（I-2）：登录成功后复位", () => {
     stub401Adapter();
     const store = useUserStoreHook();
 
-    // 第一次会话过期：跳 /login?returnTo=
+    // 第一次会话过期：跳 /login?redirect=
     await expect(http.request("/v1/anything")).rejects.toMatchObject({
       status: 401
     });
     expect(redirectSpy).toHaveBeenCalledTimes(1);
-    expect(redirectSpy.mock.calls[0][0]).toMatch(/^#\/login\?returnTo=/);
+    expect(redirectSpy.mock.calls[0][0]).toMatch(/^\/login\?redirect=/);
 
     // 第二次 401（未登录中间没有登录成功）：闸门吞掉，不重复跳
     await expect(http.request("/v1/anything")).rejects.toMatchObject({
@@ -163,6 +163,6 @@ describe("401 一次性闸门（I-2）：登录成功后复位", () => {
       status: 401
     });
     expect(redirectSpy).toHaveBeenCalledTimes(2);
-    expect(redirectSpy.mock.calls[1][0]).toMatch(/^#\/login\?returnTo=/);
+    expect(redirectSpy.mock.calls[1][0]).toMatch(/^\/login\?redirect=/);
   });
 });

@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import ElementPlus from "element-plus";
 import { VueQueryPlugin } from "@tanstack/vue-query";
-import AlertBell from "@/views/utopia/alert-bell/index.vue";
+import AlertBell from "@/components/knowledge/alert-bell/index.vue";
 import { S } from "@/i18n";
 import type { AlertGroup } from "@/api/knowledge/types";
 

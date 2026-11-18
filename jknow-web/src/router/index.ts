@@ -52,6 +52,105 @@ export const constantRoutes = [
     component: () => import('@/views/error/404.vue'),
     hidden: true
   },
+  // ---- 知识图谱 kb 动态路由（P2 任务 3，V0100 component 前缀 jknow/knowledge/<域>/index）----
+  // hidden 不进菜单（菜单开启在 V0102/T4：若依 getRouters 的后端菜单树）；
+  // 页面渲染为独立整页（utopia 壳的顶栏/侧栏职责由页面内组件承担——
+  // sources-rail/kb-switcher），登录校验交若依 permission.ts 的 beforeEach。
+  {
+    path: "/kb/:kbId/graph",
+    component: () => import("@/views/jknow/knowledge/graph/index.vue"),
+    hidden: true
+  },
+  {
+    path: "/kb/:kbId/search",
+    component: () => import("@/views/jknow/knowledge/search/index.vue"),
+    hidden: true
+  },
+  {
+    path: "/kb/:kbId/ontology",
+    component: () => import("@/views/jknow/knowledge/ontology/index.vue"),
+    hidden: true
+  },
+  {
+    path: "/kb/:kbId/review",
+    component: () => import("@/views/jknow/knowledge/review/index.vue"),
+    hidden: true
+  },
+  {
+    path: "/kb/:kbId/settings",
+    component: () => import("@/views/jknow/knowledge/kb-settings/index.vue"),
+    hidden: true
+  },
+  {
+    path: "/kb/:kbId/chat/:conversationId?",
+    component: () => import("@/views/jknow/knowledge/chat/index.vue"),
+    hidden: true
+  },
+  {
+    path: "/kb/:kbId/docs",
+    component: () => import("@/views/jknow/knowledge/docs/index.vue"),
+    hidden: true
+  },
+  {
+    path: "/kb",
+    redirect: "/library",
+    hidden: true
+  },
+  // 旧路径接管（源仓 router/modules/utopia.ts 的 LegacyX 族）：/graph /search 这类
+  // 不带库的地址由 KbRedirect 兜底——等 useKbContext 解析出库再 replace 到
+  // /kb/:id/:page；/kb 的 redirect 目标 /library 也落在这组上。
+  {
+    path: "/graph",
+    component: () => import("@/components/knowledge/kb-redirect/index.vue"),
+    hidden: true
+  },
+  {
+    path: "/search",
+    component: () => import("@/components/knowledge/kb-redirect/index.vue"),
+    hidden: true
+  },
+  {
+    path: "/chat",
+    component: () => import("@/components/knowledge/kb-redirect/index.vue"),
+    hidden: true
+  },
+  {
+    path: "/library",
+    component: () => import("@/components/knowledge/kb-redirect/index.vue"),
+    hidden: true
+  },
+  {
+    path: "/ontology",
+    component: () => import("@/components/knowledge/kb-redirect/index.vue"),
+    hidden: true
+  },
+  {
+    path: "/mappings",
+    component: () => import("@/components/knowledge/kb-redirect/index.vue"),
+    hidden: true
+  },
+  {
+    path: "/review",
+    component: () => import("@/components/knowledge/kb-redirect/index.vue"),
+    hidden: true
+  },
+  {
+    path: "/kb-settings",
+    component: () => import("@/components/knowledge/kb-redirect/index.vue"),
+    hidden: true
+  },
+  // 内置文档页（源仓 remaining.ts：/docs → /docs/ingest 重定向 + slug 页；
+  // docs 页内导航目标在 /docs/:slug，/kb/:kbId/docs 入口渲染缺省首页）
+  {
+    path: "/docs",
+    redirect: "/docs/ingest",
+    hidden: true
+  },
+  {
+    path: "/docs/:slug",
+    component: () => import("@/views/jknow/knowledge/docs/index.vue"),
+    hidden: true
+  },
   {
     path: '/401',
     component: () => import('@/views/error/401.vue'),

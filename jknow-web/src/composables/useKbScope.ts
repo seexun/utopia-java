@@ -10,20 +10,8 @@ import { useQuery } from "@tanstack/vue-query";
 import { ApiError } from "@/api/knowledge/client";
 import { kbDetail } from "@/api/knowledge/kbs";
 import type { Kb } from "@/api/knowledge/types";
-// —— jknow T2 类型桩（源仓 @/store/modules/kb 属 pure-admin 基建，未随 T2 迁移；
-// T3 随 store 基建接线后还原为真实 import。桩面与 useKbContext.ts 保持一致）——
-interface KbContextStore {
-  kbId: string;
-  workspaceId: string;
-  kbDetail: Kb | null;
-  loading: boolean;
-  load(kbId: string): Promise<Kb | null>;
-  remember(kbId: string): void;
-  reset(): void;
-}
-const useKbContextHook: () => KbContextStore = () => {
-  throw new Error("T3 TODO：utopia pinia store（@/store/modules/kb）未随 T2 迁移");
-};
+// T3 接线：源仓 @/store/modules/kb 落位 src/store/knowledge/modules/kb
+import { useKbContextHook } from "@/store/knowledge/modules/kb";
 import { useKbContext } from "@/composables/useKbContext";
 
 export function useKbScope(): {

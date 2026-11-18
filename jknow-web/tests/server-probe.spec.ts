@@ -7,7 +7,7 @@ import { mount } from "@vue/test-utils";
 import { defineComponent, h } from "vue";
 import { QueryClient, VueQueryPlugin } from "@tanstack/vue-query";
 import { useServerProbe, SERVER_PROBE_MS } from "@/composables/useServerProbe";
-import { useShellStoreHook } from "@/store/modules/shell";
+import { useShellStoreHook } from "@/store/knowledge/modules/shell";
 import { ApiError } from "@/api/knowledge/client";
 
 const { healthMock } = vi.hoisted(() => ({ healthMock: vi.fn() }));

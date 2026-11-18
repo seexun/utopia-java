@@ -13,15 +13,8 @@ import { watch } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { health as healthApi } from "@/api/knowledge/admin";
 import { ApiError } from "@/api/knowledge/client";
-// —— jknow T2 类型桩（源仓 @/store/modules/shell 属 pure-admin 基建，未随 T2 迁移；
-// T3 随 store 基建接线后还原为真实 import）——
-interface ShellStore {
-  markServerDown(): void;
-  markAlive(): void;
-}
-const useShellStoreHook: () => ShellStore = () => {
-  throw new Error("T3 TODO：utopia shell store（@/store/modules/shell）未随 T2 迁移");
-};
+// T3 接线：源仓 @/store/modules/shell 落位 src/store/knowledge/modules/shell
+import { useShellStoreHook } from "@/store/knowledge/modules/shell";
 
 /** 探活周期。旧壳的隐式兜底约 5 分钟量级（query gc 后重挂载），这里取更明确的 60 秒 */
 export const SERVER_PROBE_MS = 60_000;

@@ -3,10 +3,10 @@ import { describe, it, expect, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { defineComponent, h } from "vue";
 import { VueQueryPlugin } from "@tanstack/vue-query";
-import { queryClient } from "@/store/query";
+import { queryClient } from "@/store/knowledge/query";
 import { useKbContext } from "@/composables/useKbContext";
-import { useKbContextHook } from "@/store/modules/kb";
-import { store as globalPinia } from "@/store";
+import { useKbContextHook } from "@/store/knowledge/modules/kb";
+import { store as globalPinia } from "@/store/knowledge";
 
 const { workspacesMock, kbsMock, kbCreateMock } = vi.hoisted(() => ({
   workspacesMock: vi.fn(),

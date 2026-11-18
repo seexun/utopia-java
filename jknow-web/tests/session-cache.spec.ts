@@ -2,8 +2,8 @@
 // （domain/queryDefaults.ts 头注的旧仓决定）。A 登出、B 登录后，
 // A 的库列表/告警未读等缓存键不允许残留。
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { queryClient } from "@/store/query";
-import { useUserStoreHook } from "@/store/modules/user";
+import { queryClient } from "@/store/knowledge/query";
+import { useUserStoreHook } from "@/store/knowledge/modules/user";
 
 const { loginMock, registerMock, logoutMock } = vi.hoisted(() => ({
   loginMock: vi.fn(),

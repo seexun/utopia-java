@@ -55,6 +55,8 @@ const particleCanvas = ref<HTMLCanvasElement | null>(null)
 
 let timer: any = null
 let animationId: any  = null
+// 粒子形状（T1 基线 TS7006 收口：draw 回调的 p 需要具形）
+interface Particle { x: number; y: number; r: number; dx: number; dy: number; alpha: number }
 let particles: any = []
 
 const onAvatarError = (e: Event) => {
@@ -119,7 +121,7 @@ const initParticles = () => {
   resize()
   window.addEventListener('resize', resize)
 
-  particles = Array.from({ length: 80 }, () => ({
+  particles = Array.from({ length: 80 }, (): Particle => ({
     x: Math.random() * canvas.width,
     y: Math.random() * canvas.height,
     r: Math.random() * 2 + 1,

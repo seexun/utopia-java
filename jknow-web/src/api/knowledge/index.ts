@@ -1,8 +1,9 @@
 // API 层出口：按域拆分的请求函数（对照旧仓 web/src/api.ts 的 api 对象逐函数搬运，
 // 仅把 fetch 收口换成 axios 基座）。页面按域 import，例如：
 //   import { graphOverview } from "@/api/knowledge/graph";
-// jknow T2 改造：auth.ts 不迁——登录/登出/当前用户走若依体系（@/api/login +
-// useUserStore），源仓 `export * from "./auth"` 及其 login/me 断点留给 T3 页面族。
+// jknow T3 落字：auth.ts 以适配层回归——导出面（函数名/返回形状）与源仓一致，
+// 实现映射若依端点（/getInfo、/login、/logout 等），见 auth.ts 头注。
+export * from "./auth";
 export * from "./client";
 export * from "./me";
 export * from "./workspaces";

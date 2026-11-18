@@ -2,8 +2,8 @@
 // 后端不可达（网络断/5xx/其他非 401）→ ensureMe 放行 + 置 shell store 标志；
 // 401 才是没登录。成功校验清位。
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { useUserStoreHook } from "@/store/modules/user";
-import { useShellStoreHook } from "@/store/modules/shell";
+import { useUserStoreHook } from "@/store/knowledge/modules/user";
+import { useShellStoreHook } from "@/store/knowledge/modules/shell";
 import { ApiError } from "@/api/knowledge/client";
 
 const { meMock } = vi.hoisted(() => ({ meMock: vi.fn() }));

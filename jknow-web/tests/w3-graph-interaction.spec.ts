@@ -8,8 +8,8 @@ import {
   proofIndentClass,
   PROOF_INDENT_CAP,
   type WalkedRow
-} from "../src/views/utopia/graph/proof";
-import type { ProofStep } from "../src/api/types";
+} from "@/views/jknow/knowledge/graph/proof";
+import type { ProofStep } from "@/api/knowledge/types";
 
 function step(
   id: string,

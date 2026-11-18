@@ -1,11 +1,11 @@
 /* W1 图谱页数据面（任务 5）：平行边扇开与时间过滤——旧仓 Graph.tsx 的两段
-   纯逻辑在 Vue 侧的语义钉（抽到 views/utopia/graph/parallel-edges.ts）。 */
+   纯逻辑在 Vue 侧的语义钉（抽到 views/jknow/knowledge/graph/parallel-edges.ts）。 */
 import { describe, it, expect } from "vitest";
 import {
   layOutParallelEdges,
   computeActiveAt,
   DAY_MS
-} from "@/views/utopia/graph/parallel-edges";
+} from "@/views/jknow/knowledge/graph/parallel-edges";
 import type { GraphEdge } from "@/api/knowledge/types";
 
 function edge(over: Partial<GraphEdge> & { id: string; source: string; target: string }): GraphEdge {
