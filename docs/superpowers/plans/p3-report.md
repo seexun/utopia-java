@@ -1,6 +1,6 @@
 # P3 报告：联调部署收官（jknow 迁移 · 阶段四 · 终章）
 
-分支 `p3-deploy`，基线 `9a32f70`（master），四任务五提交：`658997c`（计划）→ `db2249a` → `3db7233` → `8d2fcbc`/`a358194`/`1f5e704` → 本提交（文档终稿 + tag `p3-done`）。日期 2026-11-18。
+分支 `p3-deploy`，基线 `9a32f70`（master）。提交链（7+本轮）：`658997c`（计划）→ `db2249a`（T1）→ `3db7233`（T2）→ `8d2fcbc`/`a358194`/`1f5e704`（T3 三提交）→ `8d5d317`（T4 终稿）→ `77a74f1`（收口一：es-ik 入仓/热身 SQL 入档/口径校准）→ 本提交（收口二：README 照抄性收口）；tag `p3-done` 随终稿链强移至本提交。日期 2026-11-18。
 
 ## 一、四任务勾选表
 
@@ -138,4 +138,4 @@ VALUES ('0190d3e0-0000-7d5a-8000-0000000000f2', '0190d3e0-0000-7d5a-8000-0000000
 
 ## 八、复跑指引
 
-见 `README.md`（快速开始/部署要点/验证三节）：compose 三中间件 → `mvn install -q -DskipTests -pl jknow-admin -am` → 带 `JKNOW_ES_RECONCILE=1`（演示闭环另带 `JKNOW_JOBS_WORKER=true`）起后端 → seed-demo → `pnpm dev` → admin/admin123。冒烟注意 flushdb 与 SNAPSHOT 陷阱；全仓 mvn 前的共享库热身态见 §五-1。
+见 `README.md`（快速开始/部署要点/验证三节）：compose 三中间件 → `mvn install -q -DskipTests -pl jknow-admin -am` → 带 `JKNOW_ES_RECONCILE=1`（演示闭环另带 `JKNOW_JOBS_WORKER=true`）起后端 → seed-demo（**毕重启后端触发 ES 索引重建**）→ 改 vite baseUrl 指后端端口 → `pnpm dev` → admin/admin123。冒烟注意 flushdb 与 SNAPSHOT 陷阱，且 smoke-p1 的 seed 自足段跑毕会 teardown 演示数据（继续演示需重灌）；全仓 mvn 前的共享库热身态见 §五-1。

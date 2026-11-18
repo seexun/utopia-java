@@ -84,11 +84,14 @@ mvn install -q -DskipTests -pl jknow-admin -am        # 先刷新本地仓库（
 JKNOW_PG_PORT=15432 SERVER_PORT=19080 JKNOW_ES_RECONCILE=1 \
   mvn spring-boot:run -pl jknow-admin                  # 就绪后 http://localhost:19080/api/v1/health
 
-# 3) 演示数据（可选；幂等，固定 uuid）
+# 3) 演示数据（可选；幂等，固定 uuid；seed 直灌不过索引钩子）
 docker compose -f docker-compose.dev.yml exec -T pg psql -U postgres -d jknow \
   -v ON_ERROR_STOP=1 -q -f - < scripts/seed-demo.sql  # 回收用 scripts/teardown-demo.sql
+# seed 后重启后端（或起时加 --reindex）触发 ES 索引重建——检索路径不逐查对账，
+# 不重启则检索空结果（启动对账日志「全文索引是空的，从库里重建」为成功标志）
 
-# 4) 前端
+# 4) 前端（注意：vite 代理目标默认 8080，先改 jknow-web/vite.config.ts 的 baseUrl
+#    为 http://localhost:19080 再 dev——与上面步骤 2 的端口一致）
 cd jknow-web && pnpm install
 pnpm dev                                              # http://localhost（vite 代理到 baseUrl 后端）
 ```
@@ -105,7 +108,7 @@ pnpm dev                                              # http://localhost（vite 
   - `smoke-p0.sh` 若依面 20 断言（登录/菜单/CRUD/分页 date-range）——20/20；
   - `smoke-p1.sh` 业务面 67 PASS + 1 SKIP（LLM chat 面需 `JKNOW_LLM_API_KEY`+模型配置，条件断言）；含 seed 态明细 6 面自足段（seed→断言→teardown）；
   - `seed-demo.sql` / `teardown-demo.sql` 演示数据灌/收（幂等；见文件头注释的用户口径）。
-  - 注意：冒烟会 flushdb Redis（若依会话全失效）；spring-boot:run 前必须先 `mvn install`（SNAPSHOT 本地仓陷阱）。
+  - 注意：冒烟会 flushdb Redis（若依会话全失效）；smoke-p1 的 seed 自足段**跑毕会 teardown 演示数据**——继续演示需重灌 `seed-demo.sql`（P3 演练实况：跑完冒烟再走查前重灌一次）；spring-boot:run 前必须先 `mvn install`（SNAPSHOT 本地仓陷阱）。
 
 ## 验证
 
