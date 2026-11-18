@@ -6,7 +6,9 @@
 //     /kb 是纯重定向记录（→ /library）；
 //   - 旧路径族（/graph /search /chat /library /ontology /mappings /review
 //     /kb-settings）挂 KbRedirect 兜底组件（源仓 LegacyX 同构）；
-//   - /docs 是重定向记录（→ /docs/ingest，源仓 M-3 同款），slug 页有真组件。
+//   - /docs 是重定向记录（→ /docs/ingest，源仓 M-3 同款），slug 页有真组件；
+//   - 账户层 /account 族（shell+profile/my-kbs/tokens/admin，T5 收口）也是
+//     hidden 独立整页——user-menu/kb-switcher 的链接目标。
 // 登录校验统一交若依 permission.ts 的 beforeEach（未登录 → /login?redirect=）。
 import { describe, it, expect } from "vitest";
 import router, { constantRoutes } from "@/router";
@@ -83,5 +85,30 @@ describe("kb 动态路由在 constantRoutes（hidden 独立整页）", () => {
     // 10 个 /kb/:kbId/* + /kb 重定向 + 8 条旧路径（/kb-settings 同前缀只计一次）
     expect(kbRoutes.length).toBe(19);
     expect(kbRoutes.every(r => r.hidden === true)).toBe(true);
+  });
+});
+
+// 账户层路由（T5 收口）：kb 页顶栏 user-menu（个人资料/我的库/部署管理）与
+// kb-switcher「新建知识库」（/account/kbs?create=true）的链接目标。源仓
+// remaining.ts 的 AccountShell 族——独立整页壳（不经若依 Layout），子项绝对
+// 路径仍挂壳渲染（matched 链 = shell + 页面）。
+describe("账户层路由在 constantRoutes（AccountShell 独立整页）", () => {
+  const ACCOUNT_PAGES = ["/account", "/account/kbs", "/account/tokens", "/admin"];
+
+  it.each(ACCOUNT_PAGES)(
+    "%s 解析到 account 壳（matched 链长 2，壳 + 页面）",
+    path => {
+      const m = router.resolve({ path });
+      expect(m.matched).toHaveLength(2);
+      expect(m.matched[0].components?.default).toBeDefined();
+      expect(m.matched[1].components?.default).toBeDefined();
+    }
+  );
+
+  it("hidden 语义对齐：/account 父记录不进菜单", () => {
+    const r = routeOf("/account");
+    expect(r, "constantRoutes 缺 /account").toBeDefined();
+    expect(r!.hidden).toBe(true);
+    expect(r!.children?.length).toBe(4);
   });
 });

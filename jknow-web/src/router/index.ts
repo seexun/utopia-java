@@ -166,6 +166,45 @@ export const constantRoutes = [
     component: () => import("@/views/jknow/knowledge/docs/index.vue"),
     hidden: true
   },
+  // 账户层（源仓 router/modules/remaining.ts 的 AccountShell 族，T5 收口）：
+  // kb 页顶栏 user-menu（个人资料/我的库/部署管理）与 kb-switcher「新建知识库」
+  // （/account/kbs?create=true）的链接目标——T3 只迁了 account/admin 页面族未
+  // 注册路由，链接直落 404（T4 遗留交接项，走查实测确认后补）。独立整页
+  // （account/shell.vue 自带左侧导航壳），hidden 不进若依菜单；子项写绝对路径
+  // （源仓同构，vue-router 4 根路径子项仍挂壳渲染）。源仓 /admin 的
+  // meta.roles:['admin'] 守卫 403 闸不随迁——入口可见性由 user-menu 仅对
+  // is_admin 渲染兜底，后端面另有 @PreAuthorize 粗粒度权限闸（T4 挂载清单）。
+  {
+    path: "/account",
+    component: () => import("@/views/jknow/knowledge/account/shell.vue"),
+    hidden: true,
+    children: [
+      {
+        path: "/account",
+        name: "Account",
+        component: () => import("@/views/jknow/knowledge/account/profile.vue"),
+        hidden: true
+      },
+      {
+        path: "/account/kbs",
+        name: "AccountKbs",
+        component: () => import("@/views/jknow/knowledge/account/my-kbs.vue"),
+        hidden: true
+      },
+      {
+        path: "/account/tokens",
+        name: "AccountTokens",
+        component: () => import("@/views/jknow/knowledge/account/tokens.vue"),
+        hidden: true
+      },
+      {
+        path: "/admin",
+        name: "Admin",
+        component: () => import("@/views/jknow/knowledge/admin/index.vue"),
+        hidden: true
+      }
+    ]
+  },
   {
     path: '/401',
     component: () => import('@/views/error/401.vue'),
