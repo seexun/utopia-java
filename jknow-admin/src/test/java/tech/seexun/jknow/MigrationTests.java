@@ -116,6 +116,31 @@ class MigrationTests {
                 "select count(*) from sys_menu where (menu_id = 2200 and order_num = 1)"
                         + " or (menu_id = 2210 and order_num = 2) or (menu_id = 2220 and order_num = 3)"),
                 "工作台/知识管理/配置 order_num 应为 1/2/3（三组排系统菜单之前）");
+        // —— 树形挂边逐行钉死（审查 Important-1 加固）：C→M 与 F→C 的 per-row parent 映射 ——
+        // 区间 25 行全量 case（含 3 M 的 parent=0）；任何一行 parent 与期望不符即计数>0 变红
+        //（防错挂：如 2211 误挂 2200、2141 误挂 2211 这类计数面全对但挂边错的回归）。
+        // 期望：M 2200/2210/2220→0；C 2120→2200, 2202/2203→2200, 2211/2212/2213/2214→2210, 2221→2220；
+        //      F 2121/2122→2120, 2131/2132→2213, 2141/2142→2202, 2151/2152→2203,
+        //         2161/2162→2211, 2171/2172→2212, 2181/2182→2221。
+        assertEquals(0, queryInt(
+                "select count(*) from sys_menu m where m.menu_id between 2100 and 2299"
+                        + " and m.parent_id <> (case m.menu_id"
+                        + " when 2200 then 0 when 2210 then 0 when 2220 then 0"
+                        + " when 2120 then 2200 when 2202 then 2200 when 2203 then 2200"
+                        + " when 2211 then 2210 when 2212 then 2210 when 2213 then 2210 when 2214 then 2210"
+                        + " when 2221 then 2220"
+                        + " when 2121 then 2120 when 2122 then 2120"
+                        + " when 2131 then 2213 when 2132 then 2213"
+                        + " when 2141 then 2202 when 2142 then 2202"
+                        + " when 2151 then 2203 when 2152 then 2203"
+                        + " when 2161 then 2211 when 2162 then 2211"
+                        + " when 2171 then 2212 when 2172 then 2212"
+                        + " when 2181 then 2221 when 2182 then 2221 end)"),
+                "树形挂边逐行校验：区间 25 行 parent 应与期望映射完全一致（错挂行数应为 0）");
+        assertEquals(0, queryInt(
+                "select count(*) from sys_menu m where m.parent_id <> 0"
+                        + " and not exists (select 1 from sys_menu p where p.menu_id = m.parent_id)"),
+                "sys_menu 不应存在孤儿行（parent 指向不存在的菜单）");
         // F perms 面：工作空间 2 行退役后剩 14 行，perms 值应逐项取自 V0100 原 16 项集合
         //（permission 值面零变动；knowledge:workspace:* 仅菜单按钮行退役，@PreAuthorize 面不受影响）
         var fPerms = queryStrings(
