@@ -151,7 +151,7 @@ const switcherBorder = computed(() =>
       font-size: 15px;
       font-weight: 600;
       color: #fff;
-      background: var(--current-color, #409eff);
+      background: var(--current-color, var(--color-primary));
     }
   }
 }

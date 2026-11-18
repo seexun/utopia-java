@@ -635,7 +635,7 @@ onBeforeUnmount(() => {
   transition: all 0.2s;
   
   &:hover {
-    color: #409eff;
+    color: var(--color-primary);
     background: #ecf5ff;
   }
 }
@@ -661,7 +661,7 @@ onBeforeUnmount(() => {
     gap: 5px;
 
     .el-icon {
-      color: #409eff;
+      color: var(--color-primary);
       font-size: 16px;
     }
   }
@@ -683,7 +683,7 @@ onBeforeUnmount(() => {
   transition: all 0.2s;
 
   &:hover {
-    color: #409eff;
+    color: var(--color-primary);
     background: #ecf5ff;
   }
 }
@@ -727,11 +727,11 @@ onBeforeUnmount(() => {
 
   :deep(.el-tree-node.is-current > .el-tree-node__content) {
     background: #e6f0fd;
-    color: #409eff;
+    color: var(--color-primary);
     font-weight: 600;
 
     .node-icon {
-      color: #409eff !important;
+      color: var(--color-primary) !important;
     }
   }
 }

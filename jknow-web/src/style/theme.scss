@@ -484,3 +484,10 @@ html[data-theme="auroraGreen"] {
 .app-main {
   padding: 16px;
 }
+
+/* re-assert：gvdata.scss 顶层 .text-* 与 tailwind utilities 冲突——业务语义色以后者为准（终审 I1） */
+.text-primary { color: var(--color-primary); }
+.text-success { color: var(--color-success); }
+.text-warning { color: var(--color-warning); }
+.text-danger  { color: var(--color-danger); }
+.text-muted, .text-info { color: var(--color-ink-3); }

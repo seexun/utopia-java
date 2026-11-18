@@ -20,7 +20,7 @@
 ## 第 2 节：组件样式层迁移（anivia 体系）
 
 - **迁入 `jknow-web/src/assets/styles/gvdesign/`**（自 gvdata 原样拷贝+import 路径适配）：`anivia.scss`(1162)、`gvdata.scss`(517)、`btn.scss`(99)、`table-style-optimized.scss`(123)、`global.scss`(164)。
-- **同名合并（gvdata 版为准）**：`sidebar.scss`(383) 与 `theme.scss`(378)——jknow 的若依原版同名文件按 gvdata 版替换并 diff 记录合并点；`variables.module.scss` 菜单色对齐（`$base-menu-background: #001529`、light 态全套）；`index.scss` 装配序对齐 gvdata 的 index.scss（index→global→gvdesign 各件→btn→table→sidebar→theme→transition）。
+- **同名合并（gvdata 版为准）**：`sidebar.scss`(383) 与 `theme.scss`(378)——jknow 的若依原版同名文件按 gvdata 版替换并 diff 记录合并点；`variables.module.scss` 菜单色对齐（`$base-menu-background: #001529`、light 态全套）；`index.scss` 装配序对齐 gvdata 的 index.scss 实际源码序（variables→mixin→transition→element-ui→sidebar→btn→gvdata[+ruoyi 殿后]；anivia 在 main.ts 等位引入——以参照仓实际源码为准，原稿序号有误，2026-11-19 勘误）。
 - **冲突边界**：anivia 是全局 el 面向（系统页深度对齐）；utopia.scss/utopia-pages.css 保持 `.knowledge-page` scope 不破——业务页内 el 组件同步吃到 anivia 全局形态属**预期效果**（换肤打底）；tailwind utilities 与 anivia 类名零冲突（前缀体系不同，迁移时以 grep 验证）。
 - **样式文件职责单一**：gvdesign/ 各件保持 gvdata 原职责切分，不合并不改写（可 diff 对账）。
 
