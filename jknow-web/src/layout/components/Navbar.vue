@@ -116,7 +116,11 @@ function logout(): void {
     type: 'warning'
   }).then(() => {
     userStore.logOut().then(() => {
-      location.href = '/index'
+      // 首页直达链（menu-ia T2）：登出落点 '/'（原硬编码 '/index' 会把
+      // redirect=/index 带进登录回跳，下次登录落回若依默认首页而非当前库
+      // 图谱）。'/' 经无 token 守卫 → /login?redirect=/ → 登录 push '/' →
+      // 根记录 redirect /graph → KbRedirect 解析当前库。
+      location.href = '/'
     })
   }).catch(() => { })
 }

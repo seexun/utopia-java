@@ -21,12 +21,16 @@
         />
       </el-menu>
     </el-scrollbar>
+    <!-- 库切换器（menu-ia T2）：菜单区之下钉底（el-scrollbar 撑满剩余高，
+         组件自带折叠态/暗色样式，全员可见不加 v-hasRole） -->
+    <kb-switcher />
   </div>
 </template>
 
 <script setup lang="ts">
 import Logo from './Logo.vue'
 import SidebarItem from './SidebarItem.vue'
+import KbSwitcher from '@/components/knowledge/kb-switcher/index.vue'
 import variables from '@/assets/styles/variables.module.scss'
 import useAppStore from '@/store/modules/app'
 import useSettingsStore from '@/store/modules/settings'
@@ -70,8 +74,16 @@ const activeMenu = computed(() => {
 
 <style lang="scss" scoped>
 .sidebar-container {
+  display: flex;
+  flex-direction: column; // Logo/菜单区/切库器纵排，切库器钉底（menu-ia T2）
   background-color: v-bind(getMenuBackground);
-  
+
+  // 菜单滚动区吃掉剩余高（切库器恒在视口底部可见，不与其重叠）
+  > .el-scrollbar {
+    flex: 1;
+    min-height: 0;
+  }
+
   .scrollbar-wrapper {
     background-color: v-bind(getMenuBackground);
   }

@@ -233,10 +233,18 @@ export const constantRoutes = [
     component: () => import('@/views/error/401.vue'),
     hidden: true
   },
+  // 首页直达链（menu-ia T2，选型①）：'' 顶级记录（vue-router 等价 '/'）的
+  // redirect 由若依默认页 /index 改 /graph——落点走既有 KbRedirect 接管链
+  // （组件等 useKbContext 解析当前库后 replace /kb/{id}/graph），登录
+  // （login.vue push redirect || '/'）与 Logo 点击（to='/'）都汇到这条链。
+  // 不选②新增 {path:'/'} 记录：与这条 '' 记录同路径重复注册（''/'/' 都匹配
+  // 根），先注册者恒胜，新记录永不触发即死代码；permission.ts 也不生成首页
+  // （只拼 getRouters 后端菜单），改这里即全链生效。/index 子记录保留仍可
+  // 直达（若依默认首页不删）。
   {
     path: '',
     component: Layout,
-    redirect: '/index',
+    redirect: '/graph',
     children: [
       {
         path: '/index',
@@ -361,7 +369,7 @@ const router = createRouter({
 // kb 页组件只挂载一次，过渡只走一轮；解析不出回落 kb-entry 组件原逻辑
 // （等待页/8s 引导卡），workspace 菜单（原地渲染）不经此守卫。
 router.beforeEach(async to => {
-  if (to.path.startsWith('/knowledge/')) {
+  if (menuEntryPath(to.path)) {
     const target = await resolveKnowledgeMenuPath(to.path)
     if (target) {
       return { path: target, query: to.query, replace: true }
@@ -369,5 +377,18 @@ router.beforeEach(async to => {
   }
   return true
 })
+
+// 菜单入口前缀（menu-ia T2 走查修正）：V0103 三分组的 M 路径是
+// workbench / knowledge-mgmt / config——原守卫只认 V0100 的 /knowledge/*
+// 前缀，菜单点击全部回落 kb-entry 组件解析，实测在 AppMain
+// Transition(out-in) 下 2/3 卡空主区（URL 停在菜单路径、主区空白，即上方
+// 注释的 W1 缺陷本身）。守卫机制不动（resolveKnowledgeMenuPath 按路径
+// 末段解析的原样），只把触发面扩到 V0103 组路径；/knowledge/ 旧前缀保留
+// 兼容。末段不认识的路径（workspace 等）resolve 返回 null 照落组件兜底。
+const MENU_ENTRY_PREFIXES = ['/knowledge/', '/workbench/', '/knowledge-mgmt/', '/config/']
+
+function menuEntryPath(path: string): boolean {
+  return MENU_ENTRY_PREFIXES.some(p => path.startsWith(p))
+}
 
 export default router

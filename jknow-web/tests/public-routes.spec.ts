@@ -155,3 +155,29 @@ describe("账户层路由在 constantRoutes 的 Layout children（去壳化容�
     expect(shellRec!.children!.every(c => c.hidden === true)).toBe(true);
   });
 });
+
+// 首页直达链（menu-ia T2 步骤 1，选型①）：'' 顶级记录（vue-router 里等价 '/'）
+// redirect 改指 /graph，登录（push redirect || '/'）与 Logo 点击（to='/'）由此
+// 进入 KbRedirect 接管链 → /kb/{当前库}/graph。②新增 {path:'/'} 落选：与 ''
+// 同路径重复注册、先注册者恒胜。/index 若依默认首页记录保留仍可直达。
+describe("首页直达链（'' 根记录 redirect → /graph）", () => {
+  it("'' 顶级记录 redirect → /graph（不新增 '/' 重复记录）", () => {
+    const root = constantRoutes.find(r => r.path === "");
+    expect(root, "constantRoutes 缺 '' 根记录").toBeDefined();
+    expect(String(root!.redirect)).toBe("/graph");
+    // 落选方案②不得回流：同路径两条根记录 = 注册序遮蔽 bug
+    expect(
+      constantRoutes.filter(r => r.path === "" || r.path === "/"),
+      "根路径记录应唯一（''/ '/' 二选一）"
+    ).toHaveLength(1);
+  });
+
+  it("链尾在位：/graph → /kb/:kbId/graph 两条腿都能解析", () => {
+    const legacy = router.resolve({ path: "/graph" });
+    expect(legacy.matched).toHaveLength(1);
+    expect(legacy.matched[0].components?.default).toBeDefined();
+    const kb = router.resolve({ path: "/kb/k1/graph" });
+    expect(kb.matched).toHaveLength(2);
+    expect(kb.matched[0].path).toBe("/kb");
+  });
+});
