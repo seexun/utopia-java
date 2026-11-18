@@ -1,0 +1,14 @@
+# 备选：仅起 ES-IK 单节点（pg/redis 由 docker-compose.dev.yml 或其他方式提供）。
+# 若宿主 9200 端口被他人占用，将下方 es.ports 中 "9200:9200" 改为 "19200:9200"，
+# 并以环境变量 JKNOW_ES_URL=http://localhost:19200 覆盖后端默认 ES 地址。
+services:
+  es:
+    image: utopia-es-ik:8.14.3
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports: ["9200:9200", "9300:9300"]
+    volumes: [jknow-es-data:/usr/share/elasticsearch/data]
+volumes:
+  jknow-es-data:
