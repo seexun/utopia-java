@@ -1,4 +1,386 @@
-/* 亮白色 */
+/**
+ * 全局主题层 —— 企业科技感 SaaS Light（对齐 10_jsj_template 规范）
+ * 依赖 tokens.scss（在 main.js 中先于本文件引入）。
+ * 本文件在所有全局样式（含 anivia.scss）之后加载，作为最终视觉基准：
+ * - 页面样式只引用 --color-* / --el-* token，禁止硬编码色值
+ * - 三级圆角：卡片 12px / 控件 8px / 胶囊 999px；双层阴影：卡片 --shadow-card、浮层 --shadow-pop
+ * - 状态一律 .badge-soft-*（soft 浅底 + 深色同系字），不用彩色实心 tag
+ */
+
+/* ===== 滚动条 ===== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--el-border-color-darker);
+  border-radius: 20px;
+}
+
+/* ===== 顶部加载进度条 ===== */
+#nprogress .bar {
+  background: var(--el-color-primary) !important;
+}
+#nprogress .spinner-icon {
+  border-top-color: var(--el-color-primary) !important;
+  border-left-color: var(--el-color-primary) !important;
+}
+
+/* ===== 通用卡片（页面标配容器）===== */
+.card {
+  box-sizing: border-box;
+  padding: 20px;
+  overflow-x: hidden;
+  background-color: var(--el-bg-color);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+/* ===== 状态徽标：soft 浅底 + 深色同系字（对比度 ≥ 4.5:1）===== */
+.badge-soft {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  border-radius: var(--radius-full);
+
+  &.badge-soft-primary {
+    color: var(--color-primary-text);
+    background: var(--color-primary-soft);
+  }
+  &.badge-soft-success {
+    color: var(--color-success-text);
+    background: var(--color-success-soft);
+  }
+  &.badge-soft-warning {
+    color: var(--color-warning-text);
+    background: var(--color-warning-soft);
+  }
+  &.badge-soft-danger {
+    color: var(--color-danger-text);
+    background: var(--color-danger-soft);
+  }
+  &.badge-soft-info {
+    color: var(--color-ink-2);
+    background: var(--color-neutral-soft);
+  }
+}
+
+/* ===== 统计卡条（4 列，窄屏降 2 列）===== */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+
+  @media (width <= 1200px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ===== el-table：分隔线风格，表头 13px/600 浅灰底，行高 45px ===== */
+.el-table {
+  --el-table-header-bg-color: var(--color-neutral-soft);
+  --el-table-header-text-color: var(--color-ink-2);
+  --el-table-row-hover-bg-color: var(--el-fill-color-lighter);
+  --el-table-border-color: var(--el-border-color-lighter);
+
+  .el-table__header th {
+    height: 45px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-ink-2);
+    background: var(--color-neutral-soft);
+  }
+
+  .el-table__row {
+    font-size: 14px;
+  }
+}
+
+/* 全站表格统一为分隔线风格（与示例一致）：中和存量页面 stripe 属性的斑马纹底色，
+   stripe 属性保留但不再产生隔行变色；行 hover 高亮不受影响（EP hover 规则加载顺序在后） */
+.el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
+  background: var(--el-bg-color);
+}
+
+/* ===== 单滚动模型（与示例页一致）=====
+   页面内容保持自然高度，所有中间层（el-main/容器）不产生滚动；
+   纵向滚动只由布局层 .app-main-inner 一条滚动条承担，杜绝任何窗口高度下的双滚动条 */
+.app-main-inner > .app-container .el-main {
+  overflow: visible;
+  /* el-main 是 el-container 的 flex 子项：去掉 EP 默认的 overflow:auto 后，
+     min-width 会回到 auto（由内容决定），宽表（固定列宽合计大）会把内容区
+     顶出视口，fixed:right 操作列随之跑到屏幕外。归零允许其收缩到剩余空间，
+     列溢出改由 el-table 自身的横向滚动条承担 */
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ===== 内容不足一屏时撑满视口 =====
+   左树+右表的页面内容只有自然高度，视口余下部分露出大片底色。
+   让容器纵向排布、树表容器与表格卡片伸展到占满剩余高度 */
+.app-main-inner {
+  display: flex;
+  flex-direction: column;
+}
+/* 页角说明图标：脱离文档流钉在右上角（flex 纵向布局里它会占一行高度，
+   把整页内容顶出视口造成细小滚动条） */
+.app-main-inner > .app-container > .guide-tip-fab {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  float: none;
+}
+.app-main-inner > .app-container {
+  position: relative;
+}
+/* 左侧树内容超高时树面板内部滚动，页面不出滚动条 */
+.app-main-inner .left-tree {
+  overflow-y: auto;
+}
+.app-main-inner > .app-container {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+}
+.app-main-inner > .app-container > .el-container {
+  flex: 1;
+  min-height: 0;
+}
+.app-main-inner > .app-container > .el-container > .el-aside .left-tree {
+  height: 100%;
+}
+.app-main-inner > .app-container > .el-container > .el-main {
+  display: flex;
+  flex-direction: column;
+}
+.app-main-inner > .app-container > .el-container > .el-main > .qt-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.app-main-inner > .app-container > .el-container > .el-main > .qt-wrap > .qt-wrap--content {
+  flex: 1;
+  min-height: 0;
+}
+/* 无左树的平铺页（搜索条+表格卡直接挂在容器下）同样撑满 */
+.app-main-inner > .app-container > .qt-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.app-main-inner > .app-container > .qt-wrap > .qt-wrap--content {
+  flex: 1;
+  min-height: 0;
+}
+
+/* 页签容器页（成员角色等）：tabs 占满剩余高度，页签内容继续走 pagecont 模型 */
+.app-main-inner > .app-container > .el-tabs {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.app-main-inner > .app-container > .el-tabs > .el-tabs__header {
+  flex-shrink: 0;
+}
+.app-main-inner > .app-container > .el-tabs > .el-tabs__content {
+  flex: 1;
+  min-height: 0;
+}
+.app-main-inner > .app-container > .el-tabs > .el-tabs__content > .el-tab-pane {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== pagecont 旧版页面家族：与 qt-wrap 相同的撑满+表格内滚模型 =====
+   覆盖 pagecont-top（搜索）+ pagecont-bottom(s)（表格卡+分页）结构的标准登记/
+   数据连接/资产地图/规则/服务等页面 */
+.app-main-inner .pagecont-bottom,
+.app-main-inner [class*="pagecont-bottoms"] {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.app-main-inner .pagecont-bottom .page-list,
+.app-main-inner [class*="pagecont-bottoms"] .page-list {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  /* 卡片网格页（标准检索/资产地图）：卡片多于可用空间时列表内部滚动 */
+  overflow-y: auto;
+}
+.app-main-inner .pagecont-bottom .el-table,
+.app-main-inner [class*="pagecont-bottoms"] .el-table {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.app-main-inner .pagecont-bottom .el-table .el-table__inner-wrapper,
+.app-main-inner [class*="pagecont-bottoms"] .el-table .el-table__inner-wrapper {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.app-main-inner .pagecont-bottom .el-table .el-table__body-wrapper,
+.app-main-inner [class*="pagecont-bottoms"] .el-table .el-table__body-wrapper {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.app-main-inner .pagecont-bottom .pagination-container,
+.app-main-inner [class*="pagecont-bottoms"] .pagination-container {
+  flex-shrink: 0;
+}
+
+/* ===== 表格为弹性滚动区 =====
+   视口充足时表格伸展（无滚动条）；视口偏矮时表格收缩、由表体内部滚动，
+   页面本身不再出现滚动条，分页保持可见 */
+.app-main-inner .qt-wrap--content {
+  display: flex;
+  flex-direction: column;
+}
+.app-main-inner .qt-wrap--main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.app-main-inner .qt-table {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.app-main-inner .qt-table .qt-table--main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.app-main-inner .qt-table .qt-table--pagination {
+  flex-shrink: 0;
+}
+.app-main-inner .qt-table .el-table {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.app-main-inner .qt-table .el-table .el-table__inner-wrapper {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.app-main-inner .qt-table .el-table .el-table__header-wrapper {
+  flex-shrink: 0;
+}
+.app-main-inner .qt-table .el-table .el-table__body-wrapper {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ===== el-dialog：卡片圆角 + 浮层阴影 + 头部分割线 ===== */
+.el-dialog {
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-pop);
+
+  .el-dialog__header {
+    padding: 15px 20px;
+    margin: 0;
+    border-bottom: 1px solid var(--el-border-color-lighter);
+
+    .el-dialog__title {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--color-ink);
+    }
+  }
+
+  .el-dialog__body,
+  .el-dialog__footer {
+    padding: 15px 20px;
+  }
+}
+
+/* ===== el-drawer：头/底部分割线 ===== */
+.el-drawer {
+  .el-drawer__header {
+    padding: 16px 20px;
+    margin-bottom: 0;
+    border-bottom: 1px solid var(--el-border-color-lighter);
+
+    span {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--el-text-color-primary);
+    }
+  }
+
+  .el-drawer__footer {
+    border-top: 1px solid var(--el-border-color-lighter);
+  }
+}
+
+/* ===== 输入控件 focus 光晕 ===== */
+.el-input__wrapper.is-focus,
+.el-select__wrapper.is-focused {
+  box-shadow:
+    0 0 0 1px var(--color-primary) inset,
+    0 0 0 3px var(--color-primary-glow) !important;
+}
+.el-textarea__inner:focus {
+  box-shadow:
+    0 0 0 1px var(--color-primary) inset,
+    0 0 0 3px var(--color-primary-glow) !important;
+}
+
+/* ===== el-alert 带边框 ===== */
+.el-alert {
+  border: 1px solid;
+}
+
+/* ===== 动效降级 ===== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* main-container 转 flex column：app-main 的 margin-top 不再与父级折叠，
+   配合 app-main flex:1 精确占满固定容器（消除底部溢出空带） */
+.main-container {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== jknow 业务主题层保留段（同名合并追加，2026-11-18）=====
+   本文件主体为 gvdata 版全局主题层（378 行原文）。以下为 jknow 原版 theme.scss
+   的 8 个 data-theme 侧栏品牌色板（utopia.scss 消费 --pure-theme-*）；
+   light 块 active 指示条沿用 T1 的令牌化改法 var(--color-primary)。 */
 html[data-theme="light"] {
   --pure-theme-sub-menu-active-text: #000000d9;
   --pure-theme-menu-bg: #fff;
@@ -93,4 +475,12 @@ html[data-theme="auroraGreen"] {
   --pure-theme-sidebar-logo: #112f21;
   --pure-theme-menu-title-hover: #fff;
   --pure-theme-menu-active-before: #60ac80;
+}
+
+/* ===== jknow 壳对齐垫片（2026-11-18）=====
+   gvdata 的页面留白由壳的 .app-main-inner（padding:16px）提供，anivia.scss 的
+   .app-container{margin:0;padding:0} 以其为前提；jknow 壳无 .app-main-inner
+   包裹层（router-view 直出 .app-container），留白改由 .app-main 等位提供。 */
+.app-main {
+  padding: 16px;
 }

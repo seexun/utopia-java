@@ -1,11 +1,21 @@
-@use './variables.module.scss' as vars;
+/* 壳对齐（2026-11-18）：主体为 gvdata 版 sidebar.scss 原文（383 行，token 化浅色侧栏/
+   flex 纵向弹性/sidebar-foot 钉底），仅做两处必要适配 + 追加 jknow 壳特有段：
+   1) 头部 @use as *（jknow 装配为 @use 体系，gvdata 靠 index.scss 的 @import 泄漏
+      $base-menu-* 不适用）；
+   2) mobile hideSidebar 的 translate3d(-var(...)) 为 gvdata 原文无效写法，改
+      calc(-1 * var(...))（jknow mobile 抽屉行为保持）；
+   3) 尾部追加：has-logo calc（jknow Logo 50px）与 theme-dark/theme-light 容器块
+      （jknow 壳 --current-color 换色跟随；fallback 已对齐 #2563eb）。
+   舍弃的 jknow 侧改动（让位 gvdata 观感）：菜单 44px 行高、svg-icon 10px 边距、
+   hideSidebar 54px、box-shadow 0-0-8px——详见任务报告合并点清单。 */
+@use './variables.module.scss' as *;
 
 #app {
 
   .main-container {
-    min-height: 100%;
+    height: 100%;
     transition: margin-left .28s;
-    margin-left: vars.$base-sidebar-width;
+    margin-left: var(--base-sidebar-width);
     position: relative;
   }
 
@@ -14,10 +24,15 @@
   }
 
   .sidebar-container {
+    -webkit-transition: width .28s;
     transition: width 0.28s;
-    width: vars.$base-sidebar-width !important;
+    width: var(--base-sidebar-width) !important;
+    background-color: $base-menu-background;
     height: 100%;
     position: fixed;
+    /* 纵向弹性：logo 顶部固定、菜单区撑满剩余高度、底部工具/状态区钉底不随菜单滚动 */
+    display: flex;
+    flex-direction: column;
     font-size: 0px;
     top: 0;
     bottom: 0;
@@ -25,7 +40,7 @@
     z-index: 1001;
     overflow: hidden;
     -webkit-box-shadow: 2px 0 6px rgba(0,21,41,.35);
-    box-shadow: 0px 0px 8px 0px rgba(0, 0, 0, 0.1);
+    box-shadow: 2px 0 6px rgba(0,21,41,.35);
 
     // reset element-ui css
     .horizontal-collapse-transition {
@@ -41,13 +56,8 @@
     }
 
     .el-scrollbar {
-      height: 100%;
-    }
-
-    &.has-logo {
-      .el-scrollbar {
-        height: calc(100% - 50px);
-      }
+      flex: 1 1 0;
+      min-height: 0;
     }
 
     .is-horizontal {
@@ -61,7 +71,7 @@
     }
 
     .svg-icon {
-      margin-right: 10px !important;
+      margin-right: 12px;
     }
 
     .el-menu {
@@ -74,8 +84,6 @@
       overflow: hidden !important;
       text-overflow: ellipsis !important;
       white-space: nowrap !important;
-      height: 44px !important;
-      line-height: 44px !important;
     }
 
     .el-menu-item .el-menu-tooltip__trigger {
@@ -84,126 +92,137 @@
 
     // menu hover
     .sub-menu-title-noDropdown,
-    .el-sub-menu__title {
+    .el-sub-menu__title ,.submenu-title-noDropdown {
       &:hover {
-        background-color: rgba(0, 0, 0, 0.06);
+        background-color: rgba(0, 0, 0, 0.00) !important;
+        color: #ffffff;
       }
     }
 
     & .theme-dark .is-active > .el-sub-menu__title {
-      color: vars.$base-menu-color-active !important;
+      color: $base-menu-color-active !important;
+      background-color: $base-menu-color-sub-active !important;
     }
 
     & .nest-menu .el-sub-menu>.el-sub-menu__title,
     & .el-sub-menu .el-menu-item {
-      min-width: vars.$base-sidebar-width !important;
+      min-width: var(--base-sidebar-width) !important;
 
       &:hover {
-        background-color: rgba(0, 0, 0, 0.06);
+        //background-color: rgba(0, 0, 0, 0.06) !important;
       }
     }
 
     & .theme-dark .nest-menu .el-sub-menu>.el-sub-menu__title,
     & .theme-dark .el-sub-menu .el-menu-item {
-      background-color: vars.$base-sub-menu-background;
+      //background-color: $base-sub-menu-background !important;
 
       &:hover {
-        background-color: vars.$base-sub-menu-hover !important;
+        color: #ffffff;
+        //background-color: $base-sub-menu-hover !important;
       }
     }
 
-    // theme-dark 深色主题
-    &.theme-dark {
-      box-shadow: 2px 0 8px rgba(0, 0, 0, 0.4);
-      border-right: none;
-
-      .el-menu-item.is-active {
-        position: relative;
-
-        &::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background-color: var(--current-color-dark-bg, rgba(64, 158, 255, 0.2));
-          pointer-events: none;
-          z-index: 1;
-        }
-      }
-
-      .el-sub-menu.is-active > .el-sub-menu__title {
-        color: var(--current-color, #409eff) !important;
-      }
-
-      .el-menu-item:not(.is-active),
-      .submenu-title-noDropdown,
-      .el-sub-menu__title {
-        position: relative;
-
-        &::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background-color: transparent;
-          pointer-events: none;
-          z-index: 1;
-          transition: background-color 0.2s;
-        }
-
-        &:hover::before {
-          background-color: var(--current-color-dark-bg, rgba(64, 158, 255, 0.2));
-        }
+    & .theme-dark .nest-menu .el-sub-menu>.el-sub-menu__title,
+    & .theme-dark .el-sub-menu .el-menu-item {
+      &:hover span {
+        color: #ffffff;
       }
     }
-    
-    // theme-light 浅色主题
-    &.theme-light {
-      border-right: 1px solid #e8eaf0;
-      box-shadow: none;
+    & .theme-dark .el-sub-menu.is-active {
+      background-color: #0c2135 !important;
+    }
 
-      .el-menu-item,
-      .el-sub-menu__title {
-        color: rgba(0, 0, 0, 0.65);
-      }
+    // 底部工具/状态区：flex-shrink 0 钉底，不随菜单滚动顶出视口
+    .sidebar-foot {
+      flex-shrink: 0;
+      font-size: 12px;
+      padding: 8px 10px 10px;
 
-      .el-menu-item.is-active {
-        color: var(--current-color, #409eff) !important;
-        position: relative;
-
-        &::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background-color: var(--current-color-light, #ecf5ff);
-          pointer-events: none;
-          z-index: 1;
-        }
-      }
-
-      .el-sub-menu.is-active > .el-sub-menu__title {
-        color: var(--current-color, #409eff) !important;
-      }
-
-      .el-menu-item:not(.is-active):hover,
-      .submenu-title-noDropdown:hover,
-      .el-sub-menu__title:hover {
-        background-color: #f5f7fa;
-        color: rgba(0, 0, 0, 0.85) !important;
-      }
-
-      .nest-menu .el-sub-menu > .el-sub-menu__title,
-      .el-sub-menu .el-menu-item {
-        background-color: #fafafa;
+      .foot-toggle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 36px;
+        padding: 0 10px;
+        border-radius: var(--radius-ctl);
+        cursor: pointer;
+        color: var(--color-ink-2);
+        transition: background-color var(--transition-base), color var(--transition-base);
 
         &:hover {
-          background-color: #f0f5ff;
+          background-color: var(--color-neutral-soft);
+          color: var(--color-ink);
         }
+
+        .el-icon {
+          font-size: 14px;
+          flex-shrink: 0;
+        }
+
+        .label {
+          flex: 1;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          text-align: left;
+        }
+      }
+
+      .foot-status {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 8px;
+        padding: 0 10px;
+        font-size: 11px;
+        color: var(--color-ink-3);
+
+        .dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: #22c55e;
+          flex-shrink: 0;
+        }
+
+        .ver {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+      }
+    }
+
+    // 深色主题下底部区配色（浅色 token 换成暗底可读色）
+    &:not(.sidebar-light) .sidebar-foot {
+      .foot-toggle {
+        color: rgba(255, 255, 255, .65);
+
+        &:hover {
+          background-color: rgba(255, 255, 255, .08);
+          color: #ffffff;
+        }
+      }
+
+      .foot-status {
+        color: rgba(255, 255, 255, .45);
       }
     }
   }
 
+  .el-submenu.is-opened > .el-submenu__title .el-submenu__icon-arrow {
+    color: #ffffff!important;
+  }
+
   .hideSidebar {
     .sidebar-container {
-      width: 54px !important;
+      width: 60px !important;
+    }
+
+    // 侧栏折叠过窄（60px 图标栏）：文字放不下，底部工具/状态区整体隐藏，展开入口仍在顶部汉堡按钮
+    .sidebar-foot {
+      display: none;
     }
 
     .main-container {
@@ -259,7 +278,7 @@
   }
 
   .el-menu--collapse .el-menu .el-sub-menu {
-    min-width: vars.$base-sidebar-width !important;
+    min-width: var(--base-sidebar-width) !important;
   }
 
   // mobile responsive
@@ -270,14 +289,14 @@
 
     .sidebar-container {
       transition: transform .28s;
-      width: vars.$base-sidebar-width !important;
+      width: var(--base-sidebar-width) !important;
     }
 
     &.hideSidebar {
       .sidebar-container {
         pointer-events: none;
         transition-duration: 0.3s;
-        transform: translate3d(-(vars.$base-sidebar-width), 0, 0);
+        transform: translate3d(calc(-1 * var(--base-sidebar-width)), 0, 0);
       }
     }
   }
@@ -303,14 +322,15 @@
   .el-menu-item {
     &:hover {
       // you can use $sub-menuHover
-      background-color: rgba(0, 0, 0, 0.06) !important;
+      color: var(--color-ink);
+      background-color: var(--color-neutral-soft) !important;
     }
   }
 
   // the scroll bar appears when the sub-menu is too long
   >.el-menu--popup {
     max-height: 100vh;
-    overflow-y: auto;
+    overflow-y: hidden;
 
     &::-webkit-scrollbar-track-piece {
       background: #d3dce6;
@@ -323,6 +343,152 @@
     &::-webkit-scrollbar-thumb {
       background: #99a9bf;
       border-radius: 20px;
+    }
+  }
+}
+
+/* ===== 浅色侧栏（企业科技感 SaaS Light）：白底、右分割线、菜单项 40px/圆角 8px ===== */
+#app .sidebar-container.sidebar-light {
+  box-shadow: none;
+  border-right: 1px solid var(--color-border);
+
+  .theme-light {
+    .el-menu-item,
+    .el-sub-menu__title {
+      height: 40px;
+      line-height: 40px;
+      margin: 2px 8px;
+      border-radius: var(--radius-ctl);
+      transition: background-color var(--transition-base), color var(--transition-base);
+
+      &:hover {
+        background-color: var(--color-neutral-soft) !important;
+        color: var(--color-ink) !important;
+      }
+    }
+
+    // 二级菜单项宽度不撑破带 margin 的圆角容器
+    .nest-menu .el-sub-menu > .el-sub-menu__title,
+    .el-sub-menu .el-menu-item {
+      min-width: 0 !important;
+    }
+
+    .el-menu-item.is-active {
+      background-color: var(--color-primary-soft) !important;
+      color: var(--color-primary) !important;
+      font-weight: 700;
+    }
+
+    .el-sub-menu.is-active > .el-sub-menu__title {
+      color: var(--color-primary) !important;
+    }
+
+    // 一级分组标题（el-sub-menu 的 title 区分于二级项）
+    .el-sub-menu .el-sub-menu__title {
+      font-weight: 600;
+      color: var(--color-ink-2);
+    }
+
+    // 分组展开弹层与内嵌列表中的项与二级项同形态：
+    // 高度/行高/margin/圆角已由上方 .el-menu-item, .el-sub-menu__title 基础规则覆盖，不重复声明
+  }
+}
+
+/* ===== jknow 壳特有段（合并保留，见文件头注）===== */
+#app .sidebar-container {
+
+  // Logo（50px）与菜单区为兄弟节点：无 flex 兜底的浏览器里保持原 calc 行为
+  &.has-logo {
+    .el-scrollbar {
+      height: calc(100% - 50px);
+    }
+  }
+
+  // theme-dark 深色主题（--current-color 换色跟随：Settings 抽屉改主色后选中态同步）
+  &.theme-dark {
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.4);
+    border-right: none;
+
+    .el-menu-item.is-active {
+      position: relative;
+
+      &::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-color: var(--current-color-dark-bg, rgba(37, 99, 235, 0.2));
+        pointer-events: none;
+        z-index: 1;
+      }
+    }
+
+    .el-sub-menu.is-active > .el-sub-menu__title {
+      color: var(--current-color, #2563eb) !important;
+    }
+
+    .el-menu-item:not(.is-active),
+    .submenu-title-noDropdown,
+    .el-sub-menu__title {
+      position: relative;
+
+      &::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-color: transparent;
+        pointer-events: none;
+        z-index: 1;
+        transition: background-color 0.2s;
+      }
+
+      &:hover::before {
+        background-color: var(--current-color-dark-bg, rgba(37, 99, 235, 0.2));
+      }
+    }
+  }
+
+  // theme-light 浅色主题（--current-color 换色跟随）
+  &.theme-light {
+    border-right: 1px solid var(--color-border, #e8eaf0);
+    box-shadow: none;
+
+    .el-menu-item,
+    .el-sub-menu__title {
+      color: rgba(0, 0, 0, 0.65);
+    }
+
+    .el-menu-item.is-active {
+      color: var(--current-color, #2563eb) !important;
+      position: relative;
+
+      &::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-color: var(--current-color-light, #ecf5ff);
+        pointer-events: none;
+        z-index: 1;
+      }
+    }
+
+    .el-sub-menu.is-active > .el-sub-menu__title {
+      color: var(--current-color, #2563eb) !important;
+    }
+
+    .el-menu-item:not(.is-active):hover,
+    .submenu-title-noDropdown:hover,
+    .el-sub-menu__title:hover {
+      background-color: var(--color-neutral-soft, #f5f7fa);
+      color: rgba(0, 0, 0, 0.85) !important;
+    }
+
+    .nest-menu .el-sub-menu > .el-sub-menu__title,
+    .el-sub-menu .el-menu-item {
+      background-color: var(--el-bg-color, #fafafa);
+
+      &:hover {
+        background-color: var(--color-primary-soft, #f0f5ff);
+      }
     }
   }
 }

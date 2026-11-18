@@ -8,31 +8,33 @@ $tiffany: #4AB7BD;
 $yellow: #FEC171;
 $panGreen: #30B08F;
 
-// 默认主题变量
-$menuText: #bfcbd9;
-$menuActiveText: #409eff;
-$menuBg: #1a1f2e;
-$menuHover: #263445;
+// 默认主题变量（2026-11-18 壳对齐：菜单色对齐 gvdata 版 variables.module.scss，
+// 深底 #001529 / 激活 #2563eb；$menuHover/#ffffffb3 等值随 gvdata 观感）
+$menuText: #ffffffb3;
+$menuActiveText: #2563eb;
+$menuBg: #001529;
+$menuHover: rgba(255, 255, 255, 0.08);
 
-// 浅色主题theme-light
+// 浅色主题theme-light（light 态全套对齐 gvdata：浅底/中性 hover/70% 墨字）
 $menuLightBg: #ffffff;
-$menuLightHover: #f0f1f5;
-$menuLightText: #303133;
-$menuLightActiveText: #409EFF;
+$menuLightHover: var(--color-neutral-soft);
+$menuLightText: rgba(0, 0, 0, 0.7);
+$menuLightActiveText: #2563eb;
 
 // 基础变量
 $base-sidebar-width: 200px;
 $sideBarWidth: 200px;
 
-// 菜单暗色变量
-$base-menu-color: rgba(255,255,255,.65);
-$base-menu-color-active: #ffffff;
-$base-menu-background: #1a1f2e;
-$base-sub-menu-background: #141824;
-$base-sub-menu-hover: rgba(255,255,255,.06);
+// 菜单暗色变量（gvdata 版若依经典名同值：#001529 底 / 透明子菜单层）
+$base-menu-color: #ffffffb3;
+$base-menu-color-active: #fff;
+$base-menu-color-sub-active: rgba(38, 102, 251, 0);
+$base-menu-background: #001529;
+$base-sub-menu-background: rgba(0, 130, 255, 0);
+$base-sub-menu-hover: rgba(12, 33, 53, 0);
 
 // 组件变量
-$--color-primary: #409EFF;
+$--color-primary: #2563EB;
 $--color-success: #67C23A;
 $--color-warning: #E6A23C;
 $--color-danger: #F56C6C;
@@ -71,6 +73,8 @@ $--color-info: #909399;
   --sidebar-bg: #{$menuBg};
   --sidebar-text: #{$menuText};
   --menu-hover: #{$menuHover};
+  /* 侧栏宽度 CSS 化（gvdata 版 sidebar.scss 以 var(--base-sidebar-width) 取值） */
+  --base-sidebar-width: #{$base-sidebar-width};
   
   --navbar-bg: #ffffff;
   --navbar-text: #303133;
@@ -227,11 +231,11 @@ html.dark {
     &:not(.tags-view-container--chrome) .tags-view-wrapper .tags-view-item.active {
       background-color: var(--tags-card-active-bg) !important;
       border-color: var(--tags-card-active-border) !important;
-      color: var(--current-color, #409eff) !important;
+      color: var(--current-color, #2563eb) !important;
       box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
 
       &::before {
-        background: var(--current-color, #409eff) !important;
+        background: var(--current-color, #2563eb) !important;
       }
     }
   }

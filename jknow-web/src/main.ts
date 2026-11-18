@@ -46,12 +46,16 @@ const i18n = createI18n({
 // 对齐 gvdata main.js 的引入序（tokens 先入、主题层殿后）——静态覆盖 element 的
 // --el-color-primary 色阶（#2563eb），运行时主题色阶见 store/modules/settings.ts。
 import '@/style/tokens.scss'
-import '@/assets/styles/index.scss' // global css
+import '@/assets/styles/index.scss' // global css（gvdata 装配序：variables→mixin→transition→element-ui→sidebar→btn→gvdata + ruoyi 殿后）
+// anivia 组件层（gvdesign 5 件之一，1162 行原样迁入）：等位 gvdata main.js 的
+// 引入位（index.scss 之后、tokens 之后；jknow 侧 tokens 按 T1 约束保持最先）。
+// global.scss/table-style-optimized.scss 不在此装配：gvdata 中它们由
+// utils/opBase.js 与 dpp 任务视图 scoped 引入（非全局），jknow 无等位消费点。
+import '@/assets/styles/gvdesign/anivia.scss'
 // tailwind4 入口（必须在 main.ts 引入，避免 vite 每次 hmr 重新请求整个 scss 入口）
 import '@/style/tailwind.css'
-// utopia 业务样式三件套（T2 随迁，tailwind 之后；theme.scss 的 html[data-theme]
-// 选择器在若依壳上不命中、原样保留；utopia.scss/utopia-pages.css 的全局选择器
-// 已做 .knowledge-page 最小 scope 收敛，见各文件头注）
+// 主题层+业务样式（T2 合并后 theme.scss = gvdata 全局主题层 378 行原文 + jknow
+// data-theme 段与壳对齐垫片追加；tailwind 之后，业务三件套殿后不变）
 import '@/style/theme.scss'
 import '@/style/utopia.scss'
 import '@/style/utopia-pages.css'

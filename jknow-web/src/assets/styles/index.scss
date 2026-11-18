@@ -1,9 +1,40 @@
+/* 装配序（2026-11-18 壳对齐）：对齐 gvdata 版 index.scss
+   variables → mixin → transition → element-ui → sidebar → btn → gvdata；
+   jknow 侧差异：@use 体系（gvdata 为 @import）、gvdata.scss/btn.scss 落位 gvdesign/、
+   ruoyi.scss 保留殿后（jknow 页面工具类依赖，gvdata 无此件）、
+   gvdata 版的 @font-face 字体三件（PingFangSC/Sharp/HYk2gj）因本仓无字体资产不带。
+   anivia.scss 不在此装配——按 gvdata main.js 引入位（index 之后）由 main.ts 引入。 */
+@use './variables.module.scss';
 @use './mixin.scss';
 @use './transition.scss';
 @use './element-ui.scss';
 @use './sidebar.scss';
-@use './btn.scss';
+@use './gvdesign/btn.scss';
+@use './gvdesign/gvdata.scss';
 @use './ruoyi.scss';
+
+.ellipsis {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+@for $i from 1 through 20 {
+  .ellipsis-#{$i} {
+    // Under vue, single-line and multi-line display of ellipses need to be processed separately.
+    @if $i == "1" {
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    } @else {
+      display: -webkit-box !important;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      word-break: break-all;
+      -webkit-line-clamp: $i;
+      -webkit-box-orient: vertical !important;
+    }
+  }
+}
 
 body {
   height: 100%;
@@ -11,7 +42,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  font-family: Helvetica Neue, Helvetica, PingFang SC, Hiragino Sans GB, Microsoft YaHei, Arial, sans-serif;
+  font-family: "Plus Jakarta Sans", "PingFang SC", "Microsoft YaHei", "HarmonyOS Sans SC", Helvetica Neue, Helvetica, Arial, sans-serif;
 }
 
 label {
@@ -97,37 +128,47 @@ div:focus {
   }
 }
 
-aside {
-  background: #eef1f6;
-  padding: 8px 24px;
-  margin-bottom: 20px;
-  border-radius: 2px;
-  display: block;
-  line-height: 32px;
-  font-size: 16px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
-  color: #2c3e50;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+// aside {
+//   background: #eef1f6;
+//   padding: 8px 24px;
+//   margin-bottom: 20px;
+//   border-radius: 2px;
+//   display: block;
+//   line-height: 32px;
+//   font-size: 16px;
+//   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+//   color: #2c3e50;
+//   -webkit-font-smoothing: antialiased;
+//   -moz-osx-font-smoothing: grayscale;
 
-  a {
-    color: #337ab7;
-    cursor: pointer;
+//   a {
+//     color: #337ab7;
+//     cursor: pointer;
 
-    &:hover {
-      color: rgb(32, 160, 255);
-    }
-  }
-}
+//     &:hover {
+//       color: rgb(32, 160, 255);
+//     }
+//   }
+// }
 
-//main-container全局样式
-.app-container {
-  padding: 20px;
-}
+//main-container global style
+// .app-container {
+//   // padding: 15px;
+//   margin: 15px;
+//   padding: 0px;
+//   // background-color: #FFFFFF;
+//   background-color: #f0f2f5;
+//   // min-height: 86vh;
+//   min-height: calc(87vh - 7px);
+// }
 
 .components-container {
   margin: 30px 50px;
   position: relative;
+}
+
+.pagination-container {
+  margin-top: 20px;
 }
 
 .text-center {
@@ -142,29 +183,29 @@ aside {
   text-align: right;
   padding-right: 20px;
   transition: 600ms ease position;
-  background: linear-gradient(90deg, rgba(32, 182, 249, 1) 0%, rgba(32, 182, 249, 1) 0%, rgba(33, 120, 241, 1) 100%, rgba(33, 120, 241, 1) 100%);
+  background: var(--gradient-brand);
 
   .subtitle {
     font-size: 20px;
-    color: #fff;
+    color: #fff; /* 功能白：渐变底 */
   }
 
   &.draft {
-    background: #d0d0d0;
+    background: var(--color-neutral-soft);
   }
 
   &.deleted {
-    background: #d0d0d0;
+    background: var(--color-neutral-soft);
   }
 }
 
 .link-type,
 .link-type:focus {
-  color: #337ab7;
+  color: var(--color-primary);
   cursor: pointer;
 
   &:hover {
-    color: rgb(32, 160, 255);
+    color: var(--color-primary-hover);
   }
 }
 
