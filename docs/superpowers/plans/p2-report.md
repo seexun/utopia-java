@@ -41,7 +41,7 @@ T2 末 `pnpm test`：57 文件 = 32 绿 / **25 红**（断言 276/276 全过，�
 | store 面（`@/store/*` 缺件） | 16 | store 落位 `src/store/knowledge/` + 4 个 composable 桩还原 → 全绿（3 件断言适配：user-session/kb-context 随 client.ts 行为改造，w3-chat 是真 bug 修复——vue-router 4↔5 可缺省参数语义差） |
 | 视图族（`@/views/utopia/**`） | 4 | 页面落位 + import 改写 → 全绿 |
 | 组件基建（kit/ReCol/tree.ts/offlineIcon） | 3 | 闭包补件落位 + icon-offline NON_ICON_KEYS 登记 4 条 → 全绿 |
-| public-routes | 1 | 改写为 jknow 语义（kb 路由全在 constantRoutes/hidden/独立整页/KbRedirect/纯重定向）21 断言 → 绿；T4 修复轮补 3 条存在性断言（29 断言），**T5 再补 /account 族 5 断言（29 tests）** |
+| public-routes | 1 | 改写为 jknow 语义（kb 路由全在 constantRoutes/hidden/独立整页/KbRedirect/纯重定向）21 断言 → 绿；T4 修复轮补 3 条存在性断言（24 断言），**T5 再补 /account 族 5 断言（29 tests）** |
 | locales-dead-keys | 1 | **裁定弃（删 spec）**：守的是 pure-admin 基座 yaml 词条（T2 已弃该体系，vue-i18n dicts 且 i18n.spec 9 例在守）；迁入是零引用死文件。总账 57=56+1 |
 
 T5 终值：**56 文件 / 421 断言全绿**（416 + T5 新增 5）。
@@ -82,7 +82,7 @@ T5 终值：**56 文件 / 421 断言全绿**（416 + T5 新增 5）。
 
 | 账本条目 | 归纳与核实（T5 实测） |
 |---|---|
-| T1 parked：vite.config 2 行 base 注释被改写 | T2 触碰 vite.config 时已还原；T5 核验 vite.config.ts:14-17 与若依原文一致 ✓ |
+| T1 parked：vite.config 2 行 base 注释被改写 | T2 还原了 loadEnv 区注释，但 base 注释行还原不完整（「子路径上…指定这个子路径」被改写为「子路径下…指定子路径」，T5 核验只对了 14-17 行漏了这行）；**终审收口轮还原该行为 c5ae98d 基线逐字节原文**（diff 核验一致，typecheck 0 错）✓ |
 | T1 minor：element-plus 口径误差 | 声明 `^2.14.7`（简报指定），lockfile 实装 **2.14.8**（semver 范围内取新；T1 报告「装出 2.14.7」系口径小误差）✓ |
 | T1 minor：passWithNoTests 已清 | T2 移除；T5 grep vite.config.ts 零命中 ✓ |
 | T2 minor：若依视图 2 字符触碰备案 | views/system/dept/index.vue:292、menu/index.vue:464 补 `!`（@types/js-cookie 严格化暴露的 TS2538，与邻行 305/477 既有写法一致，零行为变化）——协调者补认知备案接受，维持现状 |
@@ -93,7 +93,10 @@ T5 终值：**56 文件 / 421 断言全绿**（416 + T5 新增 5）。
 | T3 minor：§七原轮冒烟表述未就地勘误 | §十修复轮记录已覆盖（404 截图作废重拍、路由补全）——报告读者以 §十为准 |
 | T4 minor：PhraseAlignmentTests 注释重复两行 | 811-812 与 823-824 两处直调登录态注释逐字重复（两测试方法各一份）——纯外观，零行为，P3 顺手可清 |
 | T4 minor：kb-entry 未知路径段死等边界 | 手改 URL 到 /knowledge/<未知段> 停「加载中」等待页（segment 不在 KB_PAGES 且非 workspace → 不 replace 也不渲染）——KbRedirect 同观感，T4 已接受；与下条同根 |
-| T4 minor：kb 解析失败无错误面（非管理员首登） | **T5 实测走查**（§八.4）：零工作区用户停在等待页静默等——源仓同语义（#580「非管理员 403 就静默等管理员来创建」），非迁移缺陷；错误面优化记 P3 |
+| T4 minor：kb 解析失败无错误面（非管理员首登） | **T5 实测走查**（§七.3）：零工作区用户停在等待页静默等——源仓同语义（#580「非管理员 403 就静默等管理员来创建」），非迁移缺陷；错误面优化记 P3 |
+| 补记：auth.ts 的「不迁」与实况 | 计划口径是 auth.ts 不迁（源仓 cookie 会话面无意义）；T3 实况以**若依适配层**形态新建 `api/knowledge/auth.ts`——导出面与源仓同名同形（me/login/register/logout/updateMe/changePassword/oidc 三件），实现映射若依端点（me→GET /getInfo、login/register/logout→/login、/register、/logout、updateMe/changePassword→/system/user/profile(+/updatePwd)、oidc→恒「未启用」），不写 /v1/ 请求故快照闸 actual 面不变（RETIRED_AUTH 9 端点登记继续成立）。**§三/任务 2 的「api 16 件」计数含它**（15 源仓件 + 适配层 1 件） |
+
+**若依自有文件触碰面汇总**（全部为闭合所需最小面，逐任务详报有逐行理由）：views/login.vue（T1，2 处 Cookies.set 包 String()）、views/system/dept/index.vue:292 + views/system/menu/index.vue:464（T2，各补 2 字符 `!`）、store/modules/user.ts（T3，pwdChrtype `?? ''`）、types/api/login.ts（T3，+可选 pwdChrtype）、views/lock.vue（T3，Particle 具形）、types/global.d.ts（T2/T3，vue/axios 声明手术——上游 RuoYi-Vue3 既有钝化手段的扩展面）、tsconfig/vite.config.ts/package.json（基建：jsx/noImplicitAny/unplugin-icons types、tailwind/vitest/projects/`/api` 代理、依赖合并）、main.ts（i18n/tailwind 样式引入/VueQueryPlugin/ToastHost/offlineIcon）；App.vue 零净变更（ToastHost 并入又撤出）。dept/menu 等其余若依面零触碰。
 
 ## 七、T5 全链验收记录（2026-11-18 实测）
 
@@ -160,7 +163,7 @@ T5 终值：**56 文件 / 421 断言全绿**（416 + T5 新增 5）。
 2. **kb-entry 解析失败无错误面**：零工作区/未知路径段停「加载中」——建议补错误/引导页（源仓同语义，非回归）。
 3. **构建体积**：index/cache 两 chunk 超限告警（sigma+graphology+markdown 链）——manualChunks 专项。
 4. **样式 scope 收敛点**：utopia.scss/utopia-pages.css 已 scope `.knowledge-page`；body[layout] 系若依壳永不命中原样保留——若后续发现互染再收。
-5. **类型面现代化**：global.d.ts 的 vue/axios/EP 替换式声明（any 型扩展面）是源仓钝化手段的延续；augmentation 化+修约 300 条上游潜在严格性错误留专项。
+5. **类型面现代化**：global.d.ts 的 vue/axios/EP 替换式声明（any 型扩展面）是源仓钝化手段的延续；**另 tsconfig `noImplicitAny:false` 放宽**（源仓 strict:false 下 97 处隐式 any 同款写法，strict 其余位全开）；augmentation 化、收 noImplicitAny、修约 300 条上游潜在严格性错误留专项。
 6. **PhraseAlignmentTests 注释重复两行**（811/823）纯外观。
 7. **菜单点击 replace 后若依 tagsView 留 /knowledge/<页> 空标签**（T3 已接受行为）。
 8. **knowledge:search:edit 有意空缺**（§五.2），检索写面出现时补挂。
