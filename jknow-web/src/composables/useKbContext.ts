@@ -86,6 +86,25 @@ export async function resolveLegacyKbPath(path: string): Promise<string | null> 
   }
 }
 
+/** /knowledge/<页>（若依后端菜单 C 页，component=kb-entry）的守卫等价物
+ *  （kb/account 若依壳内联，规格 2026-11-18-kb-inline-layout）：kb 页挂进
+ *  若依 Layout 后，主区 AppMain 的 <Transition mode="out-in"> 会把「kb-entry
+ *  挂载 → replace」的跳板式二次换子变成**空主区**（进场丢失——上方
+ *  resolveLegacyKbPath 的 W1 结论「守卫直接返回重定向，页面组件只挂载一次」
+ *  在菜单链路同样成立，实测复现）。守卫里 await 解析（queryClient.fetchQuery
+ *  与组件侧 useQuery 同缓存键，去重共享），解析出直接给 /kb/:id/:page。
+ *  页名取路径**末段**（kb-entry 同表：ingest 域的页面载体是 library 文库页）；
+ *  workspace（原地渲染模式）与非 kb 页返回 null——回落 kb-entry 组件原逻辑
+ *  （等待页 → 8s 引导卡）。 */
+export async function resolveKnowledgeMenuPath(
+  path: string
+): Promise<string | null> {
+  const seg = path.replace(/\/+$/, "").split("/").pop() ?? "";
+  if (seg === "workspace") return null;
+  const page = seg === "ingest" ? "library" : seg;
+  return resolveLegacyKbPath(`/${page}`);
+}
+
 export function useKbContext(): {
   /** 当前库（URL 优先：路由参数 > 记忆 > 列表第一个）。**库列表说了算**——
    *  路由参数指向的 id 不在当前工作区列表里时，回落列表第一个（与旧仓一致；

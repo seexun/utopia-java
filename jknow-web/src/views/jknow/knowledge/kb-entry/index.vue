@@ -63,7 +63,10 @@ const segment = computed(
 const page = computed<string | null>(() => KB_PAGES[segment.value] ?? null);
 const isWorkspace = computed(() => segment.value === "workspace");
 
-// kb 页模式：解析落定即 replace（query 保留——深链参数不丢语义）
+// kb 页模式：解析落定即 replace（query 保留——深链参数不丢语义）。kb/account
+// 壳内联后常规路径由 router/index.ts 的 /knowledge/* 守卫直跳（不经本组件挂载
+// ——AppMain 的 Transition(out-in) 下「挂载 → replace」跳板会丢进场，主区空白）；
+// 本 watch 退居兜底：守卫解析不出（无工作区/无库）而上下文后来落定的罕见路。
 watch(
   [() => kb.value?.id, settled],
   ([id, ready]) => {
@@ -88,24 +91,31 @@ const workspaceReady = computed(
 </script>
 
 <template>
-  <MyKbs v-if="workspaceReady" />
-  <!-- 引导卡：8s 未解析出工作区/库——状态一句话，动作在按钮上（与 kbScope
-       的 noAccess 落地页同一副骨架） -->
-  <div v-else-if="guided" class="grid h-full place-items-center px-6">
-    <div class="max-w-sm text-center">
-      <h2 class="text-xl" style="color: #0f172a">
-        {{ S.kbEntry.guideTitle }}
-      </h2>
-      <p class="mt-2 text-sm leading-relaxed" style="color: #475569">
-        {{ S.kbEntry.guideBody }}
-      </p>
-      <el-button class="mt-4" size="default" @click="reload">
-        {{ S.kbEntry.retry }}
-      </el-button>
+  <!-- 单根包装（kb/account 若依壳内联验收顺手项）：若依 AppMain 主区的
+       <Transition mode="out-in"> 要求子组件是单个真实元素根（KbRedirect 根注释
+       的既有约定「根必须是带内容盒的真实元素」）；本模板原是 MyKbs / 引导卡 /
+       等待页三选一的多根 fragment，这里同法包一层兜住。菜单链的空白主区根因
+       在「挂载 → replace」跳板，已由 router 守卫直跳修复（见 router/index.ts）。 -->
+  <div class="h-full">
+    <MyKbs v-if="workspaceReady" />
+    <!-- 引导卡：8s 未解析出工作区/库——状态一句话，动作在按钮上（与 kbScope
+         的 noAccess 落地页同一副骨架） -->
+    <div v-else-if="guided" class="grid h-full place-items-center px-6">
+      <div class="max-w-sm text-center">
+        <h2 class="text-xl" style="color: #0f172a">
+          {{ S.kbEntry.guideTitle }}
+        </h2>
+        <p class="mt-2 text-sm leading-relaxed" style="color: #475569">
+          {{ S.kbEntry.guideBody }}
+        </p>
+        <el-button class="mt-4" size="default" @click="reload">
+          {{ S.kbEntry.retry }}
+        </el-button>
+      </div>
     </div>
-  </div>
-  <!-- 等待页：壳在、内容空（与 KbRedirect 同观感——一行「加载中」） -->
-  <div v-else class="grid h-full place-items-center px-6">
-    <p class="text-sm" style="color: #94a3b8">{{ S.nav.loading }}</p>
+    <!-- 等待页：壳在、内容空（与 KbRedirect 同观感——一行「加载中」） -->
+    <div v-else class="grid h-full place-items-center px-6">
+      <p class="text-sm" style="color: #94a3b8">{{ S.nav.loading }}</p>
+    </div>
   </div>
 </template>

@@ -388,3 +388,25 @@ body[layout="vertical"] .app-wrapper .sidebar-container {
     0 4px 6px -2px rgb(0 0 0 / 5%),
     0 10px 15px -3px rgb(0 0 0 / 10%);
 }
+
+/* ============================================================
+   kb/account 若依壳内联高度链（规格 2026-11-18-kb-inline-layout §2）：
+   /kb/:kbId/* 与 /account/* 挂进 Layout children 后，高度链由 AppMain 承载
+   （fixedHeader 态 .fixed-header + .app-main 定高 calc(100vh - 50px)、
+   hasTagsView 态 84px）。页根的全屏尺度在壳内收敛为随壳容器：
+   - .h-full 页根（graph/search/library/doc/ontology/mappings/settings/
+     chat/account 壳）本就是 height:100%，同值无感；
+   - review 页根的 .h-screen（100vh）与 docs 页根的 .docs-page{height:100vh}
+     在壳内会高出 50-84px 造成滚动跳变，这里压回 100%：
+     · .h-screen 是 tailwind @layer utilities 规则，不分层 CSS 恒压层内规则
+       （reset.scss C-1 同族口径）；
+     · .docs-page 是组件 scoped 规则 .docs-page[data-v]（0,2,0），补 div 元素
+       选择器抬到（0,2,1）稳压（与加载顺序无关）。
+   只用直接子选择器（>）：AppMain 的 router-view 直接渲染页根；嵌套在页内的
+   .knowledge-page 子树（admin 挂在 account 壳的滚动 main 里）不受影响，
+   保持文档流。壳外独立整页（/docs/:slug 顶级路由）不经 .app-main，不受影响。
+   ============================================================ */
+.app-main > div.knowledge-page {
+  height: 100%;
+  min-height: 0;
+}
