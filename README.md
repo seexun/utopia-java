@@ -3,7 +3,7 @@
 基于 [RuoYi-Vue v3.9.2](https://github.com/yangzongzhuan/RuoYi-Vue) 骨架重宿主的知识图谱系统（业务源自 utopia，分阶段迁移中）。
 
 - 后端：Java 21 / Spring Boot 4.1.2 / PostgreSQL 16 / Redis 7 / Flyway
-- 前端：jknow-web（源自 RuoYi-Vue3-typescript，目录已按规格 D 节改名；内部品牌清理归 P2）
+- 前端：jknow-web（RuoYi-Vue3-typescript 壳 + utopia 知识图谱前端，双形态一体，见下节）
 - 坐标：`tech.seexun:jknow`，包根 `tech.seexun.jknow`
 
 迁移设计规格见 `docs/superpowers/specs/`。
@@ -30,6 +30,25 @@ jknow
 ```
 
 依赖方向：admin 聚合若依骨架与七业务域；业务域内部 `extract → llm`、`store → common/ingest/reason`、`search → store`、`contract → store`（llm/reason/ingest 除 JDK+第三方库外零内部依赖）。
+
+## 前端 jknow-web（双形态一体）
+
+一个 Vue 3 + TS 应用，两种页面形态共用同一登录态（若依 token，`Authorization: Bearer`）：
+
+- **若依管理面**（`/system` `/monitor` `/tool` 等及首页）：RuoYi-Vue3 原生页面，Layout 壳 + 动态路由（`getRouters` 后端菜单树）。
+- **知识图谱业务面**（源自 utopia-web，P2 迁入）：
+  - 菜单入口「知识图谱」（V0102 开启）：8 个 C 页统一指向入口组件 `views/jknow/knowledge/kb-entry`——解析工作区/库后跳 `/kb/{kbId}/{页}` 或原地渲染工作空间页（my-kbs），冷登录自动建 General 库；
+  - `/kb/{kbId}/*` 10 页独立整页（graph/search/chat/ontology/review/settings/library/mappings/docs/doc-viewer，hidden 不进菜单）；旧路径 `/graph` `/library` 等由 KbRedirect 接管重定向；
+  - `/account` 族（profile/我的库/令牌/管理）独立壳整页——kb 页顶栏 user-menu 的链接目标；
+  - 代码落位：api `src/api/knowledge/`、页面 `src/views/jknow/knowledge/`、组件 `src/components/knowledge/`、store `src/store/knowledge/`（共用若依 pinia 实例）、i18n `src/i18n/`（vue-i18n，仅业务面使用）+ tailwind v4（scope 限 `.knowledge-page`）。
+  - 接口面：业务 API 走 `/api/v1/**`（client.ts 统一 Bearer/401 会话处置）；菜单/按钮权限对齐 V0100 `knowledge:*` 16 项，后端 `@PreAuthorize` 粗粒度挂载。
+
+```bash
+cd jknow-web && pnpm install
+pnpm dev            # 端口 80，代理 /dev-api 与 /api 到 vite.config.ts 的 baseUrl
+pnpm test           # vitest 56 文件（app jsdom + domain node 双面）
+pnpm typecheck && pnpm build:prod
+```
 
 ## 本地启动
 
