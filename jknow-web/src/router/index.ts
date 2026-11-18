@@ -67,6 +67,16 @@ export const constantRoutes = [
     hidden: true
   },
   {
+    path: "/kb/:kbId/library",
+    component: () => import("@/views/jknow/knowledge/library/index.vue"),
+    hidden: true
+  },
+  {
+    path: "/kb/:kbId/doc/:docId",
+    component: () => import("@/views/jknow/knowledge/doc-viewer/index.vue"),
+    hidden: true
+  },
+  {
     path: "/kb/:kbId/ontology",
     component: () => import("@/views/jknow/knowledge/ontology/index.vue"),
     hidden: true
@@ -74,6 +84,11 @@ export const constantRoutes = [
   {
     path: "/kb/:kbId/review",
     component: () => import("@/views/jknow/knowledge/review/index.vue"),
+    hidden: true
+  },
+  {
+    path: "/kb/:kbId/mappings",
+    component: () => import("@/views/jknow/knowledge/mappings/index.vue"),
     hidden: true
   },
   {

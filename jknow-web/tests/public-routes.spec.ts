@@ -2,7 +2,8 @@
 // 源仓断言「公开页在壳外」（remaining.ts 不进 pure-admin 拍平树）；jknow 的路由
 // 体系换若依 router——T3 的等价语义是「kb 动态路由全部落在 constantRoutes、
 // hidden 不进菜单、页面为独立整页路由（不经若依 Layout 拍平）」：
-//   - 8 个 /kb/:kbId/* 页各有真组件；/kb 是纯重定向记录（→ /library）；
+//   - 10 个 /kb/:kbId/* 页各有真组件（含 library/mappings/doc 三条补全）；
+//     /kb 是纯重定向记录（→ /library）；
 //   - 旧路径族（/graph /search /chat /library /ontology /mappings /review
 //     /kb-settings）挂 KbRedirect 兜底组件（源仓 LegacyX 同构）；
 //   - /docs 是重定向记录（→ /docs/ingest，源仓 M-3 同款），slug 页有真组件。
@@ -17,8 +18,11 @@ function routeOf(path: string) {
 const KB_PAGES = [
   "/kb/:kbId/graph",
   "/kb/:kbId/search",
+  "/kb/:kbId/library",
+  "/kb/:kbId/doc/:docId",
   "/kb/:kbId/ontology",
   "/kb/:kbId/review",
+  "/kb/:kbId/mappings",
   "/kb/:kbId/settings",
   "/kb/:kbId/chat/:conversationId?",
   "/kb/:kbId/docs",
@@ -76,8 +80,8 @@ describe("kb 动态路由在 constantRoutes（hidden 独立整页）", () => {
     const kbRoutes = constantRoutes.filter(
       r => r.path.startsWith("/kb") || LEGACY_PATHS.includes(r.path)
     );
-    // 7 个 /kb/:kbId/* + /kb 重定向 + 8 条旧路径（/kb-settings 同前缀只计一次）
-    expect(kbRoutes.length).toBe(16);
+    // 10 个 /kb/:kbId/* + /kb 重定向 + 8 条旧路径（/kb-settings 同前缀只计一次）
+    expect(kbRoutes.length).toBe(19);
     expect(kbRoutes.every(r => r.hidden === true)).toBe(true);
   });
 });
