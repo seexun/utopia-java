@@ -1,9 +1,11 @@
 // KB 作用域装载（对照旧仓 KbScope.tsx 的宿主职责，任务 5 抽为 composable）：
 // 直问后端 kbDetail（跨工作区深链不错杀）→ 记上下文（kbStore.load + wsStore
-// 对齐）→ rebuildMenus。旧仓由 KbScope 组件包住每个页面；Vue 侧路由被
+// 对齐）。旧仓由 KbScope 组件包住每个页面；Vue 侧路由被
 // pure-admin 拍平成平铺叶子（禁父子包装，见 router/modules/utopia.ts 头注），
 // 所以「每个页面 setup 里调一次 useKbScope()」就是 KbScope 的对等物——
 // 壳面包屑（库名）、角色门控（my_role）、SSE 失效面都从这里进料。
+// （P3 清理：pure-admin 菜单管线的 jknow 侧消费链无生产引用，详情载入后
+//  的 rebuildMenus 一并摘除。）
 import { computed, watch, type ComputedRef, type Ref } from "vue";
 import { useRoute } from "vue-router";
 import { useQuery } from "@tanstack/vue-query";
@@ -12,7 +14,6 @@ import { kbDetail } from "@/api/knowledge/kbs";
 import type { Kb } from "@/api/knowledge/types";
 // T3 接线：源仓 @/store/modules/kb 落位 src/store/knowledge/modules/kb
 import { useKbContextHook } from "@/store/knowledge/modules/kb";
-import { useKbContext } from "@/composables/useKbContext";
 
 export function useKbScope(): {
   kbId: ComputedRef<string>;
@@ -21,7 +22,6 @@ export function useKbScope(): {
 } {
   const route = useRoute();
   const kbStore = useKbContextHook();
-  const { rebuildMenus } = useKbContext();
 
   const kbId = computed(
     () => (route.params as { kbId?: string } | undefined)?.kbId ?? ""
@@ -37,13 +37,12 @@ export function useKbScope(): {
   });
 
   // 打开哪个库，"上次看的"就跟到哪个库；工作区也一并对齐（旧仓 effect 同语义）。
-  // 详情到手后重组侧栏菜单——写菜单随角色显隐，要等 my_role 才知道
   watch(
     () => kbQuery.data.value,
     (kb: Kb | undefined) => {
       if (!kb) return;
       if (kbStore.kbId !== kb.id || kbStore.kbDetail?.my_role !== kb.my_role) {
-        kbStore.load(kb.id).then(() => rebuildMenus());
+        kbStore.load(kb.id);
       }
     },
     { immediate: true }

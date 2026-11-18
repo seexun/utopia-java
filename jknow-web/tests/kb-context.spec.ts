@@ -1,6 +1,7 @@
-// W1 壳单元测试：库上下文与菜单。
-// 覆盖：samePageInKb（旧仓 kb.tsx 纯函数语义）、utopiaMenus（三组 8 页/写菜单
-// 随角色显隐）、switchKb（写 store + 失效事件流键 + 停在当前页导航）。
+// W1 壳单元测试：库上下文。
+// 覆盖：samePageInKb（旧仓 kb.tsx 纯函数语义）、switchKb（写 store + 失效事件流
+// 键 + 停在当前页导航）。（P3 清理：utopiaMenus/wholeMenus 消费链随无宿主四件
+// 摘除，对应断言段一并退役。）
 import { describe, it, expect, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { defineComponent, h, nextTick } from "vue";
@@ -12,19 +13,15 @@ import {
 import { VueQueryPlugin } from "@tanstack/vue-query";
 import { queryClient } from "@/store/knowledge/query";
 import { samePageInKb } from "@/domain/kbContext";
-import { utopiaMenus } from "@/router/utopia-menu";
 import { useKbContextHook } from "@/store/knowledge/modules/kb";
-import { usePermissionStoreHook } from "@/store/knowledge/modules/permission";
 import { STREAM_KEYS } from "@/domain/queryDefaults";
 import { useKbContext } from "@/composables/useKbContext";
-import { S } from "@/i18n";
 import { store as globalPinia } from "@/store/knowledge";
 
 beforeEach(() => {
   localStorage.clear();
   localStorage.setItem("utopia.lang", "en");
   useKbContextHook().$reset();
-  usePermissionStoreHook().wholeMenus = [];
   // composable 的查询/失效面绑定单例客户端（store/query.ts）——测试前清空
   queryClient.clear();
 });
@@ -43,63 +40,6 @@ describe("samePageInKb：换库停在同一个页面上（旧仓 kb.tsx 语义�
 
   it("不在 /kb 作用域下时保持原行为", () => {
     expect(samePageInKb("/account", "A", "B")).toBe("/account");
-  });
-});
-
-describe("utopiaMenus：三组覆盖 8 个 KB 页面，写菜单随角色显隐", () => {
-  it("可写库：三组、顺序与路径对齐旧仓 Shell 的 MENU（图谱是门面，本体与映射相邻）", () => {
-    const menus = utopiaMenus("kb1", true);
-    expect(menus).toHaveLength(3);
-    // 取词走当前语言包（S 冻结于模块加载，测试不钉语言）
-    expect(menus.map(g => g.meta.title)).toEqual([
-      S.nav.groupWorkbench,
-      S.nav.groupKnowledge,
-      S.nav.groupConfig
-    ]);
-    const paths = menus.flatMap(g => (g.children ?? []).map(i => i.path));
-    expect(paths).toEqual([
-      "/kb/kb1/graph",
-      "/kb/kb1/search",
-      "/kb/kb1/chat",
-      "/kb/kb1/library",
-      "/kb/kb1/review",
-      "/kb/kb1/ontology",
-      "/kb/kb1/mappings",
-      "/kb/kb1/settings"
-    ]);
-    // 折叠态可用性契约（菜单缺陷修复批）：SidebarItem 折叠分支靠
-    // `meta.icon + parentId === null` 收起组头文字只留图标（子项收进 popper）；
-    // 本项目 initRouter 不经过 buildHierarchyTree，层级字段由 utopiaMenus
-    // 自补——形状漂移会让折叠态退回「工…」截断文字，这里钉住。
-    expect(menus.every(g => typeof g.meta.icon === "string")).toBe(true);
-    expect(menus.map(g => g.parentId)).toEqual([null, null, null]);
-    expect(menus.map(g => g.pathList)).toEqual([[0], [1], [2]]);
-    expect(menus.flatMap(g => (g.children ?? []).map(c => c.parentId))).toEqual(
-      [0, 0, 0, 1, 1, 1, 1, 2]
-    );
-    expect(menus.flatMap(g => (g.children ?? []).map(c => c.pathList))).toEqual(
-      [
-        [0, 0],
-        [0, 1],
-        [0, 2],
-        [1, 0],
-        [1, 1],
-        [1, 2],
-        [1, 3],
-        [2, 0]
-      ]
-    );
-  });
-
-  it("只读库（viewer）：菜单与可写库同形——8 项全量（对齐旧仓静态 MENU；设置页内部只读呈现，写操作另有 useKbRole 闸）", () => {
-    const menus = utopiaMenus("kb1", false);
-    const paths = menus.flatMap(g => (g.children ?? []).map(i => i.path));
-    expect(paths).toHaveLength(8);
-    expect(paths.some(p => p.endsWith("/settings"))).toBe(true);
-  });
-
-  it("kbId 未解析（冷启动极早期）时不渲染菜单，等 KbScope 载入后重组", () => {
-    expect(utopiaMenus("", true)).toEqual([]);
   });
 });
 
@@ -141,7 +81,7 @@ function makeHarness() {
 }
 
 describe("switchKb：换库是一次导航，不只是记一笔", () => {
-  it("从 /kb/A/chat/c1 切到 B：落在 /kb/B/chat（会话不带走），记忆与菜单跟着走", async () => {
+  it("从 /kb/A/chat/c1 切到 B：落在 /kb/B/chat（会话不带走），记忆跟着走", async () => {
     const { router, ctx, unmount } = makeHarness();
     await router.push("/kb/A/chat/c1");
     await nextTick();
@@ -152,12 +92,6 @@ describe("switchKb：换库是一次导航，不只是记一笔", () => {
 
     expect(router.currentRoute.value.path).toBe("/kb/B/chat");
     expect(localStorage.getItem("utopia.kb")).toBe("B");
-    // 菜单重组：条目路径换成新库
-    const menuPaths = usePermissionStoreHook().wholeMenus
-      .flatMap(g => (g.children ?? []) as { path: string }[])
-      .map(i => i.path);
-    expect(menuPaths.length).toBeGreaterThan(0);
-    for (const p of menuPaths) expect(p).toContain("/kb/B/");
     unmount();
   });
 

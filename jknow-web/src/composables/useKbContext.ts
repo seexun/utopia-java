@@ -22,11 +22,10 @@ import * as workspacesApi from "@/api/knowledge/workspaces";
 import type { Kb, Workspace } from "@/api/knowledge/types";
 // T3 接线：源仓 @/store/modules/kb、@/store/query 落位 src/store/knowledge/
 //（与若依 store 并存，共用同一枚 pinia 实例）；源仓 @/router/utils 的
-// initRouter（pure-admin 菜单管线）不迁——菜单组装逻辑内联进 rebuildMenus。
+// initRouter（pure-admin 菜单管线）不迁——P3 清理：其 jknow 侧消费链
+//（侧栏菜单源/菜单 store/菜单重组动作）全库无生产引用，已整链摘除。
 import { useKbContextHook } from "@/store/knowledge/modules/kb";
 import { queryClient } from "@/store/knowledge/query";
-import { usePermissionStoreHook } from "@/store/knowledge/modules/permission";
-import { utopiaMenus } from "@/router/utopia-menu";
 
 /** 空工作区自动创建 General 的取数函数（#580：空着起步，不带包；非管理员 403
  *  就静默等管理员来创建——现实中首个用户即管理员，General 总在）。 */
@@ -97,11 +96,8 @@ export function useKbContext(): {
   workspaces: ComputedRef<Workspace[]>;
   /** 工作区和库的列表都取回来了：kb 为空是真的没有库，不是还在加载 */
   settled: ComputedRef<boolean>;
-  /** 换库：记一笔 + 失效事件流覆盖的键（目标库）+ 停在当前页跳过去 + 重组菜单 */
+  /** 换库：记一笔 + 失效事件流覆盖的键（目标库）+ 停在当前页跳过去 */
   switchKb: (id: string) => void;
-  /** 用当前上下文（kbId/角色）重组侧栏菜单——KbScope 载入详情后调它，
-   *  角色 gating（只读库没有写菜单）要等 my_role 到手才知道 */
-  rebuildMenus: () => void;
 } {
   const route = useRoute();
   const router = useRouter();
@@ -148,22 +144,6 @@ export function useKbContext(): {
     () => workspacesQuery.isFetched.value && (!workspace.value || kbsQuery.isFetched.value)
   );
 
-  /** 用当前上下文重组侧栏菜单（源仓 initRouter 的知识域部分内联——pure-admin
-   *  的 wholeMenus 管线由 knowledge permission store 的直赋承担，重复调用只
-   *  换掉 wholeMenus 数组；kbId 取 URL 参数优先，否则回落记忆，my_role 只在
-   *  kb 详情接口里、详情没回来时缺省放行（与 useKbRole 口径一致）） */
-  function rebuildMenus() {
-    const kbStore = useKbContextHook();
-    const routeKbId = (
-      route.params as { kbId?: string } | undefined
-    )?.kbId;
-    const kbId = routeKbId ?? kbStore.kbId;
-    const canWrite = kbStore.kbDetail?.my_role !== "viewer";
-    usePermissionStoreHook().handleWholeMenus(
-      utopiaMenus(kbId, canWrite) as never[]
-    );
-  }
-
   /** **换库是一次导航，不只是记一笔。** 只写 store 的话，值变了、组件也重渲染了，
    *  算出来的还是同一个库（URL 优先），切换器整个是死的——所以把导航并进动作
    *  本身（旧仓 kb.tsx setKb 注释原文的教训）。事件流只订当前库，目标库在没人订
@@ -176,15 +156,9 @@ export function useKbContext(): {
     for (const head of STREAM_KEYS) {
       queryClient.invalidateQueries({ queryKey: [head, id] });
     }
-    rebuildMenus();
     const currentKbId = routeKbId.value;
     if (currentKbId && currentKbId !== id) {
-      // 源仓的菜单重组在 pure-admin 守卫里随每轮导航重跑（router/index.ts 的
-      // initRouter）；若依守卫不认知域菜单——push 落定后补一次重组（此刻
-      // route.params.kbId 已是新库），语义对齐源仓
-      router
-        .push(samePageInKb(route.path, currentKbId, id))
-        .then(() => rebuildMenus());
+      router.push(samePageInKb(route.path, currentKbId, id));
     }
   }
 
@@ -194,7 +168,6 @@ export function useKbContext(): {
     workspace,
     workspaces,
     settled,
-    switchKb,
-    rebuildMenus
+    switchKb
   };
 }

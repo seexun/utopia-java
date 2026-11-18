@@ -74,10 +74,6 @@ vi.mock("@/api/knowledge/ontology", () => ({
   uniquenessCandidates: vi.fn(),
   rules: vi.fn()
 }));
-vi.mock("@/composables/useKbContext", () => ({
-  useKbContext: () => ({ rebuildMenus: vi.fn() }),
-  resolveLegacyKbPath: vi.fn()
-}));
 
 function counts(over: Partial<ReviewCounts> = {}): ReviewCounts {
   return {

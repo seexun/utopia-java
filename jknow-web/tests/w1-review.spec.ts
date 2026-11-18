@@ -25,11 +25,6 @@ vi.mock("@/api/knowledge/review", () => ({
   reviewHistory: historyMock
 }));
 vi.mock("@/api/knowledge/kbs", () => ({ kbDetail: kbDetailMock }));
-// useKbScope 载详情后会重组 pure-admin 菜单（initRouter 全链）——测试里桩掉
-vi.mock("@/composables/useKbContext", () => ({
-  useKbContext: () => ({ rebuildMenus: vi.fn() }),
-  resolveLegacyKbPath: vi.fn()
-}));
 // 只桩页面真实 import 的三个写函数（W3 收口：初版桩了六个图谱读函数、
 // 恰恰漏了这三个——「query mock 噪音」即此；纯读用例下漏桩无症状，但形状失真）
 vi.mock("@/api/knowledge/graph", () => ({

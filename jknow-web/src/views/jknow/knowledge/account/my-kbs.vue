@@ -1,7 +1,7 @@
 <!-- 我的知识库页（对照旧仓 pages/MyKbs.tsx 全量）：可访问的库 + 我的角色 +
-     加入信息 + 概览统计 + 新建知识库弹窗（缺省 restricted，不污染全员切换器；
+     加入信息 + 概览统计 + 新建知识库弹窗（缺省 restricted，不污染全员库列表；
      建库不是系统管理员专属——工作区 Admin 起就能建）。?create=true 落地即开表单
-     （库切换器「新建」一行指到这里）。 -->
+     （「新建」深链指到这里）。 -->
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
@@ -38,9 +38,9 @@ const wsRole = useQuery({
   queryFn: () => workspaceRole(workspaceId.value!),
   enabled: computed(() => !!workspaceId.value)
 });
-// 建库的入口在别处（顶栏的库切换器最后一行），带着 ?create=true 落地就直接开表单
+// 建库的入口在别处（「新建」深链），带着 ?create=true 落地就直接开表单
 const creating = ref(String(route.query.create ?? "") === "true");
-/* I-1（W3 审查收口）：kb-switcher 的「新建知识库」是站内 push（path 不变、
+/* I-1（W3 审查收口）：「新建知识库」是站内 push（path 不变、
    只改 query）——组件不重挂（lay-content 按 path 定 key），onMounted 那次
    消费接不住第二回。改 watch query：来了就开表单并清掉地址栏参数；
    前进/后退到带参地址同样生效 */

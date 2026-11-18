@@ -76,38 +76,7 @@ import LucideWand2 from "~icons/lucide/wand-2?raw";
 import LucideX from "~icons/lucide/x?raw";
 import SimpleIconsGithub from "~icons/simple-icons/github?raw";
 
-// utopia 侧栏菜单（W3 走查补）：utopia-menu.ts 的 8 个 KB 页图标。此前 meta.icon
-// 写的是带冒号的 "ep/xxx"（hooks.ts 见冒号即走 IconifyIconOnline 运行时拉取，
-// 内网/离线环境静默不渲染——对照帧里新壳菜单条目光杆没图标）；且 ep 集合根本没有
-// waypoints（那是 lucide 的名）。此处按 pure-admin 离线注册机制（?raw + addIcon）
-// 落本地，menu 侧改用无冒号键（hooks.ts 走 Offline 分支）。
-import LucideWaypoints from "~icons/lucide/waypoints?raw";
-import EpSearch from "~icons/ep/search?raw";
-import EpChatDotRound from "~icons/ep/chat-dot-round?raw";
-import EpCollection from "~icons/ep/collection?raw";
-import EpFinished from "~icons/ep/finished?raw";
-import EpConnection from "~icons/ep/connection?raw";
-import EpCoin from "~icons/ep/coin?raw";
-import EpSetting from "~icons/ep/setting?raw";
-// 折叠态组头图标（utopia-menu.ts 分组节点的 meta.icon；展开态组头是纯文字标签，
-// 这三个键只在折叠到 54px 后可见。EpMonitor 复用上方 ep 集合的既有导入）
-import EpReading from "~icons/ep/reading?raw";
-import EpOperation from "~icons/ep/operation?raw";
-
 const icons = [
-  // utopia 侧栏菜单（utopia-menu.ts 的 meta.icon 同名键）
-  ["utopia/graph", LucideWaypoints],
-  ["utopia/search", EpSearch],
-  ["utopia/chat", EpChatDotRound],
-  ["utopia/library", EpCollection],
-  ["utopia/review", EpFinished],
-  ["utopia/ontology", EpConnection],
-  ["utopia/mappings", EpCoin],
-  ["utopia/settings", EpSetting],
-  // utopia 侧栏分组节点（工作台/知识管理/配置）
-  ["utopia/group-workbench", EpMonitor],
-  ["utopia/group-knowledge", EpReading],
-  ["utopia/group-config", EpOperation],
   // Element Plus Icon: https://github.com/element-plus/element-plus-icons
   ["ep/menu", EpMenu],
   ["ep/edit", EpEdit],

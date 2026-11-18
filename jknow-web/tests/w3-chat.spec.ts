@@ -41,7 +41,7 @@ vi.mock("@/api/knowledge/chat", async importOriginal => {
 });
 vi.mock("@/api/knowledge/auth", () => ({ me: m.me }));
 vi.mock("@/api/knowledge/kbs", () => ({ kbDetail: m.kbDetail, readiness: m.readiness }));
-/* 作用域弹层/切库不在本任务断言面里；rebuildMenus 需要壳级路由器，整面桩掉 */
+/* 作用域弹层/切库不在本任务断言面里，整面桩掉 */
 vi.mock("@/composables/useKbContext", () => ({
   useKbContext: () => ({
     kb: ref(null),
@@ -49,8 +49,7 @@ vi.mock("@/composables/useKbContext", () => ({
     workspace: ref(null),
     workspaces: ref([]),
     settled: ref(true),
-    switchKb: vi.fn(),
-    rebuildMenus: vi.fn()
+    switchKb: vi.fn()
   }),
   resolveLegacyKbPath: vi.fn()
 }));

@@ -1,6 +1,6 @@
 /* W3 审查收口（I-1）：站内改 query 不重挂（lay-content 按 path 定 key）之后，
    「setup 一次性读」的页面参数必须改 watch ?create= 才接得住第二回。
-   kb-switcher 的「新建知识库」push /account/kbs?create=true —— 同页落地
+   「新建知识库」push /account/kbs?create=true —— 同页落地
    （已在 /account/kbs 时 path 不变）必须直接开表单。 */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
@@ -93,7 +93,7 @@ describe("MyKbs ?create=true（I-1）", () => {
     await flushPromises();
     // 没带参：表单关着（UDialog open=false 不挂载）
     expect(openDialog()).toBeNull();
-    // kb-switcher 的那一步：path 不变、只改 query（组件不重挂）
+    // 站内 push 的那一步：path 不变、只改 query（组件不重挂）
     await router!.push({ path: "/account/kbs", query: { create: "true" } });
     await flushPromises();
     expect(openDialog()).not.toBeNull();

@@ -296,62 +296,6 @@ body[layout="vertical"] .app-wrapper .sidebar-container {
   }
 }
 
-/* 库切换器（侧栏左下角，旧 .kb-switcher） */
-.kb-switcher {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: calc(100% - 24px);
-  height: 38px;
-  margin: 10px 12px 12px;
-  padding: 0 10px;
-  cursor: pointer;
-  user-select: none;
-  background: var(--el-fill-color-light);
-  border-radius: 8px;
-
-  &:hover {
-    background: #e2e8f0;
-  }
-
-  .kb-switcher-name {
-    flex: 1;
-    overflow: hidden;
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--el-text-color-primary);
-    text-align: left;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-}
-
-/* 问题3（左下角层叠）：.left-collapse（absolute bottom 0、高 40px）与切换器
-   （流式排在 el-scrollbar 之后）压在同一条带上，切换器被覆盖点不进。
-   对照旧壳 Shell.tsx 的左下角设计重排：切换器钉在最底一行（bottom 12px）、
-   折叠钮在其上一行（bottom 60px），互不重叠；滚动区相应让出 152px
-   （logo 48 + 折叠钮 40 + 阴影 4 + 切换器 60，对照 pure-admin has-logo 的 92px）。
-   has-switcher 由 NavVertical 在「桌面 + 未折叠（切换器在挂）」时挂上；折叠态
-   切换器不在挂，几何回落 pure-admin 默认（折叠钮回 bottom 0、滚动区 92px）。 */
-body[layout="vertical"] .app-wrapper .sidebar-container.has-switcher {
-  .el-scrollbar.pc {
-    height: calc(100% - 152px);
-  }
-
-  .left-collapse {
-    bottom: 60px;
-  }
-
-  .kb-switcher {
-    position: absolute;
-    right: 12px;
-    bottom: 12px;
-    left: 12px;
-    width: auto;
-    margin: 0;
-  }
-}
-
 /* 顶栏（旧 .layout-header 56px）+ 面包屑（旧 .breadcrumb） */
 .utopia-navbar {
   display: flex;

@@ -8,7 +8,7 @@
 //     /kb-settings）挂 KbRedirect 兜底组件（源仓 LegacyX 同构）；
 //   - /docs 是重定向记录（→ /docs/ingest，源仓 M-3 同款），slug 页有真组件；
 //   - 账户层 /account 族（shell+profile/my-kbs/tokens/admin，T5 收口）也是
-//     hidden 独立整页——user-menu/kb-switcher 的链接目标。
+//     hidden 独立整页——user-menu 与「新建」深链的链接目标。
 // 登录校验统一交若依 permission.ts 的 beforeEach（未登录 → /login?redirect=）。
 import { describe, it, expect } from "vitest";
 import router, { constantRoutes } from "@/router";
@@ -89,7 +89,7 @@ describe("kb 动态路由在 constantRoutes（hidden 独立整页）", () => {
 });
 
 // 账户层路由（T5 收口）：kb 页顶栏 user-menu（个人资料/我的库/部署管理）与
-// kb-switcher「新建知识库」（/account/kbs?create=true）的链接目标。源仓
+// 「新建知识库」深链（/account/kbs?create=true）的链接目标。源仓
 // remaining.ts 的 AccountShell 族——独立整页壳（不经若依 Layout），子项绝对
 // 路径仍挂壳渲染（matched 链 = shell + 页面）。
 describe("账户层路由在 constantRoutes（AccountShell 独立整页）", () => {

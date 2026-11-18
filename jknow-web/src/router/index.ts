@@ -55,7 +55,7 @@ export const constantRoutes = [
   // ---- 知识图谱 kb 动态路由（P2 任务 3，V0100 component 前缀 jknow/knowledge/<域>/index）----
   // hidden 不进菜单（菜单开启在 V0102/T4：若依 getRouters 的后端菜单树）；
   // 页面渲染为独立整页（utopia 壳的顶栏/侧栏职责由页面内组件承担——
-  // sources-rail/kb-switcher），登录校验交若依 permission.ts 的 beforeEach。
+  // sources-rail 等），登录校验交若依 permission.ts 的 beforeEach。
   {
     path: "/kb/:kbId/graph",
     component: () => import("@/views/jknow/knowledge/graph/index.vue"),
@@ -167,7 +167,7 @@ export const constantRoutes = [
     hidden: true
   },
   // 账户层（源仓 router/modules/remaining.ts 的 AccountShell 族，T5 收口）：
-  // kb 页顶栏 user-menu（个人资料/我的库/部署管理）与 kb-switcher「新建知识库」
+  // kb 页顶栏 user-menu（个人资料/我的库/部署管理）与「新建知识库」深链
   // （/account/kbs?create=true）的链接目标——T3 只迁了 account/admin 页面族未
   // 注册路由，链接直落 404（T4 遗留交接项，走查实测确认后补）。独立整页
   // （account/shell.vue 自带左侧导航壳），hidden 不进若依菜单；子项写绝对路径

@@ -79,10 +79,6 @@ vi.mock("@/api/knowledge/auth", () => ({
   oidcMe: vi.fn(),
   oidcUnlinkMe: vi.fn()
 }));
-vi.mock("@/composables/useKbContext", () => ({
-  useKbContext: () => ({ rebuildMenus: vi.fn() }),
-  resolveLegacyKbPath: vi.fn()
-}));
 
 const kbRow = {
   id: "kb1",
