@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -34,6 +35,7 @@ import tech.seexun.jknow.store.entity.UserRow;
  * rss_full_content::requeue_failed 的对等物——同一套源锁/代际/purge 栅栏/容量上限。
  */
 @RestController
+@PreAuthorize("@ss.hasPermi('knowledge:ingest:list')")
 public class JobsController {
 
     private final JobsService jobs;
@@ -92,6 +94,7 @@ public class JobsController {
     }
 
     /** jobs_routes.rs:69-96 requeue_in_kb（Editor）。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:ingest:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/jobs/requeue")
     public RequeueResponse requeueInKb(@PathVariable UUID kbId,
                                        @RequestBody(required = false) RequeueBody body,
@@ -106,6 +109,7 @@ public class JobsController {
     }
 
     /** jobs_routes.rs:99-127 requeue_all：系统级告警（没有库的）从这里走，只给管理员。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:ingest:edit')")
     @PostMapping("/api/v1/jobs/requeue")
     public RequeueResponse requeueAll(@RequestBody(required = false) RequeueBody body,
                                       HttpServletRequest request) {
@@ -131,6 +135,7 @@ public class JobsController {
      * P0 队列验证端点（api/mod.rs:598/642-650 jobs_noop）：入队一个 noop 任务
      * （后续里程碑移除）；worker 未启用的部署里它只是安静排着。
      */
+    @PreAuthorize("@ss.hasPermi('knowledge:ingest:edit')")
     @PostMapping("/api/v1/jobs/noop")
     public NoopResponse noop(HttpServletRequest request) {
         user(request);

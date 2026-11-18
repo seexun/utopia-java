@@ -484,9 +484,12 @@ function reset(fn: () => void) {
       </template>
       <template #footer>
         <div class="foot-danger">
+          <!-- T4：自列比较改 email——me() 的 User.id 是若依 userId 字符串（utopia uuid
+               不在 getInfo 响应面，T3 遗留缺口），与成员行的 user_id(uuid) 恒不等；
+               userName 与成员 email 同源（sys_user.user_name），自列判定由此闭合 -->
           <el-button
             v-if="
-              me.data.value?.is_admin && me.data.value.id !== editing?.user_id
+              me.data.value?.is_admin && me.data.value?.email !== editing?.email
             "
             size="small"
             :title="S.members.deactivateHint"

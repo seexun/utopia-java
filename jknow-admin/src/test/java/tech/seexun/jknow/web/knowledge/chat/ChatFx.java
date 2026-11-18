@@ -41,6 +41,8 @@ abstract class ChatFx extends StoreTestBase {
 
     /** 起假模型 + 建一套 org/workspace/kb/user（viewer），chat 设置指向假端点。 */
     void fixture(List<ScriptedReply> replies) throws Exception {
+        // 直调面登录态（P2 任务 4 起 ChatController 挂 @PreAuthorize——hasPermi 要 LoginUser）
+        loginAsAdminDirectCall();
         fake = ChatScriptServer.start(replies);
         org = UUID.randomUUID();
         UUID ws = UUID.randomUUID();
@@ -146,5 +148,6 @@ abstract class ChatFx extends StoreTestBase {
     void cleanup() {
         fake.stop();
         jdbc.update("DELETE FROM organizations WHERE id = ?", org);
+        logoutDirectCall();
     }
 }

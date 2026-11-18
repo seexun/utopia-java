@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -51,6 +52,7 @@ import tech.seexun.jknow.store.entity.WorkspaceRow;
  * 包没装上）。M4 任务 6 的 {@code ontology_packs_unsupported} 降级自此退役。
  */
 @RestController
+@PreAuthorize("@ss.hasPermi('knowledge:workspace:list')")
 public class WorkspaceKbWriteController {
 
     private final WorkspaceAccess wsAccess;
@@ -96,6 +98,7 @@ public class WorkspaceKbWriteController {
         return name;
     }
 
+    @PreAuthorize("@ss.hasPermi('knowledge:workspace:edit')")
     @PostMapping("/api/v1/workspaces")
     public WorkspaceRow createWorkspace(@RequestBody NameReq req, HttpServletRequest request) {
         UserRow user = user(request);
@@ -105,6 +108,7 @@ public class WorkspaceKbWriteController {
 
     // ---- PATCH /api/v1/workspaces/{id}（workspaces.rs:58-68 rename：ws Admin） ----
 
+    @PreAuthorize("@ss.hasPermi('knowledge:workspace:edit')")
     @PatchMapping("/api/v1/workspaces/{id}")
     public WorkspaceRow renameWorkspace(@PathVariable UUID id, @RequestBody NameReq req,
                                         HttpServletRequest request) {
@@ -117,6 +121,7 @@ public class WorkspaceKbWriteController {
 
     // ---- DELETE /api/v1/workspaces/{id}（workspaces.rs:70-78 delete：ws Owner） ----
 
+    @PreAuthorize("@ss.hasPermi('knowledge:workspace:edit')")
     @DeleteMapping("/api/v1/workspaces/{id}")
     public OkResponse deleteWorkspace(@PathVariable UUID id, HttpServletRequest request) {
         UserRow user = user(request);
@@ -135,6 +140,7 @@ public class WorkspaceKbWriteController {
      * fail-on-missing-creator-properties 让 record 全参必填，serde 的「Option 隐式可省」
      * （missing_field 反序列化器对 Option 回 None）用显式取键翻译。
      */
+    @PreAuthorize("@ss.hasPermi('knowledge:workspace:edit')")
     @PostMapping("/api/v1/workspaces/{id}/kbs")
     public KbRow createKb(@PathVariable("id") UUID workspaceId, @RequestBody JsonNode body,
                           HttpServletRequest request) {
@@ -201,6 +207,7 @@ public class WorkspaceKbWriteController {
      * <b>不校验长度</b>（Rust update 亦然——只有 workspaces 的 validate_name 管 1-64）；
      * data_conventions 清空送空串、null/缺键 = 不改（与 description 同一约定）。
      */
+    @PreAuthorize("@ss.hasPermi('knowledge:workspace:edit')")
     @PatchMapping("/api/v1/kbs/{id}")
     public KbRow updateKb(@PathVariable UUID id, @RequestBody JsonNode body,
                           HttpServletRequest request) {
@@ -253,6 +260,7 @@ public class WorkspaceKbWriteController {
 
     // ---- DELETE /api/v1/kbs/{id}（kbs.rs:227-246 delete：KB Admin） ----
 
+    @PreAuthorize("@ss.hasPermi('knowledge:workspace:edit')")
     @DeleteMapping("/api/v1/kbs/{id}")
     public OkResponse deleteKb(@PathVariable UUID id, HttpServletRequest request) {
         UserRow user = user(request);

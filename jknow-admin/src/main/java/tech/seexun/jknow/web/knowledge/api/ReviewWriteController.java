@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -54,6 +55,7 @@ import tech.seexun.jknow.store.temporal.TemporalService;
  * 这次请求知道的事。批量裁决逐条独立：一条失败不拖累其余的，结果逐条带回。
  */
 @RestController
+@PreAuthorize("@ss.hasPermi('knowledge:review:list')")
 public class ReviewWriteController {
 
     /** review_routes.rs:512 BATCH_MAX：一批 id 最多 500——够一屏全选，挡住一次请求把库锁上几分钟。 */
@@ -176,6 +178,7 @@ public class ReviewWriteController {
         }
     }
 
+    @PreAuthorize("@ss.hasPermi('knowledge:review:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/review/{reviewId}")
     public OkResponse decide(@PathVariable UUID kbId, @PathVariable UUID reviewId,
                              @RequestBody DecideBody body, HttpServletRequest request) {
@@ -232,6 +235,7 @@ public class ReviewWriteController {
     record BatchResponse(int decided, List<ResolutionService.ReviewBatchOutcome> outcomes) {
     }
 
+    @PreAuthorize("@ss.hasPermi('knowledge:review:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/review/batch")
     public BatchResponse batch(@PathVariable UUID kbId, @RequestBody BatchBody body,
                                HttpServletRequest request) {
@@ -288,6 +292,7 @@ public class ReviewWriteController {
         }
     }
 
+    @PreAuthorize("@ss.hasPermi('knowledge:review:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/review/agent/{decisionId}")
     public OkResponse agentAnswer(@PathVariable UUID kbId, @PathVariable UUID decisionId,
                                   @RequestBody AgentAnswerBody body, HttpServletRequest request) {
@@ -364,6 +369,7 @@ public class ReviewWriteController {
     record ConfirmPendingResponse(boolean ok, UUID factId, boolean created, int conflicts) {
     }
 
+    @PreAuthorize("@ss.hasPermi('knowledge:review:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/review/pending/{pendingId}")
     public Object decidePending(@PathVariable UUID kbId, @PathVariable UUID pendingId,
                                 @RequestBody DecidePendingBody body, HttpServletRequest request) {
@@ -404,6 +410,7 @@ public class ReviewWriteController {
 
     // ---- 5. POST /kbs/{id}/facts/{fact_id}/confirm（review_routes.rs:590-612） ----
 
+    @PreAuthorize("@ss.hasPermi('knowledge:review:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/facts/{factId}/confirm")
     public OkResponse confirmFact(@PathVariable UUID kbId, @PathVariable UUID factId,
                                   HttpServletRequest request) {
@@ -421,6 +428,7 @@ public class ReviewWriteController {
 
     // ---- 6. POST /kbs/{id}/facts/{fact_id}/reject（review_routes.rs:614-636） ----
 
+    @PreAuthorize("@ss.hasPermi('knowledge:review:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/facts/{factId}/reject")
     public OkResponse rejectFact(@PathVariable UUID kbId, @PathVariable UUID factId,
                                  HttpServletRequest request) {
@@ -457,6 +465,7 @@ public class ReviewWriteController {
         }
     }
 
+    @PreAuthorize("@ss.hasPermi('knowledge:review:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/facts/{factId}/close")
     public OkResponse closeFact(@PathVariable UUID kbId, @PathVariable UUID factId,
                                 @RequestBody CloseFactBody body, HttpServletRequest request) {
@@ -496,6 +505,7 @@ public class ReviewWriteController {
         }
     }
 
+    @PreAuthorize("@ss.hasPermi('knowledge:review:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/conflicts/{conflictId}")
     public OkResponse resolveConflict(@PathVariable UUID kbId, @PathVariable UUID conflictId,
                                       @RequestBody ConflictBody body, HttpServletRequest request) {
@@ -531,6 +541,7 @@ public class ReviewWriteController {
 
     // ---- 9. POST /kbs/{id}/merges/{merge_id}/revert（review_routes.rs:638-674） ----
 
+    @PreAuthorize("@ss.hasPermi('knowledge:review:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/merges/{mergeId}/revert")
     public OkResponse revertMerge(@PathVariable UUID kbId, @PathVariable UUID mergeId,
                                   HttpServletRequest request) {
@@ -575,6 +586,7 @@ public class ReviewWriteController {
         }
     }
 
+    @PreAuthorize("@ss.hasPermi('knowledge:review:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/entities/merge")
     public MergeIdResponse manualMerge(@PathVariable UUID kbId, @RequestBody ManualMergeBody body,
                                        HttpServletRequest request) {
@@ -604,6 +616,7 @@ public class ReviewWriteController {
     record DecideMappingBody(String status) {
     }
 
+    @PreAuthorize("@ss.hasPermi('knowledge:review:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/review/mappings/{mappingId}")
     public OkResponse decideMapping(@PathVariable UUID kbId, @PathVariable UUID mappingId,
                                     @RequestBody DecideMappingBody body,
@@ -629,6 +642,7 @@ public class ReviewWriteController {
                                int defectsNew) {
     }
 
+    @PreAuthorize("@ss.hasPermi('knowledge:review:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/consistency/check")
     public ConsistencyResponse runConsistencyCheck(@PathVariable UUID kbId,
                                                    HttpServletRequest request) {
@@ -676,6 +690,7 @@ public class ReviewWriteController {
         }
     }
 
+    @PreAuthorize("@ss.hasPermi('knowledge:review:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/review/violations/{violationId}")
     public OkResponse decideViolation(@PathVariable UUID kbId, @PathVariable UUID violationId,
                                       @RequestBody DecideViolationBody body,
@@ -753,6 +768,7 @@ public class ReviewWriteController {
     record DecideDefectBody(String resolution) {
     }
 
+    @PreAuthorize("@ss.hasPermi('knowledge:review:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/review/defects/{defectId}")
     public OkResponse decideDefect(@PathVariable UUID kbId, @PathVariable UUID defectId,
                                    @RequestBody DecideDefectBody body, HttpServletRequest request) {
@@ -775,6 +791,7 @@ public class ReviewWriteController {
                              int capped) {
     }
 
+    @PreAuthorize("@ss.hasPermi('knowledge:review:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/inference/run")
     public InferenceResponse runInference(@PathVariable UUID kbId, HttpServletRequest request) {
         UserRow user = user(request);
@@ -827,6 +844,7 @@ public class ReviewWriteController {
 
     /** 202：收下了，投影在路上。不编一个 typed: {added: 0} 出来——那不是这次请求知道的事。 */
     @ResponseStatus(HttpStatus.ACCEPTED)
+    @PreAuthorize("@ss.hasPermi('knowledge:review:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/review/alignment/phrases/{bindingId}")
     public AcceptedResponse decideAlignmentPhrase(@PathVariable UUID kbId,
                                                   @PathVariable UUID bindingId,
@@ -921,6 +939,7 @@ public class ReviewWriteController {
         }
     }
 
+    @PreAuthorize("@ss.hasPermi('knowledge:review:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/review/alignment/kind-words/{kindWord}")
     public OkResponse decideAlignmentKindWord(@PathVariable UUID kbId,
                                               @PathVariable String kindWord,
@@ -970,6 +989,7 @@ public class ReviewWriteController {
 
     /** 批准且要读数的先排 read_phrases（填缓存后自己排物化），否则直接排物化——驳回也要重算。 */
     @ResponseStatus(HttpStatus.ACCEPTED)
+    @PreAuthorize("@ss.hasPermi('knowledge:review:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/review/alignment/rules/{ruleId}")
     public AcceptedResponse decideAlignmentRule(@PathVariable UUID kbId,
                                                 @PathVariable UUID ruleId,
@@ -1004,6 +1024,7 @@ public class ReviewWriteController {
     record DecideErrataBody(boolean approve) {
     }
 
+    @PreAuthorize("@ss.hasPermi('knowledge:review:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/review/errata/{actionId}")
     public OkResponse decideErrata(@PathVariable UUID kbId, @PathVariable UUID actionId,
                                    @RequestBody DecideErrataBody req, HttpServletRequest request) {

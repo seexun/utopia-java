@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -35,6 +36,7 @@ import tech.seexun.jknow.store.mapper.OntologyMapper;
  * 对 FOAF 44KB / FIBO 几百 KB 的量级无差别。
  */
 @RestController
+@PreAuthorize("@ss.hasPermi('knowledge:ontology:list')")
 public class OntologyImportController {
 
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -69,6 +71,7 @@ public class OntologyImportController {
     /**
      * 先看会发生什么（preview_import）。Editor 即可——只算不写。
      */
+    @PreAuthorize("@ss.hasPermi('knowledge:ontology:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/ontology/imports/preview")
     public ObjectNode preview(@PathVariable UUID kbId, MultipartHttpServletRequest multipart,
                               HttpServletRequest request) {
@@ -90,6 +93,7 @@ public class OntologyImportController {
      * <p>apply 是多笔提交：中途失败时一部分判据已经落了，尽力对账（对账自身失败只记
      * 告警，原错误照样返回，不吞）。
      */
+    @PreAuthorize("@ss.hasPermi('knowledge:ontology:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/ontology/imports")
     public ObjectNode apply(@PathVariable UUID kbId, MultipartHttpServletRequest multipart,
                             HttpServletRequest request) {

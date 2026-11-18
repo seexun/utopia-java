@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,6 +31,7 @@ import tech.seexun.jknow.store.entity.UserRow;
  * {@link tech.seexun.jknow.web.knowledge.query.QueryRunner}）。
  */
 @RestController
+@PreAuthorize("@ss.hasPermi('knowledge:settings:list')")
 public class DatasourcesController {
 
     private final DatasourcesService datasources;
@@ -59,6 +61,7 @@ public class DatasourcesController {
      * <p><b>列表过滤不是守卫。</b>那只挡「看得见」，而这个端点是照着 id 调的——谁都能
      * 自己拼一个 uuid 打过来。授权在这里再查一次。
      */
+    @PreAuthorize("@ss.hasPermi('knowledge:settings:edit')")
     @PutMapping("/api/v1/kbs/{kbId}/data-sources/{dsId}")
     public JsonNode mount(@PathVariable UUID kbId, @PathVariable UUID dsId,
                           HttpServletRequest request) {
@@ -87,6 +90,7 @@ public class DatasourcesController {
     }
 
     /** datasource_routes.rs:225-233 unmount（幂等——没挂也是 ok）。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:settings:edit')")
     @DeleteMapping("/api/v1/kbs/{kbId}/data-sources/{dsId}")
     public JsonNode unmount(@PathVariable UUID kbId, @PathVariable UUID dsId,
                             HttpServletRequest request) {
@@ -108,6 +112,7 @@ public class DatasourcesController {
      * <p><b>读不出结构回 422 带引擎原话</b>（截 600 字符）；我们自己这边出的错（库、写
      * 文档）照旧 500。
      */
+    @PreAuthorize("@ss.hasPermi('knowledge:settings:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/data-sources/{dsId}/sync-schema")
     public ResponseEntity<JsonNode> syncSchema(@PathVariable UUID kbId, @PathVariable UUID dsId,
                                                HttpServletRequest request) {
@@ -138,6 +143,7 @@ public class DatasourcesController {
      * datasource_routes.rs:271-285 explore：Agentic 探索——后台任务读挂载源 schema，提议
      * 指标/维度→字段 映射（低置信入 Review）。无挂载源 422 no_data_sources。
      */
+    @PreAuthorize("@ss.hasPermi('knowledge:settings:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/data-sources/explore")
     public JsonNode explore(@PathVariable UUID kbId, HttpServletRequest request) {
         UserRow user = user(request);

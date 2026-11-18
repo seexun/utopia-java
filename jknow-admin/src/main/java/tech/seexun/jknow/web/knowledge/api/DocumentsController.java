@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -45,6 +46,7 @@ import tech.seexun.jknow.store.mapper.DocumentsMapper;
  * 随 MCP 域任务一并补）。
  */
 @RestController
+@PreAuthorize("@ss.hasPermi('knowledge:ingest:list')")
 public class DocumentsController {
 
     /** documents_routes.rs:350 一页缺省 15、钳 [1,200]。 */

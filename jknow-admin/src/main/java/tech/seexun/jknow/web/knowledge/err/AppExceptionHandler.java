@@ -145,6 +145,19 @@ public class AppExceptionHandler {
         return respond(HttpStatus.INTERNAL_SERVER_ERROR, body);
     }
 
+    /**
+     * RBAC 拒绝（P2 任务 4：业务 controller 挂 @PreAuthorize/@ss.hasPermi 后，
+     * AccessDeniedException 从方法拦截器抛进 handler 链）。必须显式接住——本类的
+     * Exception 兜底在本工程优先于若依 GlobalExceptionHandler 的同名处理，不接就会
+     * 把「权限不够」误报成 500 内部错误。形状对齐源 Forbidden 契约（403 + 上表文案）。
+     */
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    ResponseEntity<String> accessDenied(org.springframework.security.access.AccessDeniedException e) {
+        ObjectNode body = mapper.createObjectNode();
+        body.put("error", "You don't have permission to do that");
+        return respond(HttpStatus.FORBIDDEN, body);
+    }
+
     private ResponseEntity<String> respond(HttpStatus status, ObjectNode body) {
         return ResponseEntity.status(status)
                 .header("Content-Type", "application/json")

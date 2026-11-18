@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -46,6 +47,7 @@ import tech.seexun.jknow.store.entity.UserRow;
  * </ul>
  */
 @RestController
+@PreAuthorize("@ss.hasPermi('knowledge:settings:list')")
 public class McpController {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -172,6 +174,7 @@ public class McpController {
     }
 
     /** mcp.rs:171-259 handle。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:settings:edit')")
     @PostMapping(path = "/api/v1/kbs/{kbId}/mcp", produces = MediaType.APPLICATION_JSON_VALUE)
     public ObjectNode handle(@PathVariable UUID kbId, @RequestBody JsonNode req,
                              HttpServletRequest request) {

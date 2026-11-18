@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -40,6 +41,7 @@ import tech.seexun.jknow.store.mapper.WorkspaceMapper;
  * 写路径（代开账号/停复活/改部署配置）已过 403 门后落 500（不谎报成功）。
  */
 @RestController
+@PreAuthorize("@ss.hasPermi('knowledge:settings:list')")
 public class AdminUsersController {
 
     private final WorkspaceMapper workspaces;
@@ -113,6 +115,7 @@ public class AdminUsersController {
     // ---- admin 面其余端点：403 判定链对齐；happy 写路径归 M2 ----
 
     /** admin_routes.rs:107-146 create_user（写路径归 M2：非 admin 403 形状对齐）。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:settings:edit')")
     @PostMapping("/api/v1/admin/users")
     public JsonNode createUser(HttpServletRequest request) {
         requireAdmin(request);
@@ -120,6 +123,7 @@ public class AdminUsersController {
     }
 
     /** admin_routes.rs:157-175 deactivate_user（DELETE=断访问不是删行；归 M2）。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:settings:edit')")
     @DeleteMapping("/api/v1/admin/users/{id}")
     public JsonNode deactivateUser(@PathVariable UUID id, HttpServletRequest request) {
         requireAdmin(request);
@@ -127,6 +131,7 @@ public class AdminUsersController {
     }
 
     /** admin_routes.rs:182-200 reactivate_user（归 M2）。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:settings:edit')")
     @PostMapping("/api/v1/admin/users/{id}")
     public JsonNode reactivateUser(@PathVariable UUID id, HttpServletRequest request) {
         requireAdmin(request);
@@ -134,6 +139,7 @@ public class AdminUsersController {
     }
 
     /** admin_routes.rs:68-94 put_deployment（写路径归 M2：非 admin 403 形状对齐）。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:settings:edit')")
     @PutMapping("/api/v1/admin/deployment")
     public JsonNode putDeployment(@RequestBody JsonNode body, HttpServletRequest request) {
         requireAdmin(request);
@@ -164,6 +170,7 @@ public class AdminUsersController {
      * 等于让人授权一件从没见过的东西，挂载时只得到一句「未授权」。所以登记人所在的每个
      * 工作区一并授权；要收窄，卡片上仍能撤销。
      */
+    @PreAuthorize("@ss.hasPermi('knowledge:settings:edit')")
     @PostMapping("/api/v1/admin/data-sources")
     public JsonNode createDataSource(@RequestBody JsonNode body, HttpServletRequest request) {
         UserRow user = requireAdmin(request);
@@ -188,6 +195,7 @@ public class AdminUsersController {
      * 表单里那个「测试连接」按的是它。把引擎的报错原样带回去：密码错、库名拼错、端口不通，
      * 是三件不同的事，人得知道是哪一件。
      */
+    @PreAuthorize("@ss.hasPermi('knowledge:settings:edit')")
     @PostMapping("/api/v1/admin/data-sources/test")
     public JsonNode testDataSources(@RequestBody JsonNode body, HttpServletRequest request) {
         requireAdmin(request);
@@ -213,6 +221,7 @@ public class AdminUsersController {
     }
 
     /** datasource_routes.rs:135-148 test（按 id）：结果落行（record_test）。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:settings:edit')")
     @PostMapping("/api/v1/admin/data-sources/{id}/test")
     public JsonNode testDataSource(@PathVariable UUID id, HttpServletRequest request) {
         requireAdmin(request);
@@ -231,6 +240,7 @@ public class AdminUsersController {
     }
 
     /** datasource_routes.rs:89-97 delete。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:settings:edit')")
     @DeleteMapping("/api/v1/admin/data-sources/{id}")
     public JsonNode deleteDataSource(@PathVariable UUID id, HttpServletRequest request) {
         requireAdmin(request);
@@ -253,6 +263,7 @@ public class AdminUsersController {
      * datasource_routes.rs:418-436 grant：授权一个工作区用这个源（幂等）。
      * 授权与挂载是两层，各有各的主人（0014）——两层都是多对多，挂载只能在授权过的集合里挑。
      */
+    @PreAuthorize("@ss.hasPermi('knowledge:settings:edit')")
     @PutMapping("/api/v1/admin/data-sources/{id}/grants/{workspaceId}")
     public JsonNode grant(@PathVariable UUID id, @PathVariable UUID workspaceId,
                           HttpServletRequest request) {
@@ -271,6 +282,7 @@ public class AdminUsersController {
      * （store 层一个事务）。返回卸掉了几个，好让界面说得出「顺带卸了 3 个库」而不是悄悄
      * 断人家的连接。
      */
+    @PreAuthorize("@ss.hasPermi('knowledge:settings:edit')")
     @DeleteMapping("/api/v1/admin/data-sources/{id}/grants/{workspaceId}")
     public JsonNode revoke(@PathVariable UUID id, @PathVariable UUID workspaceId,
                            HttpServletRequest request) {

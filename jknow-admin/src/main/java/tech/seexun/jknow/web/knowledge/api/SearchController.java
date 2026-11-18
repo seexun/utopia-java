@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -37,6 +38,7 @@ import tech.seexun.jknow.store.entity.UserRow;
  * {@code {"results":[ChunkView{id,document_id,seq,text,filename}]}}。
  */
 @RestController
+@PreAuthorize("@ss.hasPermi('knowledge:search:list')")
 public class SearchController {
 
     private static final org.slf4j.Logger log =
@@ -101,7 +103,9 @@ public class SearchController {
     }
 
     // ---- POST /api/v1/kbs/{kbId}/search（search_routes.rs:25-41） ----
-
+    // 语义是读：POST 只是查询体载体（源仓同形），挂 :edit 会让 knowledge:search:list
+    // 变成死权限（本域唯一端点）；读取令牌的 scope 闸（filter 层 GET/HEAD 判定）另行兜底
+    @PreAuthorize("@ss.hasPermi('knowledge:search:list')")
     @PostMapping("/api/v1/kbs/{kbId}/search")
     public SearchResponse search(@PathVariable UUID kbId, @RequestBody SearchReq req,
                                  HttpServletRequest request) {

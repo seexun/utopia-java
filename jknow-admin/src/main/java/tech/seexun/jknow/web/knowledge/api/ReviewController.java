@@ -3,6 +3,7 @@ package tech.seexun.jknow.web.knowledge.api;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -29,6 +30,7 @@ import tech.seexun.jknow.store.entity.UserRow;
  * （review_routes.rs:20/83-86）；未知 queue → 422 unknown_queue（141-147）。
  */
 @RestController
+@PreAuthorize("@ss.hasPermi('knowledge:review:list')")
 public class ReviewController {
 
     /** review_routes.rs:20：一页多少条（服务端默认，不是上限）。 */

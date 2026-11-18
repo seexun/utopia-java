@@ -9,6 +9,7 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -40,6 +41,7 @@ import tech.seexun.jknow.store.entity.UserRow;
  * Query 拒绝原文（"Failed to deserialize query string: missing field `q`"）。
  */
 @RestController
+@PreAuthorize("@ss.hasPermi('knowledge:ontology:list')")
 public class MappingsController {
 
     /** mapping_routes.rs:20 MAPPING_PAGE：一页多少条（口径比审阅队列密）。 */

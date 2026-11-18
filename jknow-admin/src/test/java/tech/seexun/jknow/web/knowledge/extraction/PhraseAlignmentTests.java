@@ -808,6 +808,9 @@ class PhraseAlignmentTests extends HeartStoreTestBase {
     void aPropertyCreatedInTheEditorHasItsVectorBeforePhrasesAreAligned() throws Exception {
         Fx f = seed();
         try {
+            // 直调面登录态（P2 任务 4 起 OntologyController 挂 @PreAuthorize——hasPermi 要
+            // LoginUser）；本例两处直调（createRelationType/updateRelationType）全要过注解
+            loginAsAdminDirectCall();
             enableEmbeddings(f);
             tech.seexun.jknow.store.entity.UserRow editor = editor(f);
             com.fasterxml.jackson.databind.ObjectMapper json =
@@ -817,6 +820,8 @@ class PhraseAlignmentTests extends HeartStoreTestBase {
                      "description": "where the main office of an entity is",
                      "domains": ["%s"], "ranges": ["%s"]}
                     """.formatted(f.legalEntity, f.place));
+            // 直调面登录态（P2 任务 4 起 OntologyController 挂 @PreAuthorize——hasPermi 要
+            // LoginUser）；本例两处直调（createRelationType/updateRelationType）全要过注解
             var created = ontologyApi.createRelationType(editor, f.kb, req);
             UUID id = UUID.fromString(created.get("id").asText());
 
@@ -871,6 +876,7 @@ class PhraseAlignmentTests extends HeartStoreTestBase {
                     vectorOf(f, id).get(1));
         } finally {
             cleanup(f);
+            logoutDirectCall();
         }
     }
 

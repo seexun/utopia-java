@@ -10,6 +10,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -44,6 +45,7 @@ import tech.seexun.jknow.store.mapper.WorkspaceMapper;
  * 四把 api_key 只回「是否已配置」布尔（settings_routes.rs:15-43），封印串绝不出库。
  */
 @RestController
+@PreAuthorize("@ss.hasPermi('knowledge:workspace:list')")
 public class WorkspaceKbController {
 
     private final WorkspaceMapper workspaces;

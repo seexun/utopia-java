@@ -6,6 +6,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -43,6 +44,7 @@ import tech.seexun.jknow.store.entity.UserRow;
  * <p>时刻参数 at/as_of（世界轴/记录轴，0019）与 limit 钳位逐字（graph_routes.rs:27-44/46-52）。
  */
 @RestController
+@PreAuthorize("@ss.hasPermi('knowledge:graph:list')")
 public class GraphController {
 
     /** graph_routes.rs:48：总览默认画 150 个节点。 */
@@ -109,6 +111,7 @@ public class GraphController {
      * 一条名字事实 0041，旧名字不作废——召回靠它认出来）。台账分开记 retyped/renamed；
      * 返回改后的实体与当下的同名列。
      */
+    @PreAuthorize("@ss.hasPermi('knowledge:graph:edit')")
     @PatchMapping("/api/v1/kbs/{id}/entities/{entityId}")
     public java.util.Map<String, Object> updateEntity(@PathVariable UUID id,
                                                       @PathVariable UUID entityId,
@@ -180,6 +183,7 @@ public class GraphController {
      * 与来源级重抽的分工——重抽保留既有决策，重建放弃它们，换取「当前语料 × 当前本体」
      * 的确定性重演（早期脏抽取、本体大改后的收场手段）。决策台账与裁决缓存刻意保留。
      */
+    @PreAuthorize("@ss.hasPermi('knowledge:graph:edit')")
     @PostMapping("/api/v1/kbs/{id}/graph/rebuild")
     public java.util.Map<String, Object> rebuild(@PathVariable UUID id,
                                                  HttpServletRequest request) {

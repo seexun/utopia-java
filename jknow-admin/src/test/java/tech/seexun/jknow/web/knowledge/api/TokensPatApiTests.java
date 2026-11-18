@@ -17,6 +17,8 @@ import tech.seexun.jknow.common.uuids.Uuids;
  * 三步 + <b>pt- 双通</b>（T7 交接）——若依 token（LoginUser+SecurityContext 形态）与
  * pt- Bearer（不挂 postprocessor，真走 PersonalTokenAuthFilter 的摘要查表验签）打同一个
  * 业务端点同形 200；坏令牌/前缀不对 401；撤销后立刻 401（判断在 SQL 里）。
+ * P2 任务 4 追加：业务面挂 @PreAuthorize 后的 pt- 双通复核——PT_PERMISSIONS 是 V0100
+ * 全集 16 项（通配 knowledge:* 在 hasPermi 精确匹配下必 403），读写两面都要真过权限注解。
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class TokensPatApiTests extends ApiTestBase {
@@ -162,5 +164,74 @@ class TokensPatApiTests extends ApiTestBase {
         Resp blocked = rawPost("/api/v1/workspaces", plain, "{\"name\":\"should-fail\"}");
         assertEquals(401, blocked.status());
         assertEquals("Not signed in or invalid credentials", blocked.body().get("error").asText());
+    }
+
+    /**
+     * P2 任务 4：业务面挂 @PreAuthorize 后的 pt- 双通复核。
+     * <ul>
+     * <li>读面（类级 knowledge:workspace:list）：pt- 打 /workspaces 要 200——上面的
+     *     issueListRevokeAndDoublePass 已覆盖，这里再用 write 令牌补一遍同断言；</li>
+     * <li>写面（方法级 knowledge:settings:edit）：write scope 的 pt- 打 me/tokens 签发
+     *     要 200——若权限集还是 knowledge:* 通配（P1 落字预告的坑），这里会是若依
+     *     200+体 code:403 的权限拒绝形状（Resp.code() 取体 code）；</li>
+     * <li>对照组（注解真挂上了，不是漏挂后的裸奔通过）：空权限集的若依登录态打同一
+     *     读面 → 200+体 code:403「没有权限」。</li>
+     * </ul>
+     */
+    @Test
+    void ptPassesPreAuthorizeOnMountedBusinessFace() throws Exception {
+        Resp writeIssued = post("/api/v1/me/tokens", userId,
+                "{\"name\":\"t8-pat-write\",\"scope\":\"write\"}");
+        assertEquals(200, writeIssued.status(), writeIssued.raw());
+        String writePlain = writeIssued.body().get("token").asText();
+        String writeId = writeIssued.body().get("info").get("id").asText();
+        String nestedId = null;
+        try {
+            // 读面：类级 knowledge:workspace:list
+            Resp read = rawGet("/api/v1/workspaces", writePlain);
+            assertEquals(200, read.status(), "pt-（16 项全集）过类级 workspace:list 注解\n" + read.raw());
+            // 写面：方法级 knowledge:settings:edit（真达业务层——嵌套签发一枚 read 令牌成功）
+            Resp nested = rawPost("/api/v1/me/tokens", writePlain,
+                    "{\"name\":\"t8-pat-nested\",\"scope\":\"read\"}");
+            assertEquals(200, nested.status(), nested.raw());
+            assertEquals(200, nested.code(),
+                    "pt- 过方法级 settings:edit 注解（若为 code:403 则权限集未展开为 16 项）\n" + nested.raw());
+            nestedId = nested.body().get("info").get("id").asText();
+            // 对照组：空权限集登录态 → 403 源 Forbidden 契约形状（@PreAuthorize 拒绝
+            // 由 AppExceptionHandler.accessDenied 接住，不落 500 兜底）
+            Resp denied = getWithEmptyPermissions("/api/v1/workspaces");
+            assertEquals(403, denied.status(), "空权限集应被 @ss.hasPermi 拒\n" + denied.raw());
+            assertEquals("You don't have permission to do that",
+                    denied.body().get("error").asText(), denied.raw());
+        } finally {
+            // 收尾：嵌套签发的那枚与 write 令牌都撤掉（打戳不删行，同源语义）
+            if (nestedId != null) {
+                jdbc.update("UPDATE personal_tokens SET revoked_at = now() WHERE id = ?",
+                        java.util.UUID.fromString(nestedId));
+            }
+            assertEquals(200, delete("/api/v1/me/tokens/" + writeId, userId).status(), "收尾撤 write 令牌");
+        }
+    }
+
+    /** 空权限集的若依登录态（拒绝形状对照组）：与 ApiTestBase.ruoyi 同形态，permissions 换空集。 */
+    private Resp getWithEmptyPermissions(String path) throws Exception {
+        Long sessionUserId = jdbc.queryForObject(
+                "SELECT user_id FROM sys_user WHERE utopia_uuid = ?", Long.class, userId);
+        tech.seexun.jknow.common.core.domain.entity.SysUser sysUser =
+                new tech.seexun.jknow.common.core.domain.entity.SysUser();
+        sysUser.setUserId(sessionUserId);
+        tech.seexun.jknow.common.core.domain.model.LoginUser loginUser =
+                new tech.seexun.jknow.common.core.domain.model.LoginUser(
+                        sessionUserId, null, sysUser, java.util.Set.of());
+        org.springframework.security.authentication.UsernamePasswordAuthenticationToken authentication =
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                        loginUser, null, loginUser.getAuthorities());
+        var result = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .get(path).accept(org.springframework.http.MediaType.APPLICATION_JSON)
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors
+                        .authentication(authentication))).andReturn();
+        String raw = result.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        return new Resp(result.getResponse().getStatus(),
+                raw.isEmpty() ? null : mapper.readTree(raw), raw);
     }
 }

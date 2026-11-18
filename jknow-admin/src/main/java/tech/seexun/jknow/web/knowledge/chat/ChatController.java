@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -42,6 +43,7 @@ import tech.seexun.jknow.store.entity.UserRow;
  * 有意的——丢答案比多跑一轮贵，而 MAX_ROUNDS 已经给了上限。
  */
 @RestController
+@PreAuthorize("@ss.hasPermi('knowledge:chat:list')")
 public class ChatController {
 
     private static final String NO_MODEL = "Chat model not configured. Go to Settings → Models.";
@@ -116,6 +118,7 @@ public class ChatController {
         }
     }
 
+    @PreAuthorize("@ss.hasPermi('knowledge:chat:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/chat")
     public SseEmitter chat(@PathVariable UUID kbId, @RequestBody ChatReq req,
                            HttpServletRequest request) {
@@ -328,6 +331,7 @@ public class ChatController {
     }
 
     /** 只通知生成的持有者，由它保存部分答案并发送终态。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:chat:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/chat/{conversationId}/stop")
     public ObjectNode stop(@PathVariable UUID kbId, @PathVariable UUID conversationId,
                            @RequestBody StopReq req, HttpServletRequest request) {
@@ -372,6 +376,7 @@ public class ChatController {
      * 改会话标题。标题本来是从第一句话自动取的，而一段对话跑偏是常态——改名让人能按
      * 自己记得的方式找回它。
      */
+    @PreAuthorize("@ss.hasPermi('knowledge:chat:edit')")
     @PatchMapping("/api/v1/kbs/{kbId}/conversations/{conversationId}")
     public ObjectNode rename(@PathVariable UUID kbId, @PathVariable UUID conversationId,
                              @RequestBody RenameConversationReq req, HttpServletRequest request) {
@@ -383,6 +388,7 @@ public class ChatController {
         return out;
     }
 
+    @PreAuthorize("@ss.hasPermi('knowledge:chat:edit')")
     @DeleteMapping("/api/v1/kbs/{kbId}/conversations/{conversationId}")
     public ObjectNode delete(@PathVariable UUID kbId, @PathVariable UUID conversationId,
                              HttpServletRequest request) {

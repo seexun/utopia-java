@@ -6,6 +6,7 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,6 +28,7 @@ import tech.seexun.jknow.store.mapper.TokensMapper;
  * 录制链路 token_prefix 掩码、行数确定性由剧本 ${run_id} 唯一账号钉死（M5 挂账核销））。
  */
 @RestController
+@PreAuthorize("@ss.hasPermi('knowledge:settings:list')")
 public class TokensController {
 
     private final TokensMapper tokens;
@@ -59,6 +61,7 @@ public class TokensController {
      * token_routes.rs:17-30 IssueReq（serde Option 隐式可省——按 WorkspaceKbWriteController
      * 先例读 JsonNode 显式取键：全局 fail-on-missing-creator-properties 对可缺省项不友好）。
      */
+    @PreAuthorize("@ss.hasPermi('knowledge:settings:edit')")
     @PostMapping("/api/v1/me/tokens")
     public java.util.Map<String, Object> issue(@RequestBody com.fasterxml.jackson.databind.JsonNode body,
                                                HttpServletRequest request) {
@@ -99,6 +102,7 @@ public class TokensController {
     }
 
     /** token_routes.rs:101-118 revoke：打戳不删行。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:settings:edit')")
     @DeleteMapping("/api/v1/me/tokens/{id}")
     public java.util.Map<String, Object> revoke(@PathVariable UUID id, HttpServletRequest request) {
         UserRow user = user(request);

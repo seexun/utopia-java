@@ -2,6 +2,7 @@ package tech.seexun.jknow.web.knowledge.api;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -28,6 +29,7 @@ import tech.seexun.jknow.store.mapper.MembersWriteMapper;
  * 最初邀请人（added_by COALESCE）、审计两笔。
  */
 @RestController
+@PreAuthorize("@ss.hasPermi('knowledge:workspace:list')")
 public class MembersWriteController {
 
     private final WorkspaceAccess wsAccess;
@@ -50,6 +52,7 @@ public class MembersWriteController {
     }
 
     /** members_routes.rs:61-92 set_role。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:workspace:edit')")
     @PutMapping("/api/v1/workspaces/{id}/members/{userId}")
     public java.util.Map<String, Object> setRole(@PathVariable UUID id, @PathVariable UUID userId,
                                                  @RequestBody SetRoleReq body,
@@ -81,6 +84,7 @@ public class MembersWriteController {
     }
 
     /** members_routes.rs:94-119 remove。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:workspace:edit')")
     @DeleteMapping("/api/v1/workspaces/{id}/members/{userId}")
     public java.util.Map<String, Object> remove(@PathVariable UUID id, @PathVariable UUID userId,
                                                 HttpServletRequest request) {
@@ -106,6 +110,7 @@ public class MembersWriteController {
     }
 
     /** kbs.rs:280-299 set_member：矩阵 UPSERT + 审计 kb.member_set。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:workspace:edit')")
     @PutMapping("/api/v1/kbs/{id}/members/{userId}")
     public java.util.Map<String, Object> setKbMember(@PathVariable UUID id,
                                                      @PathVariable UUID userId,
@@ -124,6 +129,7 @@ public class MembersWriteController {
     }
 
     /** kbs.rs:302-320 remove_member：0 行 → NotFound + 审计 kb.member_removed。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:workspace:edit')")
     @DeleteMapping("/api/v1/kbs/{id}/members/{userId}")
     public java.util.Map<String, Object> removeKbMember(@PathVariable UUID id,
                                                         @PathVariable UUID userId,

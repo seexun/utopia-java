@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -39,6 +40,7 @@ import tech.seexun.jknow.store.entity.UserRow;
  * 形状不经该段；记录在台账。
  */
 @RestController
+@PreAuthorize("@ss.hasPermi('knowledge:review:list')")
 public class QuestionsRulesWriteController {
 
     private final KbAccess rbac;
@@ -65,6 +67,7 @@ public class QuestionsRulesWriteController {
     // ---- 竞争性问题（question_routes.rs） ----
 
     /** question_routes.rs:37-67 create：人提的问题一落地就是 accepted——它就是人对这个库的要求。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:review:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/questions")
     public ObjectNode create(@PathVariable UUID kbId, @RequestBody JsonNode body,
                              HttpServletRequest request) {
@@ -87,6 +90,7 @@ public class QuestionsRulesWriteController {
     }
 
     /** question_routes.rs:92-119 update：字段级可选（serde Option 语义——JsonNode 显式取键）。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:review:edit')")
     @PatchMapping("/api/v1/kbs/{kbId}/questions/{id}")
     public ObjectNode update(@PathVariable UUID kbId, @PathVariable UUID id,
                              @RequestBody JsonNode body, HttpServletRequest request) {
@@ -110,6 +114,7 @@ public class QuestionsRulesWriteController {
     }
 
     /** question_routes.rs:121-128 delete。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:review:edit')")
     @DeleteMapping("/api/v1/kbs/{kbId}/questions/{id}")
     public ObjectNode delete(@PathVariable UUID kbId, @PathVariable UUID id,
                              HttpServletRequest request) {
@@ -119,6 +124,7 @@ public class QuestionsRulesWriteController {
     }
 
     /** question_routes.rs:132-142 propose_questions：排一份任务，结果是 proposed 的问题等人接受。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:review:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/questions/propose")
     public ObjectNode proposeQuestions(@PathVariable UUID kbId, HttpServletRequest request) {
         rbac.requireKb(user(request), kbId, Role.EDITOR);
@@ -131,6 +137,7 @@ public class QuestionsRulesWriteController {
     }
 
     /** question_routes.rs:227-242 propose（本体提案）：glossary=full 可选放大词表。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:review:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/ontology/propose")
     public ObjectNode proposeOntology(@PathVariable UUID kbId, @RequestBody JsonNode body,
                                       HttpServletRequest request) {
@@ -149,6 +156,7 @@ public class QuestionsRulesWriteController {
     // ---- 业务规则（rule_routes.rs） ----
 
     /** rule_routes.rs:77-117 create。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:review:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/rules")
     public ObjectNode createRule(@PathVariable UUID kbId, @RequestBody JsonNode body,
                                  HttpServletRequest request) {
@@ -170,6 +178,7 @@ public class QuestionsRulesWriteController {
     }
 
     /** rule_routes.rs:119-167 update：字段级可选；conditions 整份替换。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:review:edit')")
     @PatchMapping("/api/v1/kbs/{kbId}/rules/{ruleId}")
     public ObjectNode updateRule(@PathVariable UUID kbId, @PathVariable UUID ruleId,
                                  @RequestBody JsonNode body, HttpServletRequest request) {
@@ -188,6 +197,7 @@ public class QuestionsRulesWriteController {
     }
 
     /** rule_routes.rs:169-188 delete：派生行随 CASCADE 走。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:review:edit')")
     @DeleteMapping("/api/v1/kbs/{kbId}/rules/{ruleId}")
     public ObjectNode deleteRule(@PathVariable UUID kbId, @PathVariable UUID ruleId,
                                  HttpServletRequest request) {
@@ -204,6 +214,7 @@ public class QuestionsRulesWriteController {
      * 走的是同一个 materialize（预览与正式是同一条路）。Java 的 Outcome 不分规则子计数
      * （rules/rounds 族字段缺省 0——台账注记）；单侧步，形状差异不进双打。
      */
+    @PreAuthorize("@ss.hasPermi('knowledge:review:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/rules/run")
     public ObjectNode runRules(@PathVariable UUID kbId, HttpServletRequest request) {
         rbac.requireKb(user(request), kbId, Role.EDITOR);

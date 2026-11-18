@@ -3,6 +3,7 @@ package tech.seexun.jknow.web.knowledge.api;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -22,6 +23,7 @@ import tech.seexun.jknow.store.entity.UserRow;
  * （与 Rust AuthUser 提取器同位），已认证的流式推送 M1 deferred（COVERAGE.md 同款处置）。
  */
 @RestController
+@PreAuthorize("@ss.hasPermi('knowledge:settings:list')")
 public class AlertsController {
 
     /** alerts_routes.rs:22 PAGE：一页几组（弹窗里放得下的量）。 */
@@ -68,6 +70,7 @@ public class AlertsController {
     }
 
     /** alerts_routes.rs:107-122 mark_group_read（M5 任务 6 落位）。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:settings:edit')")
     @PostMapping("/api/v1/alerts/read-group")
     public java.util.Map<String, Object> readGroup(@RequestBody ReadGroupBody body,
                                                    HttpServletRequest request) {
@@ -77,6 +80,7 @@ public class AlertsController {
     }
 
     /** alerts_routes.rs:124-130 mark_all_read（M5 任务 6 落位）。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:settings:edit')")
     @PostMapping("/api/v1/alerts/read-all")
     public java.util.Map<String, Object> readAll(HttpServletRequest request) {
         UserRow user = user(request);

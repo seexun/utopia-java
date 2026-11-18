@@ -19,7 +19,7 @@ import tech.seexun.jknow.common.core.domain.model.LoginUser;
  * pt- 个人令牌的若依安全链兜底（P1 任务 8）：<b>Authorization: Bearer pt-...</b> 时
  * 验个人令牌（摘要查表 + 未撤 + 未过期，见 {@link PersonalTokenService#authenticate}），
  * 过了就以「发它的人」的若依身份进链——构造 {@link LoginUser}（userId=utopia_uuid
- * 反查 sys_user 的主档，permissions=knowledge:*）塞 SecurityContext；身后的
+ * 反查 sys_user 的主档，permissions=V0100 全集 16 项）塞 SecurityContext；身后的
  * {@link ClientContextBridgeFilter} 照常把 LoginUser 折算成业务 UserRow/ClientContext
  * 请求属性，业务端点零改动。
  *
@@ -33,6 +33,22 @@ import tech.seexun.jknow.common.core.domain.model.LoginUser;
  * 下一次请求立即生效（源 tokens.rs 的语义）。
  */
 public class PersonalTokenAuthFilter extends OncePerRequestFilter {
+
+    /**
+     * pt- 面的权限集（P2 任务 4 展开，P1 落字「全集展开」裁定兑现）：V0100 的 8 域
+     * list/edit 共 16 项逐字展开。<b>不能写 {@code knowledge:*}</b>——若依
+     * {@code @ss.hasPermi} 是精确匹配（仅 {@code *:*:*} 是通配），业务 controller
+     * 挂上 {@code @PreAuthorize} 后通配串一律 403，这正是 P1 终审预告的坑。
+     */
+    private static final java.util.Set<String> PT_PERMISSIONS = java.util.Set.of(
+            "knowledge:workspace:list", "knowledge:workspace:edit",
+            "knowledge:graph:list", "knowledge:graph:edit",
+            "knowledge:ontology:list", "knowledge:ontology:edit",
+            "knowledge:search:list", "knowledge:search:edit",
+            "knowledge:chat:list", "knowledge:chat:edit",
+            "knowledge:ingest:list", "knowledge:ingest:edit",
+            "knowledge:review:list", "knowledge:review:edit",
+            "knowledge:settings:list", "knowledge:settings:edit");
 
     private final PersonalTokenService tokens;
     private final UtopiaUuidResolver resolver;
@@ -95,7 +111,7 @@ public class PersonalTokenAuthFilter extends OncePerRequestFilter {
         sysUser.setUserName(binding.userName());
         sysUser.setNickName(binding.nickName());
         LoginUser loginUser = new LoginUser(binding.userId(), binding.deptId(), sysUser,
-                java.util.Set.of("knowledge:*"));
+                PT_PERMISSIONS);
         UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken(loginUser, null, loginUser.getAuthorities());
         authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

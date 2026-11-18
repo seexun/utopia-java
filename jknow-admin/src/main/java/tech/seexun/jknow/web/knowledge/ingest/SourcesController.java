@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -50,6 +51,7 @@ import tech.seexun.jknow.store.secrets.SourceSecretKeys;
  * 路由层（sources_routes.rs:187-190）。
  */
 @RestController
+@PreAuthorize("@ss.hasPermi('knowledge:ingest:list')")
 public class SourcesController {
 
     private static final Logger log = LoggerFactory.getLogger(SourcesController.class);
@@ -135,6 +137,7 @@ public class SourcesController {
 
     // ---- POST /api/v1/kbs/{kbId}/sources（sources_routes.rs:87-137 create，Editor） ----
 
+    @PreAuthorize("@ss.hasPermi('knowledge:ingest:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/sources")
     public CreateResponse create(@PathVariable UUID kbId, @RequestBody JsonNode body,
                                  HttpServletRequest request) {
@@ -167,6 +170,7 @@ public class SourcesController {
 
     // ---- PATCH /api/v1/kbs/{kbId}/sources/{sourceId}（sources_routes.rs:230-269 update） ----
 
+    @PreAuthorize("@ss.hasPermi('knowledge:ingest:edit')")
     @PatchMapping("/api/v1/kbs/{kbId}/sources/{sourceId}")
     public UpdateResponse update(@PathVariable UUID kbId, @PathVariable UUID sourceId,
                                  @RequestBody JsonNode body, HttpServletRequest request) {
@@ -198,6 +202,7 @@ public class SourcesController {
 
     // ---- DELETE /api/v1/kbs/{kbId}/sources/{sourceId}（sources_routes.rs:302-330） ----
 
+    @PreAuthorize("@ss.hasPermi('knowledge:ingest:edit')")
     @DeleteMapping("/api/v1/kbs/{kbId}/sources/{sourceId}")
     public OkResponse delete(@PathVariable UUID kbId, @PathVariable UUID sourceId,
                              HttpServletRequest request) {
@@ -216,6 +221,7 @@ public class SourcesController {
 
     // ---- POST .../sync（sources_routes.rs:344-362 sync_now：mark_queued 幂等） ----
 
+    @PreAuthorize("@ss.hasPermi('knowledge:ingest:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/sources/{sourceId}/sync")
     public QueuedResponse syncNow(@PathVariable UUID kbId, @PathVariable UUID sourceId,
                                   HttpServletRequest request) {
@@ -244,6 +250,7 @@ public class SourcesController {
 
     // ---- POST .../re-extract（sources_routes.rs:795-833 来源级全量重抽） ----
 
+    @PreAuthorize("@ss.hasPermi('knowledge:ingest:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/sources/{sourceId}/re-extract")
     public CountResponse reExtract(@PathVariable UUID kbId, @PathVariable UUID sourceId,
                                    HttpServletRequest request) {
@@ -268,6 +275,7 @@ public class SourcesController {
 
     // ---- POST .../missing/cleanup（sources_routes.rs:271-296 批量清理缺文件） ----
 
+    @PreAuthorize("@ss.hasPermi('knowledge:ingest:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/sources/{sourceId}/missing/cleanup")
     public DeletedResponse cleanupMissing(@PathVariable UUID kbId, @PathVariable UUID sourceId,
                                           HttpServletRequest request) {
@@ -307,6 +315,7 @@ public class SourcesController {
 
     // ---- POST .../rotate-token（sources_routes.rs:159-173：旧密钥立即失效） ----
 
+    @PreAuthorize("@ss.hasPermi('knowledge:ingest:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/sources/{sourceId}/rotate-token")
     public TokenResponse rotateToken(@PathVariable UUID kbId, @PathVariable UUID sourceId,
                                      HttpServletRequest request) {

@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -44,6 +45,7 @@ import tech.seexun.jknow.store.temporal.TemporalMath.OpenValue;
  * 读族全部 Viewer 起步（rules 0021：读规则要 Viewer，写要 Editor——写面归问题/规则域）。
  */
 @RestController
+@PreAuthorize("@ss.hasPermi('knowledge:ontology:list')")
 public class OntologyReadFamilyController {
 
     private final KbAccess rbac;

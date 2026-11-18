@@ -16,18 +16,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * P1 闸门：空 PG 重放全链 V0000-V0101（102 个迁移）。
+ * P1 闸门：空 PG 重放全链 V0000-V0102（103 个迁移）。
  * 镜像用 pgvector/pgvector:pg16——V0001 起业务迁移依赖 vector 扩展，与 compose 本地库同源。
  * 仿 utopia-java MigrationTests 模式（整类共用一个容器：首测重放，次测幂等）。
  * V0001-V0099 逐字拷自 utopia-server（V0090-V0110 顺位改号为 V0081-V0099，内容字节一致）；
- * V0100 菜单种子、V0101 用户重绑（sys_user.utopia_uuid 桥接列 + FK 改指 + DROP users）为本工程新写。
+ * V0100 菜单种子、V0101 用户重绑（sys_user.utopia_uuid 桥接列 + FK 改指 + DROP users）、
+ * V0102 菜单开启（visible='0' + C 页 component 统一指 kb-entry 入口组件）为本工程新写。
  */
 @Testcontainers(disabledWithoutDocker = true)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class MigrationTests {
 
-    /** V0000 + 99（源拷） + V0100 + V0101 */
-    private static final int MIGRATION_COUNT = 102;
+    /** V0000 + 99（源拷） + V0100 + V0101 + V0102 */
+    private static final int MIGRATION_COUNT = 103;
 
     /** V0100__knowledge_menu 实际插入行数：1 顶级目录 + 8 个 C 页 + 每页 list/edit 两个 F 按钮 = 25 */
     private static final int KNOWLEDGE_MENU_COUNT = 25;
@@ -63,7 +64,7 @@ class MigrationTests {
     @Order(1)
     void replayFullChainCreatesAllTables() throws SQLException {
         var result = flyway().migrate();
-        assertEquals(MIGRATION_COUNT, result.migrationsExecuted, "应执行 V0000-V0101 共 102 个迁移");
+        assertEquals(MIGRATION_COUNT, result.migrationsExecuted, "应执行 V0000-V0102 共 103 个迁移");
         assertEquals(TABLE_COUNT, queryInt(
                 "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'"
                         + " AND table_name <> 'flyway_schema_history'"),
@@ -77,6 +78,15 @@ class MigrationTests {
         assertEquals(KNOWLEDGE_MENU_COUNT, queryInt(
                 "select count(*) from sys_menu where menu_id between 2100 and 2199"),
                 "知识图谱菜单应为 25 行（1 目录 + 8 页 + 16 按钮）");
+        // —— V0102 菜单开启断言：25 行全部 visible='0'（显示），C 页 component 统一指 kb-entry ——
+        assertEquals(KNOWLEDGE_MENU_COUNT, queryInt(
+                "select count(*) from sys_menu where menu_id between 2100 and 2199 and visible = '0'"),
+                "V0102 开启后知识图谱菜单 25 行应全部 visible='0'");
+        assertEquals(8, queryInt(
+                "select count(*) from sys_menu where menu_id between 2100 and 2199 and menu_type = 'C'"
+                        + " and component = 'jknow/knowledge/kb-entry/index'"),
+                "8 个 C 页 component 应统一指菜单入口组件 kb-entry（kb 页 kbId 取自路由参数，"
+                        + "直连页面在 /knowledge/<页> 上是死页——V0102 校正项）");
         // —— V0101 用户重绑断言 ——
         assertEquals(1, queryInt(
                 "select count(*) from information_schema.columns"

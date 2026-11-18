@@ -7,6 +7,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -44,6 +45,7 @@ import tech.seexun.jknow.store.entity.UserRow;
  * Editor。
  */
 @RestController
+@PreAuthorize("@ss.hasPermi('knowledge:ontology:list')")
 public class OntologyController {
 
     private final KbAccess rbac;
@@ -79,6 +81,7 @@ public class OntologyController {
      * 把这条谓词已经在账上的开放行对一遍（#341）。与落库时同一条路：作废+改写，
      * supersedes 链回旧行；拿不准的进人审。谓词没有唯一性声明时拒绝——声明是人的事。
      */
+    @PreAuthorize("@ss.hasPermi('knowledge:ontology:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/ontology/relation-types/{id}/reconcile")
     public java.util.Map<String, Object> reconcileRelationType(@PathVariable UUID kbId,
                                                                @PathVariable UUID id,
@@ -100,6 +103,7 @@ public class OntologyController {
      * ontology_routes.rs:541-578 decide_proposal：一条提案有人表态了。**改状态不删行**——
      * 采纳发生过、拒绝也发生过，而拒绝留痕正是下一轮代理不再把它刷回待看的依据。
      */
+    @PreAuthorize("@ss.hasPermi('knowledge:ontology:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/ontology/proposals")
     public java.util.Map<String, Object> decideProposal(@PathVariable UUID kbId,
                                                         @RequestBody JsonNode body,
@@ -125,6 +129,7 @@ public class OntologyController {
      * /ontology/proposals/adopt（mod.rs:384→question_routes adopt）：采纳一条提案（人改过
      * 的几格随请求来）：建元素、标记、排对齐。走 ProposeOntologyJob.adopt 真身（M5 任务 5）。
      */
+    @PreAuthorize("@ss.hasPermi('knowledge:ontology:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/ontology/proposals/adopt")
     public java.util.Map<String, Object> adoptProposal(@PathVariable UUID kbId,
                                                        @RequestBody JsonNode body,
@@ -150,6 +155,7 @@ public class OntologyController {
     }
 
     /** ontology_routes.rs delete_entity_type（store 真身 M3 在）。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:ontology:edit')")
     @DeleteMapping("/api/v1/kbs/{kbId}/ontology/entity-types/{id}")
     public java.util.Map<String, Object> deleteEntityType(@PathVariable UUID kbId,
                                                           @PathVariable UUID id,
@@ -163,6 +169,7 @@ public class OntologyController {
     }
 
     /** ontology_routes.rs delete_relation_type（store 真身 M3 在）。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:ontology:edit')")
     @DeleteMapping("/api/v1/kbs/{kbId}/ontology/relation-types/{id}")
     public java.util.Map<String, Object> deleteRelationType(@PathVariable UUID kbId,
                                                             @PathVariable UUID id,
@@ -176,6 +183,7 @@ public class OntologyController {
     }
 
     /** ontology_routes.rs:703-708 type_resolution_preview（ResolveTypesJob.preview 真身）。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:ontology:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/ontology/type-resolution/preview")
     public java.util.Map<String, Object> typeResolutionPreview(@PathVariable UUID kbId,
                                                                HttpServletRequest request) {
@@ -184,6 +192,7 @@ public class OntologyController {
     }
 
     /** ontology_routes.rs:717-736 type_resolution_apply：跑一遍并落库（三档处置）+ 审计。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:ontology:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/ontology/type-resolution")
     public java.util.Map<String, Object> typeResolutionApply(@PathVariable UUID kbId,
                                                              HttpServletRequest request) {
@@ -207,6 +216,7 @@ public class OntologyController {
      * 带来的实体改过去。认可的是类对，改的是实体——两件事分开，调用方可以只认可
      * 规则而暂不动任何实体。
      */
+    @PreAuthorize("@ss.hasPermi('knowledge:ontology:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/ontology/type-resolution/approve")
     public java.util.Map<String, Object> approveRefinement(@PathVariable UUID kbId,
                                                            @RequestBody JsonNode body,
@@ -240,6 +250,7 @@ public class OntologyController {
     }
 
     /** ontology_routes.rs:747-765 type_resolution_undo：把那一批实体放回原来的类。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:ontology:edit')")
     @DeleteMapping("/api/v1/kbs/{kbId}/ontology/type-resolution/{batchId}")
     public java.util.Map<String, Object> typeResolutionUndo(@PathVariable UUID kbId,
                                                             @PathVariable UUID batchId,
@@ -318,6 +329,7 @@ public class OntologyController {
     }
 
     /** POST /entity-types（ontology_routes.rs:128-175 create_entity_type）。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:ontology:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/ontology/entity-types")
     public JsonNode createEntityType(@PathVariable UUID kbId, @RequestBody JsonNode body,
                                      HttpServletRequest request) {
@@ -327,6 +339,7 @@ public class OntologyController {
     }
 
     /** PATCH /entity-types/{typeId}（ontology_routes.rs:177-217 update_entity_type——Rust 路由是 patch，任务 10 曾误落 PUT，任务 11 契约对齐修正）。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:ontology:edit')")
     @PatchMapping("/api/v1/kbs/{kbId}/ontology/entity-types/{typeId}")
     public JsonNode updateEntityType(@PathVariable UUID kbId, @PathVariable UUID typeId,
                                      @RequestBody JsonNode body, HttpServletRequest request) {
@@ -336,6 +349,7 @@ public class OntologyController {
     }
 
     /** POST /relation-types（ontology_routes.rs:319-365 create_relation_type）。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:ontology:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/ontology/relation-types")
     public JsonNode createRelationType(@PathVariable UUID kbId, @RequestBody JsonNode body,
                                        HttpServletRequest request) {
@@ -345,6 +359,7 @@ public class OntologyController {
     }
 
     /** PATCH /relation-types/{typeId}（ontology_routes.rs:367-410 update_relation_type——同上，任务 11 契约对齐修正）。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:ontology:edit')")
     @PatchMapping("/api/v1/kbs/{kbId}/ontology/relation-types/{typeId}")
     public JsonNode updateRelationType(@PathVariable UUID kbId, @PathVariable UUID typeId,
                                        @RequestBody JsonNode body, HttpServletRequest request) {

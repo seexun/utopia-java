@@ -63,6 +63,39 @@ public abstract class StoreTestBase {
     protected JdbcTemplate jdbc;
 
     /**
+     * 直调 controller 的登录态供给（P2 任务 4 起 controller 挂 @PreAuthorize）：
+     * MockMvc 面的登录态由 postprocessor 逐请求挂（ApiTestBase.ruoyi）；直接调
+     * bean 方法的测试（ChatFx 直调 chatAttached、PhraseAlignmentTests 直调
+     * createRelationType 等）要自备 SecurityContext，否则 @ss.hasPermi 取不到
+     * LoginUser 直接抛「获取用户信息异常」。与 ApiTestBase.ruoyi 同形状，
+     * permissions 取 admin 全通 {@code *:*:*}——权限语义不是这些测试的考察点。
+     * 用完 {@link #logoutDirectCall()} 清线程，防串味到其它测试面。
+     */
+    protected static void loginAsAdminDirectCall() {
+        tech.seexun.jknow.common.core.domain.entity.SysUser sysUser =
+                new tech.seexun.jknow.common.core.domain.entity.SysUser();
+        sysUser.setUserId(1L);
+        tech.seexun.jknow.common.core.domain.model.LoginUser loginUser =
+                new tech.seexun.jknow.common.core.domain.model.LoginUser(
+                        1L, null, sysUser, java.util.Set.of("*:*:*"));
+        org.springframework.security.core.context.SecurityContextHolder.getContext()
+                .setAuthentication(new org.springframework.security.authentication
+                        .UsernamePasswordAuthenticationToken(
+                        loginUser, null, loginUser.getAuthorities()));
+        // hasPermi 里的 PermissionContextHolder.setContext 要线程绑定的 request 属性——
+        // 直调没有真请求，挂一个 mock 的（与 MockMvc 面的 ServletRequestAttributes 同构）
+        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
+                new org.springframework.web.context.request.ServletRequestAttributes(
+                        new org.springframework.mock.web.MockHttpServletRequest()));
+    }
+
+    /** {@link #loginAsAdminDirectCall()} 的收尾：清线程 SecurityContext 与请求属性。 */
+    protected static void logoutDirectCall() {
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
+    }
+
+    /**
      * sys_user 造数/清理助手（P1 任务 7 身份主档切 sys_user 后的 fixture 桥）：
      * 旧 users 表 fixture（INSERT INTO users (id, org_id, email, ...) / DELETE WHERE email）
      * 在测试 SQL 里统一改写为对这几个函数的调用——Java 侧实参表零改动（org 参数被吸收

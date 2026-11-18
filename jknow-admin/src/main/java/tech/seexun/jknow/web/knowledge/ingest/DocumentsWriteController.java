@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -54,6 +55,7 @@ import tech.seexun.jknow.store.mapper.KbMapper;
  * 双打差异走 WAIVERS.md「java-fixes-d9」挂账，参照实例修复后核销）。
  */
 @RestController
+@PreAuthorize("@ss.hasPermi('knowledge:ingest:list')")
 public class DocumentsWriteController {
 
     private static final Logger log = LoggerFactory.getLogger(DocumentsWriteController.class);
@@ -100,6 +102,7 @@ public class DocumentsWriteController {
      * 空文件 skip("empty file")；重复内容（同 KB 同 sha256）skip("duplicate content")；
      * 皆空→422 no_files。正文日期识别（#610）只对 txt/md/markdown。
      */
+    @PreAuthorize("@ss.hasPermi('knowledge:ingest:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/documents")
     public UploadResponse upload(@PathVariable UUID kbId,
                                  @RequestParam(value = "source", required = false) UUID source,
@@ -172,6 +175,7 @@ public class DocumentsWriteController {
     public record DeleteResponse(boolean ok, UUID deletionId, int invalidatedFacts) {
     }
 
+    @PreAuthorize("@ss.hasPermi('knowledge:ingest:edit')")
     @DeleteMapping("/api/v1/documents/{id}")
     public DeleteResponse delete(@PathVariable UUID id, HttpServletRequest request) {
         UserRow user = user(request);
@@ -196,6 +200,7 @@ public class DocumentsWriteController {
 
     // ---- POST /api/v1/documents/{id}/restore（documents_routes.rs:484-506 撤销删除） ----
 
+    @PreAuthorize("@ss.hasPermi('knowledge:ingest:edit')")
     @PostMapping("/api/v1/documents/{id}/restore")
     public Map<String, Object> restore(@PathVariable UUID id, HttpServletRequest request) {
         UserRow user = user(request);
@@ -217,6 +222,7 @@ public class DocumentsWriteController {
     }
 
     /** 真删（#268 下半）：不可撤销，只对已删除的文档开放，库管理员才能按。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:ingest:edit')")
     @PostMapping("/api/v1/documents/{id}/purge")
     public PurgeResponse purge(@PathVariable UUID id, HttpServletRequest request) {
         UserRow user = user(request);
@@ -248,6 +254,7 @@ public class DocumentsWriteController {
     }
 
     /** 重新处理（解析器升级/失败重试）：set_status('pending') + 入队（同 sha 重跑，不写版本）。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:ingest:edit')")
     @PostMapping("/api/v1/documents/{id}/reprocess")
     public ReprocessResponse reprocess(@PathVariable UUID id, HttpServletRequest request) {
         UserRow user = user(request);
@@ -265,6 +272,7 @@ public class DocumentsWriteController {
     }
 
     /** 手动触发抽取（failed 重试/补配模型后补抽）：强制全量，一个事务办完（queue_extraction_one）。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:ingest:edit')")
     @PostMapping("/api/v1/documents/{id}/extract")
     public ExtractResponse extract(@PathVariable UUID id, HttpServletRequest request) {
         UserRow user = user(request);
@@ -296,6 +304,7 @@ public class DocumentsWriteController {
      * 一键重试这个作用域里全部抽取失败的文档：逐个走 {@code queue_extraction_one}
      * （排队本身有别的动作——解雇在跑的任务、清增量标记，批量 SQL 会留下半截状态）。
      */
+    @PreAuthorize("@ss.hasPermi('knowledge:ingest:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/documents/retry-failed")
     public RetryFailedResponse retryFailed(@PathVariable UUID kbId,
                                            @RequestParam(value = "source", required = false)
@@ -328,6 +337,7 @@ public class DocumentsWriteController {
      * 普通上传语义的 JSON 直灌（无来源、无身份键、不做三路判定）：同内容视为无操作，
      * 其余一律新建（D9 消除：版本 1 + 同事务入队；{@code deleted:true} 的墓碑走 api 来源）。
      */
+    @PreAuthorize("@ss.hasPermi('knowledge:ingest:edit')")
     @PostMapping("/api/v1/kbs/{kbId}/ingest")
     public IngestActionResponse ingest(@PathVariable UUID kbId, @RequestBody JsonNode body,
                                        HttpServletRequest request) {

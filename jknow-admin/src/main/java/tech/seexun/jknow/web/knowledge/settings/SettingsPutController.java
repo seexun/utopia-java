@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -29,6 +30,7 @@ import tech.seexun.jknow.store.mapper.KbMapper;
  * （COVERAGE.md 同款处置），此处不补——前端列表靠轮询/重取，M2 事件里程碑统一回收。
  */
 @RestController
+@PreAuthorize("@ss.hasPermi('knowledge:settings:list')")
 public class SettingsPutController {
 
     private final SettingsService settings;
@@ -131,6 +133,7 @@ public class SettingsPutController {
     }
 
     /** settings_routes.rs:59-122 put（Admin）。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:settings:edit')")
     @PutMapping("/api/v1/workspaces/{workspaceId}/settings")
     public Map<String, Object> put(@PathVariable UUID workspaceId,
                                    @RequestBody PutSettingsRequest req,
@@ -166,6 +169,7 @@ public class SettingsPutController {
     }
 
     /** settings_routes.rs:142-188 put_ocr（Admin）：配上的这一刻，等它的扫描件/图片重新排队。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:settings:edit')")
     @PutMapping("/api/v1/workspaces/{workspaceId}/settings/ocr")
     public Map<String, Object> putOcr(@PathVariable UUID workspaceId,
                                       @RequestBody PutOcrRequest req,
@@ -187,6 +191,7 @@ public class SettingsPutController {
     }
 
     /** settings_routes.rs:201-237 put_transcribe（Admin）：等它的录音重新排队。 */
+    @PreAuthorize("@ss.hasPermi('knowledge:settings:edit')")
     @PutMapping("/api/v1/workspaces/{workspaceId}/settings/transcribe")
     public Map<String, Object> putTranscribe(@PathVariable UUID workspaceId,
                                              @RequestBody PutTranscribeRequest req,
