@@ -209,6 +209,49 @@ else
   echo "SKIP: POST api/v1/kbs/{id}/chat（JKNOW_LLM_API_KEY 未配）"; SKIP=$((SKIP+1))
 fi
 
+# seed 演示态明细面（P3 任务 3）：seed-demo.sql 灌库（幂等，固定 uuid）→ 明细 GET
+# （200 + 体形状断言——空库造不出的面：文档详情/实体详情/图谱邻域/会话族/未读角标）
+# → teardown-demo.sql 拆除。自足段：seed 路径按仓库相对定位，psql 经 compose exec，
+# 跑完库里不留演示档（teardown 策略见其文件头注）。
+SEED_KB='0190d3e0-0000-7d5a-8000-000000000001'
+SEED_DOC='0190d3e0-0000-7d5a-8000-000000000040'
+SEED_ENT='0190d3e0-0000-7d5a-8000-000000000020'
+SEED_CONV='0190d3e0-0000-7d5a-8000-000000000ff0'
+docker compose -f docker-compose.dev.yml exec -T pg psql -U postgres -d jknow \
+  -v ON_ERROR_STOP=1 -q -f - < scripts/seed-demo.sql
+
+# 明细断言助手：GET 200 且体含全部给定形状串（grep -a 字节级，UTF-8 中文直配）
+seed_get() { # $1=面名（echo 用） $2=端点 $3..=体形状断言串
+  local name=$1 ep=$2; shift 2
+  local code ok=1 pat
+  code=$(curl -s --max-time 10 -o /tmp/smoke-p1-seed.txt -w '%{http_code}' \
+    -H "$AUTH" "$BASE/$ep")
+  [ "$code" = 200 ] || ok=0
+  for pat in "$@"; do
+    LC_ALL=C grep -aq -- "$pat" /tmp/smoke-p1-seed.txt || ok=0
+  done
+  if [ "$ok" = 1 ]; then
+    echo "PASS: GET $ep（$name，seed 明细体形状）"; PASS=$((PASS+1))
+  else
+    echo "FAIL: GET $ep（$name）code=$code body=$(head -c 160 /tmp/smoke-p1-seed.txt)"; exit 1
+  fi
+}
+seed_get "文档详情" "api/v1/documents/$SEED_DOC" \
+  '"document":{' '"id":"'$SEED_DOC'"' '"chunks":\[' '供应链尽调报告.md'
+seed_get "实体详情" "api/v1/kbs/$SEED_KB/entities/$SEED_ENT" \
+  '"entity":{' '"facts":\[' '"same_name":\[' '星辰智造'
+seed_get "图谱邻域" "api/v1/kbs/$SEED_KB/graph/neighborhood?entity=$SEED_ENT" \
+  '"nodes":\[{'
+seed_get "会话列表" "api/v1/kbs/$SEED_KB/conversations" \
+  '"conversations":\[{' '供应链产能问题'
+seed_get "会话详情" "api/v1/kbs/$SEED_KB/conversations/$SEED_CONV" \
+  '"messages":\[{'
+seed_get "未读角标" "api/v1/alerts/unread" \
+  '"unread":[1-9][0-9]*'
+
+docker compose -f docker-compose.dev.yml exec -T pg psql -U postgres -d jknow \
+  -v ON_ERROR_STOP=1 -q -f - < scripts/teardown-demo.sql
+
 # 收尾清理：本轮 workspace（级联 kb/本体/实体类），库里不留 p1-smoke 档
 curl -s --max-time 10 -X DELETE -H "$AUTH" "$BASE/api/v1/workspaces/$WS" >/dev/null
 
