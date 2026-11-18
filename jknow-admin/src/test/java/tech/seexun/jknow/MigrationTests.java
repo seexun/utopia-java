@@ -26,14 +26,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * V0100 菜单种子、V0101 用户重绑（sys_user.utopia_uuid 桥接列 + FK 改指 + DROP users）、
  * V0102 菜单开启（visible='0' + C 页 component 统一指 kb-entry 入口组件）、
  * V0103 菜单三分组重排（工作台/知识管理/配置对齐原程序 IA；账目 85+25-11+10=109，
- * -1 若依官网 -8 旧目录/C -2 工作空间 F +10 新 M/C（2120 图谱保留改造不计新增）；F perms 一字不动仅重挂）为本工程新写。
+ * -1 若依官网 -8 旧目录/C -2 工作空间 F +10 新 M/C（2120 图谱保留改造不计新增）；F perms 一字不动仅重挂）、
+ * V0104 系统组后移（T2 走查发现三组与系统组 order 同为 1/2/3、PG 稳定排序按 menu_id 决胜致侧栏交错；
+ * 系统管理/监控/工具 order+3→4/5/6，行数零变动）为本工程新写。
  */
 @Testcontainers(disabledWithoutDocker = true)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class MigrationTests {
 
-    /** V0000 + 99（源拷） + V0100 + V0101 + V0102 + V0103 */
-    private static final int MIGRATION_COUNT = 104;
+    /** V0000 + 99（源拷） + V0100 + V0101 + V0102 + V0103 + V0104 */
+    private static final int MIGRATION_COUNT = 105;
 
     /** V0103 后 2100-2299 区间行数：3 M（2200/2210/2220）+ 8 C（2120 保留 + 2202/2203/2211/2212/2213/2214/2221）
      *  + 14 F（V0100 的 16 行减工作空间 2111/2112 定谳删除）= 25 */
@@ -83,7 +85,7 @@ class MigrationTests {
     @Order(1)
     void replayFullChainCreatesAllTables() throws SQLException {
         var result = flyway().migrate();
-        assertEquals(MIGRATION_COUNT, result.migrationsExecuted, "应执行 V0000-V0103 共 104 个迁移");
+        assertEquals(MIGRATION_COUNT, result.migrationsExecuted, "应执行 V0000-V0104 共 105 个迁移");
         assertEquals(TABLE_COUNT, queryInt(
                 "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'"
                         + " AND table_name <> 'flyway_schema_history'"),
@@ -116,6 +118,16 @@ class MigrationTests {
                 "select count(*) from sys_menu where (menu_id = 2200 and order_num = 1)"
                         + " or (menu_id = 2210 and order_num = 2) or (menu_id = 2220 and order_num = 3)"),
                 "工作台/知识管理/配置 order_num 应为 1/2/3（三组排系统菜单之前）");
+        // —— V0104 系统组后移断言（规格"系统组在后"收口；T2 走查发现 V0103 后三组与系统组
+        //    order 同为 1/2/3，PG 稳定排序按 menu_id 决胜 → 侧栏交错）——
+        assertEquals(3, queryInt(
+                "select count(*) from sys_menu where (menu_id = 1 and order_num = 4)"
+                        + " or (menu_id = 2 and order_num = 5) or (menu_id = 3 and order_num = 6)"),
+                "系统管理/系统监控/系统工具 order_num 应为 4/5/6（V0104 系统组后移）");
+        assertEquals(0, queryInt(
+                "select count(*) from sys_menu where parent_id = 0 and menu_type = 'M'"
+                        + " and order_num <= 3 and menu_id not in (2200, 2210, 2220)"),
+                "顶级 M 中 order 1-3 应只有三分组（其余顶级目录（系统组）order 必须 >3——\"系统组在后\"不变式）");
         // —— 树形挂边逐行钉死（审查 Important-1 加固）：C→M 与 F→C 的 per-row parent 映射 ——
         // 区间 25 行全量 case（含 3 M 的 parent=0）；任何一行 parent 与期望不符即计数>0 变红
         //（防错挂：如 2211 误挂 2200、2141 误挂 2211 这类计数面全对但挂边错的回归）。
