@@ -1,0 +1,3 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`API 快照漂移闸：domain/api.ts ⊆ src/api > 两侧端点都在百级规模（提取器失灵即炸） 1`] = `[]`;

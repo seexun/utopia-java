@@ -34,6 +34,12 @@ const i18n = createI18n({
 import '@/assets/styles/index.scss' // global css
 // tailwind4 入口（必须在 main.ts 引入，避免 vite 每次 hmr 重新请求整个 scss 入口）
 import '@/style/tailwind.css'
+// utopia 业务样式三件套（T2 随迁，tailwind 之后；theme.scss 的 html[data-theme]
+// 选择器在若依壳上不命中、原样保留；utopia.scss/utopia-pages.css 的全局选择器
+// 已做 .knowledge-page 最小 scope 收敛，见各文件头注）
+import '@/style/theme.scss'
+import '@/style/utopia.scss'
+import '@/style/utopia-pages.css'
 
 import App from './App.vue'
 import store from './store'

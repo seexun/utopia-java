@@ -1,6 +1,8 @@
 /// <reference types="vitest/config" />
 import { defineConfig, loadEnv } from 'vite'
 import path from 'path'
+import vue from '@vitejs/plugin-vue'
+import vueJsx from '@vitejs/plugin-vue-jsx'
 import tailwindcss from '@tailwindcss/vite'
 import createVitePlugins from './vite/plugins'
 
@@ -12,8 +14,8 @@ export default defineConfig(({ mode, command }) => {
   const { VITE_APP_ENV } = env
   return {
     // 部署生产环境和开发环境下的URL。
-    // 默认情况下，vite 会假设你的应用是被部署在一个域名的根路径下
-    // 例如 https://www.ruoyi.vip/。如果应用被部署在一个子路径下，你就需要在这个选项指定子路径。例如 https://www.ruoyi.vip/admin/，则设置 base 为 '/admin/。
+    // 默认情况下，vite 会假设你的应用是被部署在一个域名的根路径上
+    // 例如 https://www.ruoyi.vip/。如果应用被部署在一个子路径下，你就需要用这个选项指定子路径。例如，如果你的应用被部署在 https://www.ruoyi.vip/admin/，则设置 baseUrl 为 /admin/。
     base: VITE_APP_ENV === 'production' ? '/' : '/',
     plugins: [tailwindcss(), ...createVitePlugins(env, command === 'build')],
     resolve: {
@@ -77,13 +79,38 @@ export default defineConfig(({ mode, command }) => {
         ]
       }
     },
-    // vitest（对齐源仓 utopia-web 的 app 测试面：jsdom 环境、tests|src 下 *.spec.ts；
-    // 源仓的 domain 面（node 环境 + vitest-setup.ts）待任务 3 引入 src/domain 时再加。
-    // 空仓阶段无测试文件，passWithNoTests 让 `pnpm test` 空跑绿）
+    // vitest（对齐源仓 utopia-web/vitest.config.ts 的 projects 双面结构，T2 随
+    // src/domain 迁入落全——按实况去 pure-admin 基建依赖：alias 内联、不搬
+    // unplugin-icons/yaml loader/VITE_ 钉值——jknow 路由 history 模式不读它们）。
+    // app 面（jsdom）挂 tests|src 的 *.spec.ts（vue/vueJsx 插件供视图类 spec 的
+    // SFC 转换，红清单 T3 修）；domain 面（node + 根目录 vitest-setup.ts 的
+    // localStorage 桩、语言钉 en）挂 src/domain/**/*.test.ts。vitest 4 的内联
+    // projects 不继承根配置的 resolve/plugins，共享面同时铺进每个 project。
     test: {
-      environment: 'jsdom',
-      include: ['tests/**/*.spec.ts', 'src/**/*.spec.ts'],
-      passWithNoTests: true
+      projects: [
+        {
+          resolve: {
+            alias: { '@': path.resolve(__dirname, './src') }
+          },
+          plugins: [vue(), vueJsx()],
+          test: {
+            name: 'app',
+            environment: 'jsdom',
+            include: ['tests/**/*.spec.ts', 'src/**/*.spec.ts']
+          }
+        },
+        {
+          resolve: {
+            alias: { '@': path.resolve(__dirname, './src') }
+          },
+          test: {
+            name: 'domain',
+            environment: 'node',
+            include: ['src/domain/**/*.test.ts'],
+            setupFiles: ['./vitest-setup.ts']
+          }
+        }
+      ]
     }
   }
 })

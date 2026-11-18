@@ -1,0 +1,824 @@
+/* ============================================================
+   Utopia 领域页配方（W1，任务 5）：旧仓 web/src/styles.css 的组件类逐值移植
+   （只取 W1 读路径页族用到的子集）。类名与旧仓逐字同名——页面标记与旧仓
+   JSX 同构时这些类原样落位。令牌（--color-* / --text-* / --radius-* /
+   --shadow-*）在 tailwind.css 的 @theme 段定义。
+   ============================================================ */
+
+/* ---------- 基础（旧 styles.css §基础 的滚动条与正文色） ----------
+   jknow T2 最小 scope 收敛：裸 ::-webkit-scrollbar 会把若依原生页面的
+   滚动条一并改写——包 .knowledge-page 前缀（T3 页面根元素提供该类）。 */
+.knowledge-page ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.knowledge-page ::-webkit-scrollbar-thumb {
+  background-color: var(--color-ink-3);
+  border-radius: 20px;
+}
+
+/* ---------- 状态徽标：soft 浅底 + 深色同系字（禁彩色实心） ---------- */
+.badge-soft {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  padding: 2px 10px;
+  font-size: var(--text-aux);
+  font-weight: 600;
+  line-height: 18px;
+  border-radius: 999px;
+}
+.badge-soft-primary { color: var(--color-primary-text, #0958d9); background: var(--color-primary-soft, #e6f4ff); }
+.badge-soft-success { color: var(--color-success-text); background: var(--color-success-soft); }
+.badge-soft-warning { color: var(--color-warning-text); background: var(--color-warning-soft); }
+.badge-soft-danger  { color: var(--color-danger-text);  background: var(--color-danger-soft); }
+.badge-soft-info    { color: var(--color-ink-2); background: var(--color-neutral-soft); }
+
+/* ---------- 统计卡（Review 总览 / 账户） ---------- */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+@media (width <= 1200px) {
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+}
+.stat-card {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 14px 16px;
+}
+.stat-card .stat-label { font-size: var(--text-sub); color: var(--color-ink-2); }
+.stat-card .stat-value {
+  font-size: var(--text-stat);
+  font-weight: 800;
+  color: var(--color-ink);
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 文字省略 */
+.sle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mle { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+
+/* ---------- 表格页骨架（文库文档表 / 已删表 / 成员 / 规则 / 身份表） ---------- */
+.table-box { display: flex; flex-direction: column; width: 100%; }
+.table-box table { width: 100%; border-collapse: collapse; font-size: var(--text-body); }
+.table-box thead th {
+  height: 45px;
+  padding: 0 16px;
+  text-align: left;
+  font-size: var(--text-sub);
+  font-weight: 600;
+  color: var(--color-ink-2);
+  background: var(--color-fill);
+}
+.table-box tbody td { height: 45px; padding: 0 16px; border-top: 1px solid var(--color-border); }
+
+/* 行内链接（LinkButton 的实色字版本） */
+.link-inline { color: #1677ff; cursor: pointer; }
+.link-inline:hover:not(:disabled) { color: #0958d9; }
+.link-inline.is-danger { color: var(--color-danger); }
+.link-inline.is-danger:hover:not(:disabled) { color: var(--color-danger); }
+.link-inline:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ---------- 共享动效与外观 ---------- */
+.pop {
+  background: var(--color-card);
+  backdrop-filter: blur(8px) saturate(1);
+  -webkit-backdrop-filter: blur(8px) saturate(1);
+  border: 1px solid var(--color-line-strong);
+}
+
+@keyframes pop-in-kf {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+.pop-in {
+  transform-origin: top right;
+  animation: pop-in-kf 0.16s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* 走到终点时扫一道光（时间岛播放收尾） */
+@keyframes sweep-kf {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  18% {
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+.sweep {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(15, 23, 42, 0.18),
+    transparent
+  );
+  animation: sweep-kf 720ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* 停靠面板（图谱实体面板 / 本体详情面板）：原地浮现/消隐 */
+@keyframes dock-in-kf {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.dock-in {
+  transform-origin: top right;
+  animation: dock-in-kf 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes dock-out-kf {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.99);
+  }
+}
+.dock-out {
+  transform-origin: top right;
+  animation: dock-out-kf 0.15s cubic-bezier(0.4, 0, 1, 1) both;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pop-in,
+  .dock-in,
+  .dock-out,
+  .sweep {
+    animation: none;
+  }
+}
+
+/* ---------- 工具塔（图谱左下控件） ---------- */
+.turn {
+  transition: transform 120ms;
+}
+.tool {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem;
+  color: var(--color-ink-2);
+  transition:
+    color 120ms,
+    background-color 120ms;
+}
+.tool:hover:not(:disabled) {
+  color: var(--color-ink);
+  background: var(--color-fill);
+}
+.tool.is-on {
+  color: var(--color-ink);
+  background: #e2e8f0;
+}
+.tool:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+/* 指针停在所在行上才现身 */
+.reveal {
+  opacity: 0;
+  transition: opacity 120ms;
+}
+.group:hover .reveal,
+.reveal:focus-visible,
+.reveal:focus,
+.reveal.is-on {
+  opacity: 1;
+}
+
+/* 只提亮不划线 */
+.hover-ink {
+  transition: color 120ms;
+}
+.hover-ink:hover {
+  color: var(--color-ink-2);
+}
+
+/* 检索命中：警示琥珀浅底 */
+.mark {
+  border-radius: 3px;
+  padding: 0 0.25rem;
+  background: rgba(180, 83, 9, 0.16);
+  color: var(--color-warning-text);
+}
+
+/* ---------- 文档查看页 ---------- */
+.chunk {
+  transition:
+    border-color 700ms,
+    background-color 700ms,
+    box-shadow 700ms;
+}
+.fade-slow {
+  transition: opacity 700ms;
+}
+
+/* ---------- 时间岛（图谱底部时间轴） ---------- */
+.scrub-island {
+  transition:
+    background-color 260ms ease,
+    width 300ms ease;
+  box-shadow: var(--shadow-card);
+}
+.scrub-island:hover,
+.scrub-island.solid {
+  transition-duration: 120ms, 300ms;
+}
+.solid {
+  background: var(--color-primary);
+  color: #ffffff;
+}
+.scrubber-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  cursor: ew-resize;
+}
+.scrubber-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 2px;
+  height: 28px;
+  border-radius: 1px;
+  background: var(--color-ink);
+  box-shadow: 0 0 0 1.5px rgba(246, 248, 251, 0.95);
+  cursor: ew-resize;
+}
+.scrubber-range::-moz-range-thumb {
+  width: 2px;
+  height: 28px;
+  border: none;
+  border-radius: 1px;
+  background: var(--color-ink);
+  box-shadow: 0 0 0 1.5px rgba(246, 248, 251, 0.95);
+  cursor: ew-resize;
+}
+.scrubber-range::-webkit-slider-runnable-track {
+  background: transparent;
+}
+.scrubber-range::-moz-range-track {
+  background: transparent;
+}
+.bar {
+  border-radius: 1px;
+  transition: background-color 120ms;
+}
+
+/* ---------- 本体/文库轴 ---------- */
+.progress-fill {
+  transition: width 500ms ease;
+}
+.rail-fold {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    flex-grow 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.rail-fold.is-folded {
+  transition:
+    flex-grow 0.15s cubic-bezier(0.4, 0, 1, 1),
+    opacity 0.15s cubic-bezier(0.4, 0, 1, 1),
+    transform 0.15s cubic-bezier(0.4, 0, 1, 1);
+  flex-grow: 0;
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rail-fold,
+  .rail-fold.is-folded {
+    transition: none;
+  }
+}
+
+/* 画布顶栏给右侧停靠面板让开一条（本体模式图用） */
+.canvas-chrome-docked {
+  right: 24.75rem;
+}
+
+/* ---------- 药丸（图谱图例 / 「+N 个类」） ---------- */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--color-neutral-soft);
+  color: var(--color-ink-2);
+  font-size: var(--text-aux);
+}
+.pill:hover { background: #e2e8f0; }
+.pill.is-on { color: var(--color-ink); }
+.pill.is-static { cursor: default; }
+.pill.is-static:hover {
+  color: var(--color-ink-2);
+  background: var(--color-neutral-soft);
+}
+.pill.is-dim {
+  opacity: 0.35;
+  text-decoration: line-through;
+}
+.pill:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* 左下控件塔：整组一起展开，名字按自己的内容收放 */
+.tower-label {
+  max-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 0;
+  font-size: var(--text-aux);
+  line-height: 1;
+  margin-left: 0;
+  transition:
+    max-width 220ms ease,
+    margin-left 220ms ease,
+    opacity 160ms ease;
+}
+.tower:hover .tower-label,
+.tower:focus-within .tower-label {
+  max-width: 9rem;
+  margin-left: 0.5rem;
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tower-label {
+    transition: none;
+  }
+}
+
+/* 骨架（skel 微光扫过） */
+.skel {
+  position: relative;
+  overflow: hidden;
+  background: var(--color-fill);
+}
+.skel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(15, 23, 42, 0.05),
+    transparent
+  );
+  animation: skel-kf 1.4s ease-in-out infinite;
+}
+@keyframes skel-kf {
+  to {
+    transform: translateX(100%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skel::after {
+    animation: none;
+  }
+}
+
+/* 拖拽悬停 / 检索批量命中的提亮框（文库拖放区） */
+.highlight {
+  border-color: rgba(15, 23, 42, 0.45) !important;
+  background: rgba(15, 23, 42, 0.06) !important;
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.12);
+}
+
+/* ---------- 幽灵按钮（分页器的翻页键） ---------- */
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-ctl);
+  background: transparent;
+  color: var(--color-ink-2);
+  cursor: pointer;
+  transition:
+    background-color 120ms,
+    color 120ms;
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--color-fill);
+  color: var(--color-ink);
+}
+.btn-ghost:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.btn-ghost:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+/* ---------- 按钮基线复位 ----------
+   本仓的 tailwind 只装了 theme+utilities 两层（无 preflight），reset.scss 也不
+   复位 button——UA 的 2px outset 边框与按钮面底会漏到领域页的原件上
+   （URow/RailItem/Pill/ToolButton……旧仓有 preflight 兜着）。EP 的 el-button
+   自带类级样式，元素选择器压不到它。
+   **必须包在 @layer base 里**（审查 C-1）：本文件是未分层 CSS——未分层规则在
+   级联层序里恒压过全部 layer（特异性无关），直接复位会把 utilities 里的
+   bg-primary-soft/text-ink-2/hover:bg-fill 全体击穿（URow 激活蓝底胶囊、
+   Segmented 激活片全灭）。tailwind.css 首行已声明层序
+   `@layer theme, base, components, utilities`——base < utilities，复位兜底、
+   工具类自然赢回。回归测试：tests/w1-styles.spec.ts（层序断言）。 */
+@layer base {
+  button {
+    background: transparent;
+    border: none;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+  }
+}
+
+/* ---------- W2 写路径共享件：toast 入场 / 模态壳 ----------
+   值逐字取自旧仓 styles.css（.toast-in/rise-kf/modal-scrim-kf/modal-panel-kf/
+   .modal-in/.modal-scrim/.dialog-panel 族）。unlayered 规则与上同策——
+   领域原件的皮走这里，不进 tailwind 层序。 */
+
+@keyframes rise-kf {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* toast 入场：复用淡入上浮关键帧，节奏更快 */
+.toast-in {
+  animation: rise-kf 0.25s ease both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast-in {
+    animation: none;
+  }
+}
+
+@keyframes modal-panel-kf {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+.modal-in {
+  animation: modal-panel-kf 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal-in {
+    animation: modal-scrim-kf 0.14s ease-out both;
+  }
+}
+@keyframes modal-scrim-kf {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.modal-scrim {
+  background: rgb(15 23 42 / 45%);
+}
+
+/* 对话框：白实底 + 12px 圆角 + 顶部分隔的头部/底部行。近实底而不是玻璃：
+   确认框要人读一句话然后做一个不可逆的决定，下层正文透上来是干扰 */
+.dialog-panel {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-pop);
+  min-width: 320px;
+}
+.dialog-panel .dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 15px 20px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+.dialog-panel .dialog-body {
+  padding: 15px 20px;
+}
+.dialog-panel .dialog-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 15px 20px;
+  border-top: 1px solid var(--color-border);
+}
+.dialog-panel .dialog-foot .foot-danger {
+  margin-right: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ============================================================
+   W3 对话轴配方（任务 8）：旧仓 styles.css「对话配方（2b 批自垫片 C1 收编）」
+   逐值移植。类名与旧仓逐字同名——Chat 页标记与旧仓 JSX 同构时原样落位。
+   令牌（--color-* / --text-* / --radius-*）在 tailwind.css @theme 段。
+   ============================================================ */
+
+/* 还在想：这句话自己在发光，一道亮带横扫过文字 */
+.thinking {
+  background-image: linear-gradient(
+    90deg,
+    rgba(15, 23, 42, 0.4) 35%,
+    rgba(15, 23, 42, 0.95) 50%,
+    rgba(15, 23, 42, 0.4) 65%
+  );
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: thinking-kf 1.8s linear infinite;
+}
+@keyframes thinking-kf {
+  from {
+    background-position: -100% 0;
+  }
+  to {
+    background-position: 100% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .thinking {
+    background-image: none;
+    color: inherit;
+  }
+}
+
+/* 答案滚到输入框上沿是化开，不是被切一刀 */
+.chat-fade {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 2.5rem), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 2.5rem), transparent);
+}
+
+/* 用户说的那句话：比一块面板更该被看见 */
+.bubble-user {
+  background: var(--color-card); /* 旧垫片气泡面值 = #ffffff */
+}
+
+/* Composer 卡：新对话首屏居中 / 进场后停靠底部共用的一块（旧 @layer components） */
+.composer {
+  border-radius: var(--radius-card); /* 旧 --radius-panel = 12px */
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: var(--color-card); /* 旧垫片面值（浮起的面 raise）= #ffffff */
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: border-color 120ms; /* 旧快速时长档 */
+}
+.composer:focus-within {
+  border-color: var(--color-line-strong); /* 旧垫片深线色 #cbd5e1 */
+}
+
+/* 问候是这一屏的主角。旧仓内联 var(--font-brand)（= var(--font-sans) 别名，
+   指向系统栈；本仓正文继承的同一族）+ 0.03em 字距，这里收成一个类 */
+.chat-greeting {
+  letter-spacing: 0.03em;
+}
+
+/* 弹层上弹入场：composer 上方的菜单从下缘浮出 */
+@keyframes pop-up-kf {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0px) saturate(1);
+    -webkit-backdrop-filter: blur(0px) saturate(1);
+    transform: scale(0.96) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+.pop-up {
+  transform-origin: bottom left;
+  animation: pop-up-kf 0.16s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pop-up {
+    animation: none;
+  }
+}
+
+/* 正在写的那一场，左栏那一格里跳三个点 */
+.dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.dots > span {
+  width: 3px;
+  height: 3px;
+  border-radius: 9999px;
+  background: var(--color-ink-2);
+  animation: dots-kf 1.1s ease-in-out infinite;
+}
+.dots > span:nth-child(2) {
+  animation-delay: 0.18s;
+}
+.dots > span:nth-child(3) {
+  animation-delay: 0.36s;
+}
+@keyframes dots-kf {
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dots > span {
+    animation: none;
+    opacity: 0.65;
+  }
+}
+
+/* ---- 代码高亮（rehype-highlight / hljs）与对话气泡内的 markdown ----
+   代码高亮八色无同值新令牌，按旧垫片值内联字面量 */
+.chat-prose .hljs-comment,
+.chat-prose .hljs-quote {
+  color: #6b7280; /* 旧垫片代码八色之一（quote） */
+  font-style: italic;
+}
+.chat-prose .hljs-keyword,
+.chat-prose .hljs-selector-tag,
+.chat-prose .hljs-meta {
+  color: #4f5bd5; /* 旧垫片代码八色之一（meta） */
+}
+.chat-prose .hljs-string,
+.chat-prose .hljs-regexp,
+.chat-prose .hljs-addition {
+  color: #1a7f4b; /* 旧垫片代码八色之一（addition） */
+}
+.chat-prose .hljs-number,
+.chat-prose .hljs-literal,
+.chat-prose .hljs-symbol {
+  color: #9a6a12; /* 旧垫片代码八色之一（symbol） */
+}
+.chat-prose .hljs-title,
+.chat-prose .hljs-title.function_,
+.chat-prose .hljs-section {
+  color: #1d6fb8; /* 旧垫片代码八色之一（section） */
+}
+.chat-prose .hljs-type,
+.chat-prose .hljs-built_in,
+.chat-prose .hljs-class .hljs-title {
+  color: #0f8a86; /* 旧垫片代码八色之一（class） */
+}
+.chat-prose .hljs-attr,
+.chat-prose .hljs-attribute,
+.chat-prose .hljs-variable,
+.chat-prose .hljs-template-variable {
+  color: #6d4fd6; /* 旧垫片代码八色之一（template） */
+}
+.chat-prose .hljs-deletion {
+  color: #c0284f; /* 旧垫片代码八色之一（deletion） */
+}
+
+.chat-prose > :first-child {
+  margin-top: 0;
+}
+.chat-prose > :last-child {
+  margin-bottom: 0;
+}
+.chat-prose p {
+  margin: 0.4em 0;
+}
+.chat-prose ul,
+.chat-prose ol {
+  margin: 0.4em 0;
+  padding-left: 1.25em;
+}
+.chat-prose ul {
+  list-style: disc;
+}
+.chat-prose ol {
+  list-style: decimal;
+}
+.chat-prose li {
+  margin: 0.15em 0;
+}
+.chat-prose strong {
+  color: var(--color-ink); /* 旧垫片墨色 #0f172a */
+  font-weight: 600;
+}
+.chat-prose h1,
+.chat-prose h2,
+.chat-prose h3 {
+  font-weight: 600;
+  color: var(--color-ink);
+  margin: 0.7em 0 0.3em;
+  font-size: 1em;
+}
+.chat-prose hr {
+  border: 0;
+  border-top: 1px solid var(--color-border); /* 旧垫片线色 #e5eaf1 */
+  margin: 1em 0;
+}
+.chat-prose code {
+  font-size: 0.85em;
+  background: rgba(15, 23, 42, 0.08);
+  border-radius: var(--radius-ctl); /* 旧 --radius-cell = 8px */
+  padding: 0.1em 0.35em;
+}
+.chat-prose pre {
+  background: #f8fafc; /* 旧垫片凹底（代码块 well，比 fill 再浅一档，无同值令牌） */
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card); /* 旧 --radius-panel = 12px */
+  padding: 0.6em 0.8em;
+  overflow-x: auto;
+  margin: 0.5em 0;
+}
+.chat-prose pre code {
+  background: transparent;
+  padding: 0;
+}
+/* 代码块外面的一层，复制按钮贴它的右上角 */
+.chat-prose .codeblock {
+  position: relative;
+  margin: 0.5em 0;
+}
+.chat-prose .codeblock pre {
+  margin: 0;
+  padding-right: 2.75em;
+}
+.chat-prose table {
+  border-collapse: collapse;
+  margin: 0.5em 0;
+  font-size: 0.9em;
+}
+.chat-prose th,
+.chat-prose td {
+  border: 1px solid var(--color-line-strong); /* 旧垫片深线色 #cbd5e1 */
+  padding: 0.25em 0.6em;
+}
+.chat-prose a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.chat-prose blockquote {
+  border-left: 2px solid var(--color-line-strong);
+  padding-left: 0.75em;
+  color: var(--color-ink-2); /* 旧垫片次级字色 #475569 */
+  margin: 0.4em 0;
+}
+
+/* 来源新建弹窗（W3 补迁）：同步时刻手输未成形时的红边（旧仓 !border-danger 同义） */
+.time-bad .el-input__wrapper {
+  box-shadow: 0 0 0 1px var(--el-color-danger) inset;
+}

@@ -1,0 +1,446 @@
+/* ============================================================
+   Utopia 主题基调（W0）：旧仓 web/src/styles.css 的视觉令牌 → Element Plus
+   变量映射。浅色 SaaS；三栏层级「左右白、中间灰」的全套壳属任务 4，
+   这里只定全局变量与基座色。令牌出处见旧仓 styles.css §@theme（10_jsj_template）。
+   ============================================================ */
+
+/* 令牌归位（html:root 抬特异性）：本文件的 :root 设计令牌曾长期被后加载的
+   element-plus/dist/index.css 的同名 :root 块覆盖（同特异性后手胜）——文字色/
+   边框/圆角等实际一直是 EP 默认值（#303133 / 4px / #dcdfe6），ink 体系从未生效。
+   html:root = (0,1,1) 压过 :root = (0,1,0)，令牌回归设计真值。
+   jknow T2 最小 scope 收敛：EP 变量若挂 html:root 会把若依原生页面一并重涂
+   （antd 蓝主色全局生效）——收敛到 .knowledge-page（T3 页面根元素提供该类），
+   令牌只在知识图谱页面子树内生效；类选择器作用于最近祖先，继承语义等价。 */
+.knowledge-page {
+  /* 品牌主色：antd 蓝 #1677ff（国内企业软件事实标准；2026-11 侧栏国内风格重设计
+     全站迁移，色阶映射见 docs/superpowers/specs/2026-11-16-sidebar-cn-style-design.md） */
+  --el-color-primary: #1677ff;
+  /* EP dark-2（按压/深档文字）= antd blue-7；悬停语义对齐 antd 走变亮（light-3 = blue-5） */
+  --el-color-primary-dark-2: #0958d9;
+  --el-color-primary-light-3: #4096ff;
+  --el-color-primary-light-5: #69b1ff;
+  --el-color-primary-light-7: #91caff;
+  --el-color-primary-light-8: #bae0ff;
+  --el-color-primary-light-9: #e6f4ff; /* antd blue-1，soft 选中底 */
+
+  /* 语义色（旧 success/warning/danger 三件套） */
+  --el-color-success: #10b981;
+  --el-color-warning: #f59e0b;
+  --el-color-danger: #ef4444;
+  --el-color-error: #ef4444;
+
+  /* 中性（旧 ink/border/bg） */
+  --el-text-color-primary: #0f172a; /* ink */
+  --el-text-color-regular: #475569; /* ink-2 */
+  --el-text-color-secondary: #94a3b8; /* ink-3 */
+  --el-text-color-placeholder: #94a3b8;
+  --el-border-color: #e5eaf1; /* line */
+  --el-border-color-light: #e5eaf1;
+  --el-border-color-lighter: #e5eaf1;
+  --el-fill-color-light: #f1f5f9; /* neutral-soft */
+  --el-fill-color-lighter: #f6f8fb; /* bg-page */
+  --el-bg-color: #ffffff; /* card */
+  --el-bg-color-page: #f6f8fb;
+
+  /* 圆角（旧 radius-ctl 8 / radius-card 12） */
+  --el-border-radius-base: 8px;
+  --el-border-radius-small: 6px;
+  --el-border-radius-round: 999px;
+
+  /* 字体：拉丁走 Plus Jakarta Sans（品牌基调），中文走本地打包的思源黑体可变字重
+     （fontsource @fontsource-variable/noto-sans-sc，家族名 "Noto Sans SC Variable"）——
+     Windows 不再回落微软雅黑（旧式观感 + 无 500 中字重档），跨平台渲染一致；
+     PingFang/雅黑仅在字体包未加载时兜底 */
+  --el-font-family:
+    "Plus Jakarta Sans", "Noto Sans SC Variable", "PingFang SC",
+    "Microsoft YaHei", "HarmonyOS Sans SC", sans-serif;
+}
+
+/* jknow T2 最小 scope 收敛：源仓挂 html/body/#app 的页底与字体栈收敛到
+   .knowledge-page——否则若依登录页/系统管理页的正文底色与字体被整体改写。 */
+.knowledge-page {
+  /* 页底（旧 bg-page）：中间灰的基调，登录页与内容区共用。
+     字体栈与 --el-font-family 同源（中文 = 本地思源黑体，见上方说明） */
+  background-color: #f6f8fb;
+  color: #0f172a;
+  font-family:
+    "Plus Jakarta Sans", "Noto Sans SC Variable", "PingFang SC",
+    "Microsoft YaHei", "HarmonyOS Sans SC", sans-serif;
+}
+
+/* 侧栏白（三栏层级：左右白）：vertical 布局的侧栏容器与 logo 区保持白底，
+   分界线走旧 line 色；logo 区加 1px 下分割线（国内惯例的品牌区分隔）。
+   jknow T2 scope 收敛：若依壳的侧栏同名类（.sidebar-container）不得被
+   白底覆写——包 .knowledge-page 前缀后仅知识图谱页内子树可命中。 */
+.knowledge-page .sidebar-container,
+.knowledge-page .sidebar-container .sidebar-logo-container {
+  background: #fff !important;
+}
+
+.knowledge-page .sidebar-container .sidebar-logo-container {
+  border-bottom: 1px solid var(--el-border-color-light);
+}
+
+/* ============================================================
+   W1 三栏壳（旧仓 styles.css §布局骨架（规格 §4.1 定稿 v2）的移植）：
+   侧栏 240px 白底右边框、菜单条目、库切换器胶囊、顶栏、用户 chip。
+   pure-admin 的布局机制（sidebar-container/navbar/app-main）保持原样，
+   这里只按旧壳观感覆写颜色与几何。分界线走旧 line 色 #e5eaf1。
+   ============================================================ */
+
+/* 侧栏宽度对齐旧壳 240px（pure-admin 垂直布局默认 210px）；
+   折叠态（54px）不动。openSidebar = 非折叠 */
+body[layout="vertical"] .app-wrapper.openSidebar {
+  .sidebar-container {
+    width: 240px !important;
+  }
+
+  .main-container {
+    margin-left: 240px;
+  }
+
+  .fixed-header {
+    width: calc(100% - 240px);
+  }
+}
+
+/* 品牌字标（旧 .logo-mark / .logo-name）：侧栏、故障页共用同一副锁形 */
+.logo-mark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--el-color-white);
+  border-radius: 8px;
+  background: linear-gradient(135deg, #1677ff, #06b6d4);
+}
+
+.logo-name {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--el-text-color-primary);
+  letter-spacing: 0.2px;
+}
+
+/* 菜单条目（国内中后台紧凑形态）：36px 高、圆角 6、hover 填充；
+   选中态 = 浅主色底 + 主色文字 + 左缘 3px 主色竖条（竖条式，国内后台事实标准）——
+   覆写 pure-admin 基座的实心块（sidebar.scss 在本文件之后加载，这里按本文件
+   既有的「双写特异性 + !important」路数反压回去） */
+body[layout="vertical"] {
+  .sidebar-container {
+    .el-menu {
+      background: transparent;
+      border-right: none;
+      padding: 0 12px;
+    }
+
+    .el-menu-item,
+    .el-sub-menu__title {
+      height: 36px;
+      line-height: 36px;
+      margin-bottom: 2px;
+      border-radius: 6px;
+      color: var(--el-text-color-regular);
+      /* 国内侧栏字重惯例（飞书/钉钉一级菜单 500）：14px 微软雅黑 400 在白底发虚 */
+      font-weight: 500;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: var(--el-fill-color-light);
+        color: var(--el-text-color-primary);
+      }
+    }
+
+    /* 线性图标描边 1→1.7px：14px 尺寸下 1px 描边可读性不足（发虚的图标侧主因）；
+       CSS stroke-width 覆盖 Iconify svg 的 stroke-width 属性 */
+    .el-menu-item svg,
+    .el-sub-menu__title svg {
+      stroke-width: 1.7px;
+    }
+
+    /* 选中态＝竖条式（国内中后台事实标准），三处同口径压掉 pure-admin 基座：
+       一、文字主色——基座给 .is-active 发 --pure-theme-sub-menu-active-text 白字
+           （!important），.nest-menu > * / .outer-most > * 还有 #fff 的 z-index 规则；
+       二、::before 色块——从「inset 0 8px 实心主色块」改为 soft 底整条带；
+       三、左缘竖条挂 ::after（基座未占用）：3×16px 圆角主色、贴条带左缘垂直居中。 */
+    /* 选中态＝竖条式（国内中后台事实标准）。 contested 规则的覆写在下方独立
+       顶层块（要带 .app-wrapper 抬特异性，见 body[layout=vertical] 块之后的
+       「选中态竖条式覆写」）；::after 竖条无竞争，留在本块。 */
+    .el-menu-item.is-active::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 3px;
+      height: 16px;
+      border-radius: 2px;
+      background: var(--el-color-primary);
+    }
+
+    .el-menu-item.is-active::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 3px;
+      height: 16px;
+      border-radius: 2px;
+      background: var(--el-color-primary);
+    }
+
+    /* 分组标题（el-sub-menu 的 title 行）＝国内紧凑组头：小字淡灰、
+       行高收紧、非首组上留 8px 呼吸；箭头缩小调淡（组仍可折叠）。
+       颜色/字号的生效覆写在下方 .app-wrapper 抬级块（基座 !important 压级） */
+    .el-sub-menu.is-opened > .el-sub-menu__title {
+      color: var(--el-text-color-secondary);
+      font-size: 12px;
+      /* 500（雅黑渲染 400）：组头是次级标签，600 会渲染成 Bold 显得压过菜单项 */
+      font-weight: 500;
+      padding-top: 8px;
+    }
+
+    .el-menu > .el-sub-menu + .el-sub-menu {
+      margin-top: 8px;
+    }
+
+    .el-sub-menu__title .el-sub-menu__icon-arrow {
+      font-size: 12px;
+      color: var(--el-text-color-secondary);
+    }
+
+    /* 问题1（菜单对齐）根因之一：上面 `.el-menu { padding: 0 12px }` 对嵌套的
+       内联子菜单同样命中——旧壳菜单区只有一层 12px（.layout-menu），这里被叠成
+       24px，子项条带左 24/右 6 严重不对称。嵌套内联层自己不再缩进，子项与组头
+       条带同宽（实测 12..227）。选择器带 .app-wrapper 抬高特异性且后手覆盖
+       sidebar.scss（本文件在其之前 @use）。 */
+    .el-menu .el-menu--inline {
+      padding: 0;
+    }
+
+    /* 问题1根因之二：pure-admin 的 `min-width: $sideBarWidth !important`（vertical
+       块现为 240px）大于本项目菜单内容区（侧栏 240 减右边框 1px、再减 el-menu
+       两侧 12px 内边距 = 215px），子项条带被撑到右缘溢出。改用自适应的
+       min-width: 100%：条带恒等于容器内容宽——子项 right 与组头齐平、左右留白
+       12/12 对称；hover 背景条与选中蓝块（::before inset 0 8px → 左右各 20px）
+       随之对称。&.sidebar-container 双写抬特异性——本文件在 sidebar.scss 之前
+       @use，同特异性会被后加载的原规则翻回去。 */
+    &.sidebar-container .el-sub-menu .el-menu-item,
+    &.sidebar-container .el-menu .el-menu--inline .el-sub-menu__title {
+      min-width: 100% !important;
+    }
+
+    /* 问题2（折叠态）展开面保旧壳观感：组头是纯文字标签，不带图标——
+       meta.icon 只为折叠态服务（折叠后根菜单带 .el-menu--collapse，
+       本条不再命中，图标以 18px 居中显示、文字被 SidebarItem 折叠分支收起）。
+       display 要 !important：SidebarItem 给 .sub-menu-icon 内联了 display:flex。 */
+    .el-menu:not(.el-menu--collapse) {
+      > .el-sub-menu > .el-sub-menu__title > .sub-menu-icon {
+        display: none !important;
+      }
+    }
+
+    /* 问题2（折叠态几何）：折叠后根菜单不吃 0 12px 内边距——54px 全宽留给
+       组头图标居中（pure-admin 原模板折叠态即 54 全宽；本项目根菜单的
+       padding: 0 12px 会把折叠条带压到 30px、图标偏左）。 */
+    .el-menu.el-menu--collapse {
+      padding: 0;
+    }
+  }
+}
+
+/* ============================================================
+   选中态竖条式覆写（国内中后台事实标准：浅主色底 + 主色文字 + 左缘 3px 竖条）。
+   基座 sidebar.scss 的同款选择器生成自 body[layout=vertical] .sidebar-container
+   （与本文件同特异性）且**后加载**——这里带真实祖先 .app-wrapper 抬一级特异性
+   （app-wrapper 是壳的根元素类，展开/折叠都在它下面），!important 才压得过
+   基座的 pure-theme 白字与实心块 ::before。折叠态（el-menu--collapse 的
+   popper 弹层）不在本覆写范围，保持基座形态。
+   ============================================================ */
+body[layout="vertical"] .app-wrapper .sidebar-container {
+  /* 未选中项文字/图标：基座发 --pure-theme-menu-text（rgba(0,0,0,.6)）偏灰——
+     国内菜单是深字（85-88% 黑），提到 ink（图标走 currentColor 同步变深） */
+  .el-menu-item,
+  .el-sub-menu__title {
+    color: var(--el-text-color-primary);
+  }
+
+  /* 组头：基座把展开组（常开=永远 is-active）钉成 0.85 黑 11px——比菜单项还重，
+     层级倒挂；改 12px 淡灰（次级色），权重压回菜单项之下 */
+  .el-sub-menu.is-opened > .el-sub-menu__title {
+    color: var(--el-text-color-secondary) !important;
+    font-size: 12px;
+  }
+
+  /* 文字/图标主色：压掉 --pure-theme-sub-menu-active-text 白字与 #fff 的 z-index 规则 */
+  .el-menu-item.is-active,
+  .el-menu-item.is-active.nest-menu,
+  .el-menu-item.is-active.nest-menu > *,
+  .is-active.submenu-title-noDropdown.outer-most > * {
+    color: var(--el-color-primary) !important;
+    /* 字重与未选中项同档（500）：雅黑无中间字重，600 会跳档渲染成 700 真粗体，
+       选中项看起来像换了个字体（antd/飞书惯例：选中靠颜色+底+竖条，不加粗） */
+    font-weight: 500;
+  }
+
+  /* ::before 色块：从「inset 0 8px 实心主色块」改为 soft 底整条带 */
+  .el-menu-item.is-active.nest-menu::before,
+  .is-active.submenu-title-noDropdown.outer-most::before {
+    inset: 0;
+    margin: 0;
+    background: var(--el-color-primary-light-9) !important;
+    border-radius: 6px;
+  }
+}
+
+/* 库切换器（侧栏左下角，旧 .kb-switcher） */
+.kb-switcher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: calc(100% - 24px);
+  height: 38px;
+  margin: 10px 12px 12px;
+  padding: 0 10px;
+  cursor: pointer;
+  user-select: none;
+  background: var(--el-fill-color-light);
+  border-radius: 8px;
+
+  &:hover {
+    background: #e2e8f0;
+  }
+
+  .kb-switcher-name {
+    flex: 1;
+    overflow: hidden;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--el-text-color-primary);
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* 问题3（左下角层叠）：.left-collapse（absolute bottom 0、高 40px）与切换器
+   （流式排在 el-scrollbar 之后）压在同一条带上，切换器被覆盖点不进。
+   对照旧壳 Shell.tsx 的左下角设计重排：切换器钉在最底一行（bottom 12px）、
+   折叠钮在其上一行（bottom 60px），互不重叠；滚动区相应让出 152px
+   （logo 48 + 折叠钮 40 + 阴影 4 + 切换器 60，对照 pure-admin has-logo 的 92px）。
+   has-switcher 由 NavVertical 在「桌面 + 未折叠（切换器在挂）」时挂上；折叠态
+   切换器不在挂，几何回落 pure-admin 默认（折叠钮回 bottom 0、滚动区 92px）。 */
+body[layout="vertical"] .app-wrapper .sidebar-container.has-switcher {
+  .el-scrollbar.pc {
+    height: calc(100% - 152px);
+  }
+
+  .left-collapse {
+    bottom: 60px;
+  }
+
+  .kb-switcher {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    width: auto;
+    margin: 0;
+  }
+}
+
+/* 顶栏（旧 .layout-header 56px）+ 面包屑（旧 .breadcrumb） */
+.utopia-navbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 56px;
+  padding: 0 22px;
+  overflow: hidden;
+  background: var(--el-bg-color);
+  border-bottom: 1px solid var(--el-border-color);
+
+  .breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--el-text-color-secondary);
+
+    .crumb-kb {
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .crumb-current {
+      color: var(--el-text-color-primary);
+      font-weight: 600;
+    }
+  }
+}
+
+/* 用户 chip（旧 .user-chip）+ 渐变首字母头像（旧 .avatar-gradient） */
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 4px 4px;
+  cursor: pointer;
+  border-radius: 999px;
+  transition: background 0.2s ease;
+
+  &:hover {
+    background: var(--el-fill-color-light);
+  }
+}
+
+.avatar-gradient {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  font-weight: 700;
+  color: var(--el-color-white);
+  user-select: none;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1677ff, #06b6d4);
+}
+
+/* 告警铃的未读点（旧壳：角标是个点不是数字——"有事没看"是二元的） */
+.alert-bell-trigger {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  border-radius: 8px;
+
+  &:hover {
+    background: var(--el-fill-color-light);
+  }
+
+  .unread-dot {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 6px;
+    height: 6px;
+    background: var(--el-color-danger);
+    border-radius: 50%;
+  }
+}
+
+/* 壳级弹层面板（库切换器/告警/用户菜单共用一副）：白底、1px line、8px 圆角、
+   弹层阴影——对齐旧 .menu-panel */
+.shell-pop {
+  border: 1px solid var(--el-border-color);
+  border-radius: 8px;
+  box-shadow:
+    0 4px 6px -2px rgb(0 0 0 / 5%),
+    0 10px 15px -3px rgb(0 0 0 / 10%);
+}

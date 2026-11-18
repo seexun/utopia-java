@@ -22,6 +22,26 @@ declare module 'element-plus'
 // vue
 declare module 'vue' {
   interface ComponentInternalInstance { proxy: any }
+  // jknow T2：支撑层随迁代码（src/composables、src/config、src/utils/message.ts）
+  // 按源仓原样走 ESM 具名导入 vue 的工具与类型。本文件是无 import/export 的脚本
+  // 文件，这里的 declare module 是**替换式**声明——真包具名导出（computed/Ref/
+  // App…）在替换面内不可见（T1 报告预告的 TS2305 病根，P2 支撑层代码成规模踩中）。
+  // 整体改为 augmentation 会让若依自有 .vue 面约 300 条潜在严格性错误浮出（上游
+  // RuoYi-Vue3 即以这份替换声明钝化 typecheck，376 处 `ref<T>()`/`computed<T>()`
+  // 泛型调用在「无类型」声明下本就宽松），故按消费面补具名导出。签名取
+  // 「泛型 + 入参/返回 any」：泛型让显式类型实参（ref<T>()）合法，any 返回让
+  // 若依面的既有松散写法不浮错——只做编译闭合，类型面现代化留后续专项。
+  export function computed<T>(...args: any[]): any
+  export function ref<T>(...args: any[]): any
+  export function watch(...args: any[]): any
+  export function watchEffect(...args: any[]): any
+  export function onScopeDispose(...args: any[]): any
+  export function toValue(...args: any[]): any
+  export type Ref<T = any> = any
+  export type ComputedRef<T = any> = any
+  export type MaybeRefOrGetter<T = any> = any
+  export type App = any
+  export type VNode = any
 }
 
 // nprogress
@@ -72,6 +92,9 @@ declare module 'jsencrypt/bin/jsencrypt.min' {
 
 // axios
 declare module 'axios'
+// （jknow T2 试过删除此简写让真包类型生效——若依自有 .vue 面的潜在严格性错误
+// 成规模浮出；src/api/knowledge 只需类型面而非真包，改走 types-http.d.ts 的
+// 结构性本地类型。详见 vue 块注释）
 
 // vue-quill
 declare module '@vueup/vue-quill'
