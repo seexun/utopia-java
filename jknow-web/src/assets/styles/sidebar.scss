@@ -449,8 +449,16 @@
 
   // theme-light 浅色主题（--current-color 换色跟随）
   &.theme-light {
+    // 容器底色收敛浅色：上方 #app 基座规则的 $base-menu-background（ID 权重）
+    // 会压过组件 scoped v-bind 白底，light 态这里显式盖回（对齐 gvdata 白底容器）
+    background-color: $menuLightBg;
     border-right: 1px solid var(--color-border, #e8eaf0);
     box-shadow: none;
+
+    // Logo 区与菜单的分隔线（对齐 gvdata logo border-bottom）
+    .sidebar-logo-container {
+      border-bottom: 1px solid var(--color-border);
+    }
 
     .el-menu-item,
     .el-sub-menu__title {
@@ -465,6 +473,8 @@
         content: '';
         position: absolute;
         inset: 0;
+        // 选中遮罩随菜单项圆角走（SaaS-Light 形态下不再方角压圆角）
+        border-radius: inherit;
         background-color: var(--current-color-light, #ecf5ff);
         pointer-events: none;
         z-index: 1;

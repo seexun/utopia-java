@@ -36,7 +36,10 @@ const useSettingsStore = defineStore(
       // 主题色收敛 #2563eb（对齐 tokens.scss 单源）：旧默认 #409EFF 的缓存值视同
       // 未选色一并迁移，避免运行时 handleThemeStyle 内联色阶回流旧蓝。
       theme: !storageSetting.theme || storageSetting.theme === '#409EFF' ? '#2563eb' : storageSetting.theme,
-      sideTheme: storageSetting.sideTheme || sideTheme,
+      // 侧栏默认收敛 light（对齐 gvdata）：存量缓存 'theme-dark'（旧默认落盘）视同
+      // 未设置一并归一回新默认，避免旧缓存压过新默认值；用户想深色可在 Settings
+      // 抽屉「主题样式」重选（同款取舍见 theme 色 #409EFF 归一化注释）。
+      sideTheme: !storageSetting.sideTheme || storageSetting.sideTheme === 'theme-dark' ? sideTheme : storageSetting.sideTheme,
       showSettings: showSettings,
       navType: storageSetting.navType === undefined ? navType : storageSetting.navType,
       tagsView: storageSetting.tagsView === undefined ? tagsView : storageSetting.tagsView,

@@ -6,8 +6,9 @@ export default {
 
   /**
    * 侧边栏主题 深色主题theme-dark，浅色主题theme-light
+   * 默认 light（2026-11-19 用户验收反馈：对齐 gvdata 目标系统侧栏 light 系主体风格）
    */
-  sideTheme: 'theme-dark',
+  sideTheme: 'theme-light',
 
   /**
    * 是否系统布局配置

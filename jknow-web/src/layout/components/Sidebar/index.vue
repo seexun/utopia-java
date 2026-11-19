@@ -1,5 +1,7 @@
 <template>
-  <div :class="['sidebar-theme-wrapper', {'has-logo':showLogo}, sideTheme]" class="sidebar-container">
+  <!-- sidebar-light：对齐 gvdata 容器类接线——激活 sidebar.scss 的 gvdata SaaS-Light
+       菜单形态块（40px/圆角 8px/hover/active），theme-light 类仍走 jknow 壳换色跟随段 -->
+  <div :class="['sidebar-theme-wrapper', {'has-logo':showLogo, 'sidebar-light': sideTheme === 'theme-light'}, sideTheme]" class="sidebar-container">
     <logo v-if="showLogo" :collapse="isCollapse" />
     <el-scrollbar wrap-class="scrollbar-wrapper">
       <el-menu

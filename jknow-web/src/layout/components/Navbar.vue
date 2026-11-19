@@ -189,7 +189,9 @@ async function toggleTheme(event?: MouseEvent): Promise<void> {
   overflow: hidden;
   position: relative;
   background: var(--navbar-bg);
-  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  // 顶栏观感对齐 gvdata：shadow-card 软影 + 底部分割线（原先无线时与内容区分不足）
+  box-shadow: var(--shadow-card, 0 1px 2px rgba(15, 23, 42, 0.06));
+  border-bottom: 1px solid var(--color-border);
   display: flex;
   align-items: center;
   // padding: 0 8px;

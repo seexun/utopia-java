@@ -141,6 +141,11 @@ html.dark {
 
   /* 侧边栏菜单覆盖 */
   .sidebar-container {
+    // 暗态容器底随 --sidebar-bg（与 el-menu/Logo 同源 #141414）：sidebar.scss light 态
+    // 的 #app 级白底（ID 权重）会盖过 v-bind，这里 !important 显式盖回（原先 base 规则
+    // #001529 与菜单 #141414 存在底色不同源的细微差，一并收敛）
+    background-color: var(--sidebar-bg) !important;
+
     .el-menu-item:not(.is-active), .menu-title {
       color: var(--el-text-color-regular);
     }
@@ -174,6 +179,21 @@ html.dark {
           background-color: var(--menu-hover) !important;
         }
       }
+    }
+  }
+
+  /* SaaS-Light 形态块（sidebar-light 类接线后）在暗态的去浅底化：选中/hover 的
+     primary-soft/neutral-soft 浅底片会刺破暗侧栏，html.dark+#app 补权盖回深底语言
+     （选中文字仍主色、::before 10% tint 遮罩保留换色跟随） */
+  #app .sidebar-container.sidebar-light {
+    .el-menu-item:hover,
+    .el-sub-menu__title:hover {
+      background-color: var(--menu-hover) !important;
+      color: var(--sidebar-text) !important;
+    }
+    .el-menu-item.is-active {
+      background-color: transparent !important;
+      color: var(--menu-active-text) !important;
     }
   }
 
