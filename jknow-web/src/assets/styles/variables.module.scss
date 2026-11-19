@@ -161,6 +161,11 @@ html.dark {
     }
     &.theme-light {
       border-right: none !important;
+      // 暗态 Logo 底部分割线一并撤掉（同 border-right 的处理口径）：
+      // theme-light 块的 #e5eaf1 浅线在 #141414 暗底上是漏网的亮线（审查 M1）
+      .sidebar-logo-container {
+        border-bottom: none !important;
+      }
       .el-menu-item,
       .el-sub-menu__title {
         color: var(--sidebar-text) !important;

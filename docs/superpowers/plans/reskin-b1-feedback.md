@@ -23,6 +23,7 @@
 | 4 | `jknow-web/src/assets/styles/sidebar.scss` | theme-light 块补：容器白底（盖回基座深底）、Logo 区底部 1px 分割线、选中 `::before` 遮罩 `border-radius: inherit`（不方角压圆角） |
 | 5 | `jknow-web/src/layout/components/Navbar.vue` | 顶栏 `box-shadow` 收敛 `--shadow-card` 软影 + 底部 1px `--color-border` 分割线（对齐 gvdata） |
 | 6 | `jknow-web/src/assets/styles/variables.module.scss` | html.dark 暗态适配：容器底 `--sidebar-bg` !important 盖回（原先基座 #001529 与菜单 #141414 不同源的细微差一并收敛）；`html.dark #app .sidebar-container.sidebar-light` 选中/hover 去浅底化（primary-soft/neutral-soft 浅片不刺破暗侧栏，选中回深底+主色文字，::before 10% tint 遮罩保留换色跟随） |
+| 7 | 同上（审查 M1 追加） | html.dark `.sidebar-container.theme-light` 块补 `.sidebar-logo-container { border-bottom: none !important }`——暗态 Logo 底部分割线撤除（同 border-right:none 口径），light 态分割线保留 |
 
 ## 与 gvdata 并排走查——已对齐项（样式层）
 
@@ -47,6 +48,11 @@
    特有组件位，已随 light 态配色，不做形变。
 4. **选中色来源**：gvdata 固定 `--color-primary`；jknow 保留 `--current-color` 换色跟随（Settings
    抽屉改主色后选中态同步，`::before` 10% tint 遮罩实现）——jknow 特性保留，默认色下两者一致。
+5. **（M2）light 选中文字不随自定义主色**：gvdata 形态块的 `color: var(--color-primary) !important`
+   （#app+5 类）权重高于 jknow `--current-color` 规则（#app+4 类），改主色后仅 `::before` 10% tint
+   遮罩跟随、文字钉在 --color-primary——要文字也跟随需提升 jknow 规则权重或 gvdata 块让位，留批次。
+6. **（M3）hover 文字色等价差异**：jknow hover 文字 rgba(0,0,0,0.85) vs gvdata `--color-ink`(#0f172a)
+   ——同族等价差异，非肉眼可辨级，留批次随 tokens 统一时收口。
 
 ## 缓存归一化取舍（记录）
 
@@ -64,6 +70,11 @@
 - light 走查：/system/user（选中/hover）、图谱/检索/文库三知识页（kb-switcher 跟随、无样式撕裂）；
 - 暗态（html.dark 顶栏切换钮）：容器/菜单/Logo/kb-switcher 全 #141414 同源，选中深底+主色，
   hover #2d2d2d；三知识页暗态复验无撕裂；切回 light 恢复正常；
+  **更正（审查 M1）**：初版该表述漏计 Logo 底部分割线——html.dark 且 sideTheme=light 时
+  theme-light 块的 1px #e5eaf1 浅线仍画在 #141414 暗底上（feedback-dark-recheck.png x=100,y=49
+  可见）。已在 html.dark `.sidebar-container.theme-light` 块补 `.sidebar-logo-container
+  { border-bottom: none !important }`（同既有 border-right:none 口径），复验暗态无线、light 态
+  分割线保留；该截图拍摄于修正前，留作边角证据；
 - Settings 抽屉：theme-dark 重选即时生效（容器 #001529），重选 light 恢复；
 - `pnpm test` 56 文件 / **419 全绿**；`pnpm typecheck`（vue-tsc --noEmit）零错误。
 - 截图（docs/superpowers/plans/reskin-b1/）：
