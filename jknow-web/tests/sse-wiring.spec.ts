@@ -18,39 +18,61 @@
 // docCount/extraction-drops/entity/evidence/kbOne/reviewHistory/reviewSummary/
 // questionReport/storedProposals/mappingRevisions/kbDataSources）不被事件失效——
 // 旧仓同口径（写路径的 mutation 自带逐键 invalidate，新鲜期另有 30s 窗口）。
+//
+// 收尾冲刺 T1（SSE fetch 化）：事件流改 fetch 流式读（EventSource 带不了
+// Authorization 头），桩随嫁接——FakeEventSource 换 FakeEventStream（fetch 流桩）：
+// emit 按 `event:<type>` 帧写入（后端同形）、drop 掉线（实现按退避自动重连，
+// 重连成功即旧 emit("open")）、signal.aborted 即旧 source.closed。断言逐字保留。
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { defineComponent, h, ref } from "vue";
 import { QueryClient, VueQueryPlugin } from "@tanstack/vue-query";
 import { useKbEvents } from "@/composables/useKbEvents";
+import { RECONNECT_MS } from "@/domain/eventStream";
 
-class FakeEventSource {
-  static instances: FakeEventSource[] = [];
-  listeners = new Map<string, Set<() => void>>();
-  closed = false;
+const enc = new TextEncoder();
 
-  constructor(readonly url: string) {
-    FakeEventSource.instances.push(this);
+class FakeEventStream {
+  static instances: FakeEventStream[] = [];
+  /** 只在 fetch 桩开流时入册——一条 fetch 一条连接，恰好一次 */
+  static open(
+    url: string,
+    signal: AbortSignal,
+    controller: ReadableStreamDefaultController<Uint8Array>
+  ) {
+    FakeEventStream.instances.push(new FakeEventStream(url, signal, controller));
   }
-
-  addEventListener(type: string, listener: () => void) {
-    const set = this.listeners.get(type) ?? new Set();
-    set.add(listener);
-    this.listeners.set(type, set);
+  constructor(
+    readonly url: string,
+    readonly signal: AbortSignal,
+    private readonly controller: ReadableStreamDefaultController<Uint8Array>
+  ) {}
+  /** 连接被实现关掉（让出/卸载）——旧 source.closed 的对等物 */
+  get closed() {
+    return this.signal.aborted;
   }
-
-  removeEventListener(type: string, listener: () => void) {
-    this.listeners.get(type)?.delete(listener);
-  }
-
+  /** 一个事件帧（后端线上同形：`event:` 冒号后无空格） */
   emit(type: string) {
-    for (const listener of this.listeners.get(type) ?? []) listener();
+    this.controller.enqueue(enc.encode(`event:${type}\ndata: {}\n\n`));
   }
-
-  close() {
-    this.closed = true;
+  /** 掉线（=旧 emit("error")）：错误掉流，实现按退避自动重连 */
+  drop() {
+    this.controller.error(new Error("connection lost"));
   }
 }
+
+const sseFetch = vi.fn((input: unknown, init?: RequestInit) => {
+  const body = new ReadableStream<Uint8Array>({
+    // start 同步执行：mount 后立即可从 instances 取到这条连接（对等旧 new EventSource 的同步性）
+    start: controller => FakeEventStream.open(String(input), init?.signal as AbortSignal, controller)
+  });
+  return Promise.resolve(
+    new Response(body, {
+      status: 200,
+      headers: { "content-type": "text/event-stream" }
+    })
+  );
+});
 
 /** 页面键形态 → SSE 失效核对表（一个事件该失效哪些页键） */
 const KB = "kb-a";
@@ -97,7 +119,7 @@ function setup() {
   const wrapper = mount(Host, {
     global: { plugins: [[VueQueryPlugin, { queryClient: client }]] }
   });
-  const source = FakeEventSource.instances.at(-1)!;
+  const source = FakeEventStream.instances.at(-1)!;
   const invalidated = (...keys: Array<readonly unknown[]>) =>
     keys.map(key => client.getQueryState([...key])?.isInvalidated === true);
   return {
@@ -110,8 +132,8 @@ function setup() {
 
 beforeEach(() => {
   vi.useFakeTimers();
-  vi.stubGlobal("EventSource", FakeEventSource);
-  FakeEventSource.instances = [];
+  vi.stubGlobal("fetch", sseFetch);
+  FakeEventStream.instances = [];
 });
 
 afterEach(() => {
@@ -120,28 +142,28 @@ afterEach(() => {
 });
 
 describe("六个读页的键真被事件失效（接线核对表）", () => {
-  it("document → 文库列表 + 图谱主数据（readiness/me 不在事件表上）", () => {
+  it("document → 文库列表 + 图谱主数据（readiness/me 不在事件表上）", async () => {
     const { source, invalidated, unmount } = setup();
     source.emit("document");
-    vi.advanceTimersByTime(300);
+    await vi.advanceTimersByTimeAsync(300);
     expect(invalidated(PAGE_KEYS.documents, PAGE_KEYS.graphMain)).toEqual([true, true]);
     expect(invalidated(PAGE_KEYS.graphReady, PAGE_KEYS.me)).toEqual([false, false]);
     unmount();
   });
 
-  it("graph → 图谱主数据 + 本体回归面板（search 不动）", () => {
+  it("graph → 图谱主数据 + 本体回归面板（search 不动）", async () => {
     const { source, invalidated, unmount } = setup();
     source.emit("graph");
-    vi.advanceTimersByTime(300);
+    await vi.advanceTimersByTimeAsync(300);
     expect(invalidated(PAGE_KEYS.graphMain, PAGE_KEYS.regressions)).toEqual([true, true]);
     expect(invalidated(PAGE_KEYS.search, PAGE_KEYS.ontology)).toEqual([false, false]);
     unmount();
   });
 
-  it("review → 审核队列 + 映射队列 + 本体回归（台账/总览/库详情不动）", () => {
+  it("review → 审核队列 + 映射队列 + 本体回归（台账/总览/库详情不动）", async () => {
     const { source, invalidated, unmount } = setup();
     source.emit("review");
-    vi.advanceTimersByTime(300);
+    await vi.advanceTimersByTimeAsync(300);
     expect(invalidated(PAGE_KEYS.reviewQueue, PAGE_KEYS.mappings, PAGE_KEYS.regressions)).toEqual([
       true,
       true,
@@ -153,35 +175,36 @@ describe("六个读页的键真被事件失效（接线核对表）", () => {
     unmount();
   });
 
-  it("pending → 对话确认卡 + 审核队列", () => {
+  it("pending → 对话确认卡 + 审核队列", async () => {
     const { source, invalidated, unmount } = setup();
     source.emit("pending");
-    vi.advanceTimersByTime(300);
+    await vi.advanceTimersByTimeAsync(300);
     expect(invalidated(PAGE_KEYS.pending, PAGE_KEYS.reviewQueue)).toEqual([true, true]);
     unmount();
   });
 
-  it("source → 来源栏 + 文库列表（docCount/drops 走写路径失效，不随事件）", () => {
+  it("source → 来源栏 + 文库列表（docCount/drops 走写路径失效，不随事件）", async () => {
     const { source, invalidated, unmount } = setup();
     source.emit("source");
-    vi.advanceTimersByTime(300);
+    await vi.advanceTimersByTimeAsync(300);
     expect(invalidated(PAGE_KEYS.sources, PAGE_KEYS.documents)).toEqual([true, true]);
     expect(invalidated(PAGE_KEYS.docCount, PAGE_KEYS.drops)).toEqual([false, false]);
     unmount();
   });
 
-  it("alert → 告警角标与列表（库事件流顺带送告警 #1028）", () => {
+  it("alert → 告警角标与列表（库事件流顺带送告警 #1028）", async () => {
     const { source, invalidated, unmount } = setup();
     source.emit("alert");
-    vi.advanceTimersByTime(300);
+    await vi.advanceTimersByTimeAsync(300);
     expect(invalidated(PAGE_KEYS.alertsUnread, PAGE_KEYS.alertsList)).toEqual([true, true]);
     unmount();
   });
 
-  it("重连补刷把六个页族的流覆盖键一次补齐（前缀去重，立即 flush）", () => {
+  it("重连补刷把六个页族的流覆盖键一次补齐（前缀去重，立即 flush）", async () => {
     const { client, source, invalidated, unmount } = setup();
-    source.emit("error");
-    source.emit("open");
+    source.drop();
+    // 退避到点自动重连，成功即旧 emit("open")——补刷不等普通事件的 300ms 合并窗口
+    await vi.advanceTimersByTimeAsync(RECONNECT_MS);
     expect(
       invalidated(
         PAGE_KEYS.graphMain,

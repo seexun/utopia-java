@@ -1,6 +1,9 @@
 import type { SourceKind } from "./sourceKinds";
 import { S } from "./i18n";
 import { createParser } from "eventsource-parser";
+// jknow 收尾冲刺 T1：fetch 直连也要过若依鉴权——与 axios 拦截器（api/knowledge/
+// client.ts）同源取 token；js-cookie 纯浏览器库，domain 层可引（先例即 client.ts）
+import { getToken } from "@/utils/auth";
 
 export class ApiError extends Error {
   status: number;
@@ -43,13 +46,22 @@ function streamFailure(data: string): string {
   return data;
 }
 
+/** 若依鉴权头：未登录不带（登录页自身的请求没有 token 可言——与 client.ts 同裁）。
+ *  通用请求与两条对话流（fetch 直连，不走 axios 拦截器）共用这一处。 */
+function bearerHeaders(): Record<string, string> {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     credentials: "include",
-    headers:
-      init?.body instanceof FormData
+    headers: {
+      ...(init?.body instanceof FormData
         ? {}
-        : { "Content-Type": "application/json" },
+        : { "Content-Type": "application/json" }),
+      ...bearerHeaders(),
+    },
     ...init,
   });
   if (!res.ok) {
@@ -2840,6 +2852,7 @@ export function reattachChat(
     (signal) =>
       fetch(`/api/v1/kbs/${kbId}/conversations/${conversationId}/stream`, {
         credentials: "include",
+        headers: bearerHeaders(),
         signal,
       }),
     handlers,
@@ -2858,7 +2871,7 @@ export function streamChat(
       fetch(`/api/v1/kbs/${kbId}/chat`, {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...bearerHeaders() },
         body: JSON.stringify(body),
         signal,
       }),

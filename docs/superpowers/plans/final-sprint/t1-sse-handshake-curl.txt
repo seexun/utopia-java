@@ -1,0 +1,104 @@
+===== A. 无 Authorization（负基线）：POST /api/v1/kbs/{kb}/chat =====
+HTTP/1.1 200 
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+X-Content-Type-Options: nosniff
+X-XSS-Protection: 0
+X-Frame-Options: SAMEORIGIN
+Content-Type: application/json;charset=utf-8
+Content-Length: 131
+Date: Thu, 19 Nov 2026 14:31:08 GMT
+
+{"msg":"请求访问：/api/v1/kbs/0190d3e0-0000-7d5a-8000-0000000000f2/chat，认证失败，无法访问系统资源","code":401}
+===== B. Bearer 握手：POST /api/v1/kbs/{kb}/chat =====
+HTTP/1.1 422 
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+X-Content-Type-Options: nosniff
+X-XSS-Protection: 0
+X-Frame-Options: SAMEORIGIN
+Content-Type: application/json
+Content-Length: 88
+Date: Thu, 19 Nov 2026 14:31:08 GMT
+
+{"error":"Chat model not configured. Go to Settings → Models.","code":"no_chat_model"}===== C. Bearer：GET /api/v1/kbs/{kb}/events（通知事件流——subscribeEvents 的传输面）=====
+HTTP/1.1 200 
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+X-Content-Type-Options: nosniff
+X-XSS-Protection: 0
+X-Frame-Options: SAMEORIGIN
+Content-Type: text/event-stream
+Transfer-Encoding: chunked
+Date: Thu, 19 Nov 2026 14:31:39 GMT
+
+:keep-alive
+
+curl: (28) Operation timed out after 5013 milliseconds with 13 bytes received
+
+===== D. Bearer：GET /api/v1/kbs/{kb}/conversations/1466e371-e9f8-46be-84c5-b0eec8f2db0a/stream（reattach，无此会话→idle 帧）=====
+HTTP/1.1 404 
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+X-Content-Type-Options: nosniff
+X-XSS-Protection: 0
+X-Frame-Options: SAMEORIGIN
+Content-Type: application/json
+Content-Length: 21
+Date: Thu, 19 Nov 2026 14:31:44 GMT
+
+{"error":"Not found"}
+===== E. 无 Authorization：GET /api/v1/kbs/{kb}/events（负基线）=====
+HTTP/1.1 200 
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+X-Content-Type-Options: nosniff
+X-XSS-Protection: 0
+X-Frame-Options: SAMEORIGIN
+Content-Type: application/json;charset=utf-8
+Content-Length: 133
+Date: Thu, 19 Nov 2026 14:31:44 GMT
+
+{"msg":"请求访问：/api/v1/kbs/0190d3e0-0000-7d5a-8000-0000000000f2/events，认证失败，无法访问系统资源","code":401}===== F. kb …001 存在性（Bearer）=====
+200
+===== G. Bearer：GET /conversations/0190d3e0-0000-7d5a-8000-000000000ff0/stream（reattach：seed 会话无在跑生成→idle 帧）=====
+HTTP/1.1 200 
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+X-Content-Type-Options: nosniff
+X-XSS-Protection: 0
+X-Frame-Options: SAMEORIGIN
+Content-Type: text/event-stream
+Transfer-Encoding: chunked
+Date: Thu, 19 Nov 2026 14:32:39 GMT
+
+event:idle
+data:{}
+
+===== H. Bearer：POST /chat（假模型端点——流真开，模型调用失败→流内 error 帧）=====
+HTTP/1.1 200 
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+X-Content-Type-Options: nosniff
+X-XSS-Protection: 0
+X-Frame-Options: SAMEORIGIN
+Content-Type: text/event-stream;charset=UTF-8
+Transfer-Encoding: chunked
+Date: Thu, 19 Nov 2026 14:33:31 GMT
+
+event:snapshot
+data:{"generation_id":"01a1f43a-1c03-7000-ad2f-2bb63469ce54","content":"","steps":[],"sources":[]}
+
+event:conversation
+data:{"id":"01a1f43a-1bff-7000-8d63-75e38e086b65","message_id":"01a1f43a-1c07-7000-9507-3b9dab306a91","generation_id":"01a1f43a-1c03-7000-ad2f-2bb63469ce54"}
+
+event:error
+data:{"error":"LLM endpoint gave no usable answer: java.net.ConnectException","code":"model_unreachable"}
+

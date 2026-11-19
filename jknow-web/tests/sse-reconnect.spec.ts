@@ -13,6 +13,13 @@
 //      精确不变」钉住旧断言的本义（没有第二遍重取被排程）；short-absence 反而
 //      **强于旧仓**——卸载后再推进 2×HIDDEN_RELEASE_MS，断言无重连（连接数不变）、
 //      无重取（计数不变），释放定时器若未取消会在该窗口显形。
+//   ⑤ 收尾冲刺 T1（SSE fetch 化）：事件流改 fetch 流式读（EventSource 带不了
+//      Authorization 头），可控事件源从 FakeEventSource 换 FakeEventStream：
+//      emit 写 `event:<type>` 帧（后端同形）、drop 掉线（=旧 emit("error")），
+//      重连由实现按退避自动做——退避到点重连成功即旧 emit("open")；
+//      blackout 模拟断线期间网络不通（重试全败、不产生恢复）；
+//      帧 RETRY 字段压退避，让「攒着的一阵与重连同拍」可造（旧测试靠同步
+//      emit("error")+emit("open") 压缩时间）。断言与语义逐字保留。
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mount as vueMount } from "@vue/test-utils";
 import { defineComponent, h, ref } from "vue";
@@ -31,39 +38,68 @@ import {
 import { SETTLE_MS } from "@/domain/kbEventsCore";
 import { useKbEvents } from "@/composables/useKbEvents";
 import { useAlertEvents } from "@/composables/useAlertEvents";
-import { HIDDEN_RELEASE_MS } from "@/domain/eventStream";
+import { HIDDEN_RELEASE_MS, RECONNECT_MS } from "@/domain/eventStream";
 
-class FakeEventSource {
-  static instances: FakeEventSource[] = [];
-  listeners = new Map<string, Set<() => void>>();
-  closed = false;
+const enc = new TextEncoder();
 
-  constructor(readonly url: string) {
-    FakeEventSource.instances.push(this);
+class FakeEventStream {
+  static instances: FakeEventStream[] = [];
+  /** 断线期间网络不通：fetch 一律失败（模拟掉线到恢复之间的整段不可达） */
+  static blackout = false;
+  private dropped = false;
+  /** 只在 fetch 桩开流时入册——一条 fetch 一条连接，恰好一次 */
+  static open(
+    url: string,
+    signal: AbortSignal,
+    controller: ReadableStreamDefaultController<Uint8Array>
+  ) {
+    FakeEventStream.instances.push(new FakeEventStream(url, signal, controller));
   }
-
-  addEventListener(type: string, listener: () => void) {
-    const listeners = this.listeners.get(type) ?? new Set();
-    listeners.add(listener);
-    this.listeners.set(type, listeners);
+  constructor(
+    readonly url: string,
+    readonly signal: AbortSignal,
+    private readonly controller: ReadableStreamDefaultController<Uint8Array>
+  ) {}
+  /** 连接被实现关掉（让出/卸载）——旧 source.closed 的对等物 */
+  get closed() {
+    return this.signal.aborted;
   }
-
-  removeEventListener(type: string, listener: () => void) {
-    this.listeners.get(type)?.delete(listener);
+  /** 一个事件帧（后端线上同形：`event:` 冒号后无空格）；RETRY 压下一次退避。
+   *  掉线后的流已不可写——迟到帧静默丢弃（正是被测的不作数语义） */
+  emit(type: string, opts: { retry?: number } = {}) {
+    if (this.dropped) return;
+    const retry = opts.retry !== undefined ? `retry: ${opts.retry}\n` : "";
+    this.controller.enqueue(
+      enc.encode(`event:${type}\ndata: {}\n${retry}\n`)
+    );
   }
-
-  emit(type: string) {
-    for (const listener of this.listeners.get(type) ?? []) listener();
-  }
-
-  close() {
-    this.closed = true;
+  /** 掉线（=旧 emit("error")）：错误掉流，实现按退避自动重连 */
+  drop() {
+    if (this.dropped) return;
+    this.dropped = true;
+    this.controller.error(new Error("connection lost"));
   }
 }
 
+const sseFetch = vi.fn((input: unknown, init?: RequestInit) => {
+  if (FakeEventStream.blackout) {
+    return Promise.reject(new TypeError("Failed to fetch"));
+  }
+  const body = new ReadableStream<Uint8Array>({
+    // start 同步执行：订阅一发生即可从 instances 取到这条连接（对等旧 new EventSource 的同步性）
+    start: controller => FakeEventStream.open(String(input), init?.signal as AbortSignal, controller)
+  });
+  return Promise.resolve(
+    new Response(body, {
+      status: 200,
+      headers: { "content-type": "text/event-stream" }
+    })
+  );
+});
+
 /** 宿主组件挂载执行 composable（需要 VueQueryPlugin 的 inject 上下文）；
  *  unmount 即 onScopeDispose——旧仓 mock useEffect 直调 effect 的对等物。 */
-function mount(hook: () => void): { source: FakeEventSource | undefined; unmount: () => void } {
+function mount(hook: () => void): { source: FakeEventStream | undefined; unmount: () => void } {
   const Host = defineComponent({
     setup() {
       hook();
@@ -75,7 +111,7 @@ function mount(hook: () => void): { source: FakeEventSource | undefined; unmount
   });
   const unmount = () => wrapper.unmount();
   cleanups.push(unmount);
-  return { source: FakeEventSource.instances.at(-1), unmount };
+  return { source: FakeEventStream.instances.at(-1), unmount };
 }
 
 /** jsdom 真文档上偷换可见性：旧仓 fakePage 在 node 环境整个换掉 document，
@@ -154,8 +190,9 @@ async function watch(client: QueryClient, key: QueryKey) {
 
 beforeEach(() => {
   vi.useFakeTimers();
-  vi.stubGlobal("EventSource", FakeEventSource);
-  FakeEventSource.instances = [];
+  vi.stubGlobal("fetch", sseFetch);
+  FakeEventStream.instances = [];
+  FakeEventStream.blackout = false;
 });
 
 afterEach(() => {
@@ -183,16 +220,20 @@ describe("KB stream reconnect", () => {
     client.setQueryData(inactiveKey, "cached before disconnect");
     const { source } = mount(() => useKbEvents(ref("kb-a")));
     expect(source!.url).toBe("/api/v1/kbs/kb-a/events");
-    source!.emit("open");
+    // 首次正常连接（fetch 已解析）不补刷（=旧 emit("open") 的首个 open）
+    await vi.advanceTimersByTimeAsync(0);
     for (const query of recoveredQueries) expect(query.fetch).toHaveBeenCalledTimes(1);
 
-    source!.emit("error");
+    source!.drop();
+    FakeEventStream.blackout = true;
     for (const query of recoveredQueries) query.changeServer();
-    // staleTime 到期只让缓存变旧，不会自动请求；断线期间完全没有业务事件。
+    // staletime 到期只让缓存变旧，不会自动请求；断线期间（网络不通，重试全败）
+    // 完全没有业务事件、也没有恢复。
     await vi.advanceTimersByTimeAsync(STREAM_STALE_MS + 1);
     for (const query of recoveredQueries) expect(query.fetch).toHaveBeenCalledTimes(1);
 
-    source!.emit("open");
+    FakeEventStream.blackout = false;
+    await vi.advanceTimersByTimeAsync(RECONNECT_MS);
     // 重连不等普通事件的 300ms 合并窗口（失效分发落在下一个时钟滴答，advance 一格即达）
     await vi.advanceTimersByTimeAsync(1);
     for (const query of recoveredQueries) expect(query.fetch).toHaveBeenCalledTimes(2);
@@ -200,7 +241,8 @@ describe("KB stream reconnect", () => {
       for (const query of recoveredQueries)
         expect(query.observer.getCurrentResult().data).toBe("after disconnect");
     });
-    source!.emit("open");
+    // 恢复标记已清：没有新的掉线，连接健康着推进整个 settle 窗口也不再补第二遍
+    // （旧第三个 emit("open") 的本义——spurious open 不再补刷）
     await vi.advanceTimersByTimeAsync(SETTLE_MS);
     for (const query of recoveredQueries) expect(query.fetch).toHaveBeenCalledTimes(2);
     expect(client.getQueryState(inactiveKey)?.isInvalidated).toBe(true);
@@ -211,14 +253,16 @@ describe("KB stream reconnect", () => {
   it("recovers an initial failed connection and clears the recovery flag after open", async () => {
     const client = createClient();
     const query = await watch(client, ["documents", "kb-a"]);
-    const { source } = mount(() => useKbEvents(ref("kb-a")));
-    source!.emit("error");
-    query.changeServer();
-    source!.emit("open");
+    FakeEventStream.blackout = true;
+    mount(() => useKbEvents(ref("kb-a")));
+    // 初连即失败，之后多次重试全败——同一段断线只该补刷一次
+    await vi.advanceTimersByTimeAsync(RECONNECT_MS * 2);
+    FakeEventStream.blackout = false;
+    await vi.advanceTimersByTimeAsync(RECONNECT_MS);
     await vi.advanceTimersByTimeAsync(1);
     expect(query.fetch).toHaveBeenCalledTimes(2);
-    source!.emit("open");
-    await vi.advanceTimersByTimeAsync(1);
+    // 恢复标记已清：连接健康着再推进也没有第二次补刷（旧第二个 emit("open")）
+    await vi.advanceTimersByTimeAsync(RECONNECT_MS * 2);
     expect(query.fetch).toHaveBeenCalledTimes(2);
   });
 
@@ -229,13 +273,16 @@ describe("KB stream reconnect", () => {
     const badge = await watch(client, ["alerts", "unread"]);
     const list = await watch(client, ["alerts", "list", "", 0]);
     const { source } = mount(() => useKbEvents(ref("kb-a")));
-    source!.emit("open");
+    await vi.advanceTimersByTimeAsync(0);
     source!.emit("document");
-    source!.emit("graph");
+    // RETRY 压退避：让重连赶在 300ms 合并窗口收口之前（旧测试靠同步
+    // emit("error")+emit("open") 压缩时间，此处用规范字段同效）
+    source!.emit("graph", { retry: 10 });
     source!.emit("alert");
     source!.emit("alert");
-    source!.emit("error");
-    source!.emit("open");
+    await vi.advanceTimersByTimeAsync(0);
+    source!.drop();
+    await vi.advanceTimersByTimeAsync(10);
     await vi.advanceTimersByTimeAsync(1);
     expect(graph.fetch).toHaveBeenCalledTimes(2);
     expect(documents.fetch).toHaveBeenCalledTimes(2);
@@ -255,11 +302,12 @@ describe("KB stream reconnect", () => {
     const graph = await watch(client, ["graph", "kb-a"]);
     const documents = await watch(client, ["documents", "kb-a"]);
     const { source } = mount(() => useKbEvents(ref("kb-a")));
-    source!.emit("open");
+    await vi.advanceTimersByTimeAsync(0);
     for (let i = 0; i < 12; i++) {
       source!.emit("document");
       source!.emit("graph");
     }
+    await vi.advanceTimersByTimeAsync(0);
     await vi.advanceTimersByTimeAsync(SETTLE_MS - 1);
     expect(graph.fetch).toHaveBeenCalledTimes(1);
     expect(documents.fetch).toHaveBeenCalledTimes(1);
@@ -275,30 +323,26 @@ describe("KB stream reconnect", () => {
     const badge = await watch(client, ["alerts", "unread"]);
     const list = await watch(client, ["alerts", "list", "", 0]);
     const old = mount(() => useKbEvents(ref("kb-a")));
-    old.source!.emit("open");
-    old.source!.emit("error");
-    const lateOpen = [...(old.source!.listeners.get("open") ?? [])];
-    const lateGraph = [...(old.source!.listeners.get("graph") ?? [])];
-    const lateAlert = [...(old.source!.listeners.get("alert") ?? [])];
+    await vi.advanceTimersByTimeAsync(0);
+    // 在途帧（emit 后未及分发就卸载）+ 掉线后旧连接的迟到帧：都不能失效新页面
+    old.source!.emit("graph");
+    old.source!.drop();
     old.unmount();
-    const next = mount(() => useKbEvents(ref("kb-b")));
-    next.source!.emit("open");
-    for (const callback of [...lateOpen, ...lateGraph, ...lateAlert]) callback();
-    old.source!.emit("open");
     old.source!.emit("document");
-    await vi.advanceTimersByTimeAsync(SETTLE_MS);
-    expect(old.source!.closed).toBe(true);
-    expect(
-      [...old.source!.listeners.values()].every(listeners => listeners.size === 0)
-    ).toBe(true);
-    // 迟到的旧连接回调一个都没生效（旧连接/新连接/告警键都没被多余重取；
+    old.source!.emit("alert");
+    await vi.advanceTimersByTimeAsync(RECONNECT_MS * 2);
+    // 卸载释放了连接、也取消了重试：没有第二条连接冒出来（实例数不变）
+    expect(FakeEventStream.instances).toHaveLength(1);
+    // 迟到的旧连接事件一个都没生效（旧连接/新连接/告警键都没被多余重取；
     // 旧仓此处还有 getTimerCount()===0——见文件头注④，由这几行计数承接）
     expect(oldKb.fetch).toHaveBeenCalledTimes(1);
     expect(newKb.fetch).toHaveBeenCalledTimes(1);
     expect(badge.fetch).toHaveBeenCalledTimes(1);
     expect(list.fetch).toHaveBeenCalledTimes(1);
-    next.source!.emit("error");
-    next.source!.emit("open");
+    const next = mount(() => useKbEvents(ref("kb-b")));
+    await vi.advanceTimersByTimeAsync(0);
+    next.source!.drop();
+    await vi.advanceTimersByTimeAsync(RECONNECT_MS);
     await vi.advanceTimersByTimeAsync(1);
     expect(oldKb.fetch).toHaveBeenCalledTimes(1);
     expect(newKb.fetch).toHaveBeenCalledTimes(2);
@@ -309,7 +353,7 @@ describe("KB stream reconnect", () => {
   it("does not subscribe without a selected KB", () => {
     createClient();
     mount(() => useKbEvents(ref(undefined)));
-    expect(FakeEventSource.instances).toHaveLength(0);
+    expect(FakeEventStream.instances).toHaveLength(0);
   });
 });
 
@@ -321,13 +365,13 @@ describe("alert stream reconnect", () => {
     const other = await watch(client, ["documents", "kb-a"]);
     const { source } = mount(() => useAlertEvents());
     expect(source!.url).toBe("/api/v1/alerts/events");
-    source!.emit("open");
+    await vi.advanceTimersByTimeAsync(0);
     expect(badge.fetch).toHaveBeenCalledTimes(1);
     expect(list.fetch).toHaveBeenCalledTimes(1);
-    source!.emit("error");
+    source!.drop();
     badge.changeServer();
     list.changeServer();
-    source!.emit("open");
+    await vi.advanceTimersByTimeAsync(RECONNECT_MS);
     await vi.advanceTimersByTimeAsync(1);
     expect(badge.fetch).toHaveBeenCalledTimes(2);
     expect(list.fetch).toHaveBeenCalledTimes(2);
@@ -341,13 +385,14 @@ describe("alert stream reconnect", () => {
   it("also recovers when the first alert connection failed before open", async () => {
     const client = createClient();
     const query = await watch(client, ["alerts", "unread"]);
-    const { source } = mount(() => useAlertEvents());
-    source!.emit("error");
-    source!.emit("open");
+    FakeEventStream.blackout = true;
+    mount(() => useAlertEvents());
+    await vi.advanceTimersByTimeAsync(RECONNECT_MS * 2);
+    FakeEventStream.blackout = false;
+    await vi.advanceTimersByTimeAsync(RECONNECT_MS);
     await vi.advanceTimersByTimeAsync(1);
     expect(query.fetch).toHaveBeenCalledTimes(2);
-    source!.emit("open");
-    await vi.advanceTimersByTimeAsync(1);
+    await vi.advanceTimersByTimeAsync(RECONNECT_MS * 2);
     expect(query.fetch).toHaveBeenCalledTimes(2);
   });
 
@@ -355,15 +400,15 @@ describe("alert stream reconnect", () => {
     const client = createClient();
     const query = await watch(client, ["alerts", "unread"]);
     const { source, unmount } = mount(() => useAlertEvents());
-    source!.emit("open");
-    source!.emit("error");
-    const lateCallbacks = [...source!.listeners.values()].flatMap(listeners => [...listeners]);
+    await vi.advanceTimersByTimeAsync(0);
+    // 在途帧（卸载后才轮到分发）+ 卸载后再掉线/再发帧：一律不作数
+    source!.emit("alert");
     unmount();
-    for (const callback of lateCallbacks) callback();
+    source!.emit("alert");
+    source!.drop();
     expect(source!.closed).toBe(true);
-    expect(
-      [...source!.listeners.values()].every(listeners => listeners.size === 0)
-    ).toBe(true);
+    await vi.advanceTimersByTimeAsync(RECONNECT_MS * 2);
+    expect(FakeEventStream.instances).toHaveLength(1);
     expect(query.fetch).toHaveBeenCalledTimes(1);
   });
 });
@@ -373,12 +418,13 @@ describe("one notification stream per page (#1028)", () => {
     const client = createClient();
     const badge = await watch(client, ["alerts", "unread"]);
     const { source } = mount(() => useKbEvents(ref("kb-a")));
-    source!.emit("open");
+    await vi.advanceTimersByTimeAsync(0);
     source!.emit("alert");
+    await vi.advanceTimersByTimeAsync(0);
     await vi.advanceTimersByTimeAsync(SETTLE_MS);
     expect(badge.fetch).toHaveBeenCalledTimes(2);
-    source!.emit("error");
-    source!.emit("open");
+    source!.drop();
+    await vi.advanceTimersByTimeAsync(RECONNECT_MS);
     await vi.advanceTimersByTimeAsync(1);
     expect(badge.fetch).toHaveBeenCalledTimes(3);
   });
@@ -387,7 +433,7 @@ describe("one notification stream per page (#1028)", () => {
     createClient();
     mount(() => useKbEvents(ref("kb-a")));
     mount(() => useAlertEvents(ref(false)));
-    expect(FakeEventSource.instances.map(source => source.url)).toEqual([
+    expect(FakeEventStream.instances.map(source => source.url)).toEqual([
       "/api/v1/kbs/kb-a/events"
     ]);
   });
@@ -398,23 +444,20 @@ describe("one notification stream per page (#1028)", () => {
     const client = createClient();
     const documents = await watch(client, ["documents", "kb-a"]);
     const { source } = mount(() => useKbEvents(ref("kb-a")));
-    source!.emit("open");
+    await vi.advanceTimersByTimeAsync(0);
 
     page.show(false);
     await vi.advanceTimersByTimeAsync(HIDDEN_RELEASE_MS - 1);
     expect(source!.closed).toBe(false);
     await vi.advanceTimersByTimeAsync(1);
     expect(source!.closed).toBe(true);
-    expect(
-      [...source!.listeners.values()].every(listeners => listeners.size === 0)
-    ).toBe(true);
 
     documents.changeServer();
     page.show(true);
-    const reopened = FakeEventSource.instances.at(-1)!;
+    const reopened = FakeEventStream.instances.at(-1)!;
     expect(reopened).not.toBe(source);
     expect(documents.fetch).toHaveBeenCalledTimes(1);
-    reopened.emit("open");
+    // 回前台重连成功（=旧 reopened.emit("open")）即补刷
     await vi.advanceTimersByTimeAsync(1);
     expect(documents.fetch).toHaveBeenCalledTimes(2);
   });
@@ -425,13 +468,13 @@ describe("one notification stream per page (#1028)", () => {
     const client = createClient();
     const documents = await watch(client, ["documents", "kb-a"]);
     const { source, unmount } = mount(() => useKbEvents(ref("kb-a")));
-    source!.emit("open");
+    await vi.advanceTimersByTimeAsync(0);
     page.show(false);
     await vi.advanceTimersByTimeAsync(HIDDEN_RELEASE_MS - 1);
     page.show(true);
     await vi.advanceTimersByTimeAsync(HIDDEN_RELEASE_MS);
     expect(source!.closed).toBe(false);
-    expect(FakeEventSource.instances).toHaveLength(1);
+    expect(FakeEventStream.instances).toHaveLength(1);
     expect(documents.fetch).toHaveBeenCalledTimes(1);
 
     page.show(false);
@@ -442,17 +485,18 @@ describe("one notification stream per page (#1028)", () => {
     // 旧仓此处还有 getTimerCount()===0——见文件头注④；本例断言强于旧仓：
     // 卸载后再推进 2×HIDDEN_RELEASE_MS，无重连（连接数不变）、无重取（计数不变）
     await vi.advanceTimersByTimeAsync(HIDDEN_RELEASE_MS * 2);
-    expect(FakeEventSource.instances).toHaveLength(1);
+    expect(FakeEventStream.instances).toHaveLength(1);
     expect(documents.fetch).toHaveBeenCalledTimes(1);
   });
 
-  it("waits for a page opened in the background to be shown before connecting", () => {
+  it("waits for a page opened in the background to be shown before connecting", async () => {
     const page = fakePage(false);
     pages.push(page);
     createClient();
     mount(() => useAlertEvents());
-    expect(FakeEventSource.instances).toHaveLength(0);
+    expect(FakeEventStream.instances).toHaveLength(0);
     page.show(true);
-    expect(FakeEventSource.instances).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(FakeEventStream.instances).toHaveLength(1);
   });
 });
