@@ -5,8 +5,8 @@
      「撤销」原路复活/恢复/真删 purge 打字级确认/失败原文与丢弃详情两张窗）、
      全库重建（清算语义，KB admin，打字级确认）。
      reskin-b1 模板层重造（script 逻辑零动，仅 import + 纯展示 computed）：
-     PageHeader + 统计卡条 + 搜索行/表格一体卡（el-table，table-style-optimized
-     首装配）+ 空库虚线拖放卡；行内容自 write.tsx DocRow 逐格迁入模板，
+     PageHeader + 统计卡条 + 搜索行/表格一体卡（el-table，形态来自 theme.scss
+     全局 .el-table 规则）+ 空库虚线拖放卡；行内容自 write.tsx DocRow 逐格迁入模板，
      交互接线（mutation/弹窗）全部原样。 -->
 <script setup lang="ts">
 import { ref, computed, watch, h, type Component } from "vue";
@@ -701,9 +701,9 @@ function rowSourceIcon(row: SourceDoc): Component | null {
               @purge="(d: Doc) => (purging = d)"
             />
 
-            <!-- 文档表（reskin-b1 六要素之四：el-table + table-style-optimized
-                 形态，该样式文件由本页首装配——引入方式对齐 gvdata dpp 任务视图
-                 的页内 <style src>）。列集与原表一一对应不增删：文件/[来源]/
+            <!-- 文档表（reskin-b1 六要素之四：el-table 形态来自 theme.scss
+                 全局 .el-table 规则；table-style-optimized.scss 留仓零改写，
+                 待真实消费点（终审收口：原页内装配系空转，已移除））。列集与原表一一对应不增删：文件/[来源]/
                  状态/图谱/文本块/大小/动作两列；行内容=DocRow 逐格迁入模板，
                  删除/重跑解析/重抽/失败原文/丢弃详情的接线全部原样 -->
             <el-table
@@ -972,12 +972,6 @@ function rowSourceIcon(row: SourceDoc): Component | null {
   </div>
 </template>
 
-<!-- table-style-optimized.scss 首装配（reskin-b1 步骤 1）：引入位对齐 gvdata
-     实况——dpp 任务视图页内 <style lang="scss" src>（非全局装配，main.ts 的
-     gvdesign 装配注释预留的「等位消费点」即此）。单元格布局类（task-title-row
-     一族）供 el-table 列内消费 -->
-<style lang="scss" src="@/assets/styles/gvdesign/table-style-optimized.scss"></style>
-
 <style scoped lang="scss">
 /* 重造层（reskin-b1）：只引令牌（--color-* / --radius-* / --shadow-* /
    --transition-base），禁硬编码色值；卡容器/徽章/表格基础形态来自全局
@@ -988,9 +982,9 @@ function rowSourceIcon(row: SourceDoc): Component | null {
   padding-left: 34px;
 }
 
-/* ===== 统计卡条（styleGuide StatCard 形态同构；3 项收成 3 列）===== */
+/* ===== 统计卡条（styleGuide StatCard 形态同构；列节奏直接用全局
+   .stat-grid——桌面 4 列、≤1200px 降 2 列（theme.scss），页内只留间距）===== */
 .lib-stats {
-  grid-template-columns: repeat(3, 1fr);
   margin-bottom: 16px;
 }
 
