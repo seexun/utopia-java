@@ -1,9 +1,14 @@
-<!-- 数据映射（对照旧仓 pages/Mappings.tsx 全量）：左栏切功能（定义/数据源）。
-     定义：状态筛选（计数在标签里）+ 搜索 + 全选批量拍板 + 最近一轮探索的账；
+<!-- 数据映射（对照旧仓 pages/Mappings.tsx 全量）：定义/数据源两档（页头 segmented）。
+     定义：状态筛选（计数在徽章里）+ 搜索 + 全选批量拍板 + 最近一轮探索的账；
      未表态的给确认/拒绝，已表态的给编辑（留痕 revisions）与改版史。
      数据源：挂载/同步表结构/卸载 + 探索触发（#503）。Viewer 能看——
      问数的答案直接由口径决定，看得见答案却看不见口径等于要人信一个不给看的算法；
-     写动作（拍板/编辑/挂载/探索）canManage 显隐，403 兜底在 client 层。 -->
+     写动作（拍板/编辑/挂载/探索）canManage 显隐，403 兜底在 client 层。
+     final-sprint T2 模板层重造（script 逻辑零动，仅 import 换装 + 纯展示 computed）：
+     左栏 rail 退役，定义/数据源升页头 segmented（本体页图/表同款）；状态筛升
+     页下 UPill 过滤条（审查页 queue-pill 同款，计数徽章 badge-soft）；映射表落
+     el-table 卡（文库范式：搜索行+表格一体；列集以原行实况不增删——概念/数据源/
+     怎么算/状态+动作；行内展开的编辑表单与改版史落「怎么算」列）。 -->
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -27,7 +32,9 @@ import { S } from "@/i18n";
 import { toast } from "@/domain/toast";
 import { useKbScope } from "@/composables/useKbScope";
 import { useKbRole } from "@/composables/useKbRole";
-import { RailItem, UPager, UChip, Loading } from "@/components/knowledge/kit";
+import { USegmented, UPill, UPager, UChip, Loading } from "@/components/knowledge/kit";
+/* PageHeader（reskin-b1 自 gvdata 零改写迁入）：22/800 标题 + 副题 + extra 动作区 */
+import PageHeader from "@/components/PageHeader/index.vue";
 
 const PAGE = 25;
 
@@ -41,6 +48,8 @@ const queryClient = useQueryClient();
 // KbScope 对等物（每个 kb 页面 setup 调一次）
 const scope = useKbScope();
 const kbId = scope.kbId;
+// 库名副题（纯展示，final-sprint T2）：页头 PageHeader 的 subtitle 料
+const kbName = computed(() => scope.kb.value?.name ?? "");
 const { canManage } = useKbRole();
 // 注册新连接是部署级动作：管理员给直达入口（["me"] 会话内不变）
 const me = useQuery({ queryKey: ["me"], queryFn: meApi });
@@ -275,32 +284,25 @@ const hasMounted = computed(() => mountedList.value.length > 0);
 </script>
 
 <template>
-  <div class="knowledge-page flex h-full">
-    <!-- 左栏切功能，不是标签页：定义与数据源是两件不同的事 -->
-    <aside
-      class="flex w-64 shrink-0 flex-col gap-0.5 border-r border-line bg-card px-2 py-3"
-    >
-      <RailItem :active="tab === 'definitions'" @click="tab = 'definitions'">
-        <template #icon>
-          <Icon icon="lucide:database" width="14" height="14" />
+  <!-- final-sprint T2：整页单列滚动（审查/检索同款根）；kb 页在若依 Layout 的
+       AppMain 内渲染（h-full 即内容窗口高，与批次 1-4 七页同根） -->
+  <div class="knowledge-page h-full overflow-y-auto overscroll-contain px-8 py-6">
+    <div>
+      <!-- 页头（重造要素一）：标题=数据映射、副题=库名；extra=定义/数据源两档
+           切换（segmented——本体页图/表同款；定义与数据源是两件不同的事） -->
+      <PageHeader :title="S.mapping.title" :subtitle="kbName">
+        <template #extra>
+          <USegmented
+            :value="tab"
+            :options="[
+              { value: 'definitions', label: S.mapping.tabDefinitions },
+              { value: 'sources', label: S.mapping.tabSources }
+            ]"
+            @change="(v: string) => (tab = v as Tab)"
+          />
         </template>
-        {{ S.mapping.tabDefinitions }}
-      </RailItem>
-      <RailItem :active="tab === 'sources'" @click="tab = 'sources'">
-        <template #icon>
-          <Icon icon="lucide:plug" width="14" height="14" />
-        </template>
-        {{ S.mapping.tabSources }}
-      </RailItem>
-    </aside>
-
-    <div class="min-w-0 flex-1 overflow-y-auto overscroll-contain px-8 py-6">
-      <div class="mb-4">
-        <h1 class="wrap-break-word text-page font-extrabold text-ink">
-          {{ S.mapping.title }}
-        </h1>
-        <p class="mt-1 text-sub text-ink-2">{{ S.mapping.hint }}</p>
-      </div>
+      </PageHeader>
+      <p class="mb-6 text-sub text-ink-2">{{ S.mapping.hint }}</p>
 
       <!-- ======== 数据源 ======== -->
       <div v-if="tab === 'sources'" class="space-y-4">
@@ -403,59 +405,36 @@ const hasMounted = computed(() => mountedList.value.length > 0);
       </div>
 
       <!-- ======== 定义 ======== -->
-      <div v-else class="space-y-4">
-        <!-- 一条工具行：筛选、搜索、全选、批量动作排在一起 -->
-        <div class="flex flex-wrap items-center gap-2">
-          <el-input
-            v-model="q"
-            :placeholder="S.mapping.searchPlaceholder"
-            style="width: 16rem"
-            @input="page = 0"
-          />
-          <el-select v-model="status" style="width: 10rem" @change="page = 0">
-            <el-option
-              v-for="f in FILTERS"
-              :key="f.key"
-              :value="f.key"
-              :label="f.n != null ? `${f.label} (${f.n})` : f.label"
-            />
-          </el-select>
-          <el-checkbox
-            v-if="selectable.length > 0 && canManage"
-            class="ml-auto shrink-0"
-            :model-value="selectable.every(m => picked.has(m.id))"
-            :label="S.mapping.selectPage"
-            @change="
-              (v: unknown) =>
-                (picked = v ? new Set(selectable.map(m => m.id)) : new Set())
-            "
-          />
-          <template v-if="selectedIds.length > 0 && canManage">
-            <span class="tabular-nums text-sub text-ink-2">
-              {{ S.mapping.selected(selectedIds.length) }}
+      <div v-else>
+        <!-- 状态过滤条（重造要素二）：四档药丸——计数徽章 badge-soft 读服务端
+             counts（原 el-select 标签里的括号数挪进徽章）；选中 primary-soft
+             （scoped 补皮），换档回第一页（原 el-select @change 同规矩） -->
+        <div class="mb-4 flex flex-wrap items-center gap-1.5">
+          <UPill
+            v-for="f in FILTERS"
+            :key="f.key"
+            :active="status === f.key"
+            :class="['map-pill', status === f.key && 'bg-primary-soft']"
+            @click="((status = f.key), (page = 0))"
+          >
+            <span class="truncate">{{ f.label }}</span>
+            <span
+              v-if="f.n != null && f.n > 0"
+              class="badge-soft badge-soft-info tabular-nums"
+            >
+              {{ f.n }}
             </span>
-            <el-button
-              size="small"
-              @click="decideBatch(selectedIds, 'confirmed')"
-            >
-              {{ S.mapping.approve }}
-            </el-button>
-            <el-button
-              size="small"
-              type="danger"
-              plain
-              @click="decideBatch(selectedIds, 'rejected')"
-            >
-              {{ S.mapping.reject }}
-            </el-button>
-          </template>
+          </UPill>
         </div>
 
-        <p v-if="status === 'rejected'" class="text-sub text-ink-2">
+        <p v-if="status === 'rejected'" class="mb-2 text-sub text-ink-2">
           {{ S.mapping.rejectedHint }}
         </p>
         <!-- 最近一轮探索的账（#503）：单看列表答不了「漏了多少」 -->
-        <p v-if="data.data.value?.last_run" class="text-sub text-ink-2">
+        <p
+          v-if="data.data.value?.last_run"
+          class="mb-4 text-sub text-ink-2"
+        >
           {{
             S.mapping.lastRun({
               tables: data.data.value.last_run.tables_scanned,
@@ -466,236 +445,317 @@ const hasMounted = computed(() => mountedList.value.length > 0);
             })
           }}
         </p>
-        <p v-else class="text-sub text-ink-2">{{ S.mapping.lastRunMissing }}</p>
+        <p v-else class="mb-4 text-sub text-ink-2">{{ S.mapping.lastRunMissing }}</p>
 
         <Loading v-if="data.isLoading.value" />
-        <div
-          v-else-if="data.data.value && data.data.value.items.length === 0"
-          class="py-12 text-center text-body text-ink-2"
-        >
-          {{
-            q || status !== "all" ? S.mapping.emptyFiltered : S.mapping.empty
-          }}
-        </div>
-        <div
-          v-else
-          class="divide-y divide-line rounded-card border border-line bg-card"
-        >
-          <div
-            v-for="m in data.data.value?.items ?? []"
-            :key="m.id"
-            class="px-4 py-3"
-            :class="picked.has(m.id) ? 'border-line-strong' : ''"
-          >
-            <div class="flex flex-wrap items-baseline gap-2">
-              <el-checkbox
-                v-if="m.status === 'proposed' && canManage"
-                class="shrink-0 self-center"
-                :model-value="picked.has(m.id)"
-                :disabled="deciding.has(m.id)"
-                :aria-label="S.mapping.selectMapping(m.concept_name, m.source)"
-                @change="
-                  (v: unknown) => {
-                    const next = new Set(picked);
-                    v ? next.add(m.id) : next.delete(m.id);
-                    picked = next;
-                  }
-                "
-              />
-              <span class="text-body text-ink">{{ m.concept_name }}</span>
-              <span class="text-aux text-ink-2">{{ m.source }}</span>
-              <span v-if="m.unit" class="text-aux text-ink-2"
-                >[{{ m.unit }}]</span
+        <!-- 映射表卡（重造要素三，文库范式：搜索行+表格一体）：状态筛已升页级
+             药丸，卡内搜索行留搜索/全选/批量动作；列集以原行实况不增删——
+             概念/数据源/怎么算/状态+动作（表头键用 i18n 现成的 colConcept 一族）；
+             行内展开的编辑表单与改版史落「怎么算」列（那一列分到的宽度最宽） -->
+        <div v-else class="card map-table-card">
+          <div class="map-search-bar">
+            <el-input
+              v-model="q"
+              class="map-filter"
+              :placeholder="S.mapping.searchPlaceholder"
+              @input="page = 0"
+            />
+            <el-checkbox
+              v-if="selectable.length > 0 && canManage"
+              class="ml-auto shrink-0"
+              :model-value="selectable.every(m => picked.has(m.id))"
+              :label="S.mapping.selectPage"
+              @change="
+                (v: unknown) =>
+                  (picked = v ? new Set(selectable.map(m => m.id)) : new Set())
+              "
+            />
+            <template v-if="selectedIds.length > 0 && canManage">
+              <span class="tabular-nums text-sub text-ink-2">
+                {{ S.mapping.selected(selectedIds.length) }}
+              </span>
+              <el-button
+                size="small"
+                @click="decideBatch(selectedIds, 'confirmed')"
               >
-              <UChip v-if="m.derived" tone="warn">{{
-                S.mapping.derivedBadge
-              }}</UChip>
-              <span class="flex-1" />
-              <UChip
-                :tone="
-                  m.status === 'confirmed'
-                    ? 'success'
-                    : m.status === 'proposed'
-                      ? 'warn'
-                      : 'neutral'
-                "
-              >
-                {{ statusLabel(m.status) }}
-              </UChip>
-            </div>
-
-            <div class="mt-1 break-all tabular-nums text-sub text-ink-2">
-              {{ howComputed(m) ?? S.mapping.noDefinition }}
-            </div>
-            <p v-if="m.summary" class="mt-1 text-sub text-ink-2">
-              {{ m.summary }}
-            </p>
-
-            <!-- 编辑表单（revise）：行内展开，改之前那一版自动进 revisions -->
-            <div
-              v-if="editingId === m.id"
-              class="mt-3 space-y-2 border-t border-line pt-3"
-            >
-              <p class="text-aux text-ink-2">{{ S.mapping.editTitle }}</p>
-              <div class="grid grid-cols-2 gap-2">
-                <div>
-                  <div class="text-aux text-ink-2">
-                    {{ S.mapping.fieldTable }}
-                  </div>
-                  <el-input
-                    v-model="form.table"
-                    size="small"
-                    class="mt-1 tabular-nums"
-                  />
-                </div>
-                <div>
-                  <div class="text-aux text-ink-2">
-                    {{ S.mapping.fieldUnit }}
-                  </div>
-                  <el-input v-model="form.unit" size="small" class="mt-1" />
-                </div>
-              </div>
-              <div>
-                <div class="text-aux text-ink-2">{{ S.mapping.fieldExpr }}</div>
-                <el-input
-                  v-model="form.expr"
-                  size="small"
-                  class="mt-1 tabular-nums"
-                />
-              </div>
-              <div>
-                <div class="text-aux text-ink-2">{{ S.mapping.fieldSql }}</div>
-                <el-input
-                  v-model="form.sql"
-                  size="small"
-                  class="mt-1 tabular-nums"
-                />
-              </div>
-              <div>
-                <div class="text-aux text-ink-2">
-                  {{ S.mapping.fieldSummary }}
-                </div>
-                <el-input v-model="form.summary" size="small" class="mt-1" />
-              </div>
-              <el-checkbox
-                v-model="form.derived"
-                :label="S.mapping.fieldDerived"
-              />
-              <p
-                v-if="
-                  !form.table.trim() && !form.expr.trim() && !form.sql.trim()
-                "
-                class="text-sub text-danger"
-              >
-                {{ S.mapping.needOne }}
-              </p>
-              <div class="flex gap-2">
-                <el-button size="small" @click="editingId = null">
-                  {{ S.mapping.cancel }}
-                </el-button>
-                <el-button
-                  type="primary"
-                  size="small"
-                  :disabled="
-                    (!form.table.trim() &&
-                      !form.expr.trim() &&
-                      !form.sql.trim()) ||
-                    saving
-                  "
-                  @click="saveEdit(m)"
-                >
-                  {{ S.mapping.save }}
-                </el-button>
-              </div>
-            </div>
-            <!-- 行里的动作：**拍板那一下描边，其余不是实底** -->
-            <div
-              v-else-if="canManage"
-              class="mt-2 flex flex-wrap items-center gap-1"
-            >
-              <template v-if="m.status === 'proposed'">
-                <el-button
-                  size="small"
-                  :disabled="deciding.has(m.id) || picked.has(m.id)"
-                  @click="decideOne(m, 'confirmed')"
-                >
-                  {{ S.mapping.approve }}
-                </el-button>
-                <el-button
-                  size="small"
-                  type="danger"
-                  plain
-                  :disabled="deciding.has(m.id) || picked.has(m.id)"
-                  @click="decideOne(m, 'rejected')"
-                >
-                  {{ S.mapping.reject }}
-                </el-button>
-              </template>
-              <el-button size="small" text @click="openEdit(m)">
-                {{ S.mapping.edit }}
+                {{ S.mapping.approve }}
               </el-button>
               <el-button
                 size="small"
-                text
-                @click="historyId = historyId === m.id ? null : m.id"
+                type="danger"
+                plain
+                @click="decideBatch(selectedIds, 'rejected')"
               >
-                {{ S.mapping.history }}
+                {{ S.mapping.reject }}
               </el-button>
-            </div>
-
-            <!-- 改版史：留痕表是「上季度这个数是怎么算的」的兑现处 -->
-            <div
-              v-if="historyId === m.id"
-              class="mt-3 space-y-2 border-t border-line pt-3"
-            >
-              <p class="text-aux text-ink-2">{{ S.mapping.historyHint }}</p>
-              <p v-if="revs.isLoading.value" class="text-sub text-ink-2">
-                {{ S.nav.loading }}
-              </p>
-              <p v-else-if="revs.isError.value" class="text-body text-danger">
-                {{ String(revs.error.value) }}
-              </p>
-              <p
-                v-else-if="(revs.data.value?.revisions ?? []).length === 0"
-                class="text-sub text-ink-2"
-              >
-                {{ S.mapping.historyEmpty }}
-              </p>
-              <div
-                v-for="r in revs.data.value?.revisions ?? []"
-                v-else
-                :key="r.id"
-                class="text-sub"
-              >
-                <div class="text-ink-2">
-                  {{
-                    S.mapping.historyBy(
-                      r.changed_by_name ?? S.mapping.historyUnknown
-                    )
-                  }}
-                  <span class="ml-2 tabular-nums text-ink-2">
-                    {{ r.changed_at.slice(0, 16).replace("T", " ") }}
-                  </span>
-                </div>
-                <div class="break-all tabular-nums text-ink-2">
-                  {{
-                    r.before.sql ??
-                    r.before.expr ??
-                    r.before.table_name ??
-                    S.mapping.noDefinition
-                  }}
-                </div>
-              </div>
-            </div>
+            </template>
           </div>
+
+          <el-table
+            :data="data.data.value?.items ?? []"
+            row-key="id"
+            class="map-defs-table"
+          >
+            <el-table-column :label="S.mapping.colConcept" min-width="200">
+              <template #default="{ row: m }">
+                <div class="flex flex-wrap items-center gap-2">
+                  <el-checkbox
+                    v-if="m.status === 'proposed' && canManage"
+                    class="shrink-0"
+                    :model-value="picked.has(m.id)"
+                    :disabled="deciding.has(m.id)"
+                    :aria-label="S.mapping.selectMapping(m.concept_name, m.source)"
+                    @change="
+                      (v: unknown) => {
+                        const next = new Set(picked);
+                        v ? next.add(m.id) : next.delete(m.id);
+                        picked = next;
+                      }
+                    "
+                  />
+                  <span class="text-body text-ink">{{ m.concept_name }}</span>
+                  <span v-if="m.unit" class="text-aux text-ink-2"
+                    >[{{ m.unit }}]</span
+                  >
+                  <UChip v-if="m.derived" tone="warn">{{
+                    S.mapping.derivedBadge
+                  }}</UChip>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column :label="S.mapping.colSource" min-width="150">
+              <template #default="{ row: m }">
+                <span class="text-sub text-ink-2">{{ m.source }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column :label="S.mapping.colDefinition" min-width="240">
+              <template #default="{ row: m }">
+                <div class="break-all tabular-nums text-sub text-ink-2">
+                  {{ howComputed(m) ?? S.mapping.noDefinition }}
+                </div>
+                <p v-if="m.summary" class="mt-1 text-sub text-ink-2">
+                  {{ m.summary }}
+                </p>
+
+                <!-- 编辑表单（revise）：行内展开，改之前那一版自动进 revisions -->
+                <div
+                  v-if="editingId === m.id"
+                  class="mt-3 space-y-2 border-t border-line pt-3"
+                >
+                  <p class="text-aux text-ink-2">{{ S.mapping.editTitle }}</p>
+                  <div class="grid grid-cols-2 gap-2">
+                    <div>
+                      <div class="text-aux text-ink-2">
+                        {{ S.mapping.fieldTable }}
+                      </div>
+                      <el-input
+                        v-model="form.table"
+                        size="small"
+                        class="mt-1 tabular-nums"
+                      />
+                    </div>
+                    <div>
+                      <div class="text-aux text-ink-2">
+                        {{ S.mapping.fieldUnit }}
+                      </div>
+                      <el-input v-model="form.unit" size="small" class="mt-1" />
+                    </div>
+                  </div>
+                  <div>
+                    <div class="text-aux text-ink-2">{{ S.mapping.fieldExpr }}</div>
+                    <el-input
+                      v-model="form.expr"
+                      size="small"
+                      class="mt-1 tabular-nums"
+                    />
+                  </div>
+                  <div>
+                    <div class="text-aux text-ink-2">{{ S.mapping.fieldSql }}</div>
+                    <el-input
+                      v-model="form.sql"
+                      size="small"
+                      class="mt-1 tabular-nums"
+                    />
+                  </div>
+                  <div>
+                    <div class="text-aux text-ink-2">
+                      {{ S.mapping.fieldSummary }}
+                    </div>
+                    <el-input v-model="form.summary" size="small" class="mt-1" />
+                  </div>
+                  <el-checkbox
+                    v-model="form.derived"
+                    :label="S.mapping.fieldDerived"
+                  />
+                  <p
+                    v-if="
+                      !form.table.trim() && !form.expr.trim() && !form.sql.trim()
+                    "
+                    class="text-sub text-danger"
+                  >
+                    {{ S.mapping.needOne }}
+                  </p>
+                  <div class="flex gap-2">
+                    <el-button size="small" @click="editingId = null">
+                      {{ S.mapping.cancel }}
+                    </el-button>
+                    <el-button
+                      type="primary"
+                      size="small"
+                      :disabled="
+                        (!form.table.trim() &&
+                          !form.expr.trim() &&
+                          !form.sql.trim()) ||
+                        saving
+                      "
+                      @click="saveEdit(m)"
+                    >
+                      {{ S.mapping.save }}
+                    </el-button>
+                  </div>
+                </div>
+
+                <!-- 改版史：留痕表是「上季度这个数是怎么算的」的兑现处 -->
+                <div
+                  v-if="historyId === m.id"
+                  class="mt-3 space-y-2 border-t border-line pt-3"
+                >
+                  <p class="text-aux text-ink-2">{{ S.mapping.historyHint }}</p>
+                  <p v-if="revs.isLoading.value" class="text-sub text-ink-2">
+                    {{ S.nav.loading }}
+                  </p>
+                  <p v-else-if="revs.isError.value" class="text-body text-danger">
+                    {{ String(revs.error.value) }}
+                  </p>
+                  <p
+                    v-else-if="(revs.data.value?.revisions ?? []).length === 0"
+                    class="text-sub text-ink-2"
+                  >
+                    {{ S.mapping.historyEmpty }}
+                  </p>
+                  <div
+                    v-for="r in revs.data.value?.revisions ?? []"
+                    v-else
+                    :key="r.id"
+                    class="text-sub"
+                  >
+                    <div class="text-ink-2">
+                      {{
+                        S.mapping.historyBy(
+                          r.changed_by_name ?? S.mapping.historyUnknown
+                        )
+                      }}
+                      <span class="ml-2 tabular-nums text-ink-2">
+                        {{ r.changed_at.slice(0, 16).replace("T", " ") }}
+                      </span>
+                    </div>
+                    <div class="break-all tabular-nums text-ink-2">
+                      {{
+                        r.before.sql ??
+                        r.before.expr ??
+                        r.before.table_name ??
+                        S.mapping.noDefinition
+                      }}
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column :label="S.mapping.colStatus" width="110">
+              <template #default="{ row: m }">
+                <UChip
+                  :tone="
+                    m.status === 'confirmed'
+                      ? 'success'
+                      : m.status === 'proposed'
+                        ? 'warn'
+                        : 'neutral'
+                  "
+                >
+                  {{ statusLabel(m.status) }}
+                </UChip>
+              </template>
+            </el-table-column>
+            <!-- 动作列不带表头（文库动作列同款）：**拍板那一下描边，其余不是
+                 实底**；编辑开着时让位（原 v-else-if 同语义——表单占位，动作收起） -->
+            <el-table-column width="230" align="right">
+              <template #default="{ row: m }">
+                <div
+                  v-if="canManage && editingId !== m.id"
+                  class="flex flex-wrap items-center justify-end gap-1"
+                >
+                  <template v-if="m.status === 'proposed'">
+                    <el-button
+                      size="small"
+                      :disabled="deciding.has(m.id) || picked.has(m.id)"
+                      @click="decideOne(m, 'confirmed')"
+                    >
+                      {{ S.mapping.approve }}
+                    </el-button>
+                    <el-button
+                      size="small"
+                      type="danger"
+                      plain
+                      :disabled="deciding.has(m.id) || picked.has(m.id)"
+                      @click="decideOne(m, 'rejected')"
+                    >
+                      {{ S.mapping.reject }}
+                    </el-button>
+                  </template>
+                  <el-button size="small" text @click="openEdit(m)">
+                    {{ S.mapping.edit }}
+                  </el-button>
+                  <el-button
+                    size="small"
+                    text
+                    @click="historyId = historyId === m.id ? null : m.id"
+                  >
+                    {{ S.mapping.history }}
+                  </el-button>
+                </div>
+              </template>
+            </el-table-column>
+            <template #empty>
+              <div class="py-8 text-body text-ink-2">
+                {{
+                  q || status !== "all" ? S.mapping.emptyFiltered : S.mapping.empty
+                }}
+              </div>
+            </template>
+          </el-table>
+          <UPager
+            :total="data.data.value?.total ?? 0"
+            :page-size="PAGE"
+            :page="page"
+            @page="(p: number) => (page = p)"
+          />
         </div>
-        <UPager
-          :total="data.data.value?.total ?? 0"
-          :page-size="PAGE"
-          :page="page"
-          @page="(p: number) => (page = p)"
-        />
       </div>
     </div>
   </div>
 </template>
+
+<style scoped lang="scss">
+/* 状态过滤条（final-sprint T2，审查页 queue-pill 同款）：UPill 的基态皮 .pill
+   在 utopia-pages.css（未分层，恒压 tailwind utilities 层）——选中态的
+   primary-soft 底/主色深档字在这里补，并一并压过 .pill:hover（免得悬停时
+   选中片闪回 border 档）。bg-primary-soft 工具类同时留在选中元素上作测试锚
+   （实际着色以本条为准，未分层的 .pill 背景会压过 utilities 层的它） */
+.map-pill.is-on,
+.map-pill.is-on:hover {
+  color: var(--color-primary-text);
+  background: var(--color-primary-soft);
+}
+
+/* 搜索行（文库 lib-search-bar 同款）：原模板内联 16rem 宽度移入 */
+.map-search-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 16px;
+
+  .map-filter {
+    width: 16rem;
+  }
+}
+</style>

@@ -1,6 +1,10 @@
 <!-- 文档查看页（对照旧仓 pages/DocViewer.tsx，W1 读面）：来源栏 + 分块全文 +
      每块的抽取对照栏（事实三元组，实体可跳图谱）+ 引用跳转点亮。
-     「做成案例」（AddOntologyRegressionDialog）是写流，属任务 6，不渲染。 -->
+     「做成案例」（AddOntologyRegressionDialog）是写流，属任务 6，不渲染。
+     final-sprint T2 模板层重造（script 逻辑零动，仅 import + 纯展示 computed）：
+     页头落 PageHeader（文档名·库名，回文库留 extra）；分块原文落 .card 读页卡；
+     ?quote= 的引文在目标分块里用检索命中同款琥珀 .mark 标出（highlightSegments
+     归一切段——对不上的引文不标）；引用跳转锚（滚动+点亮）原样。 -->
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from "vue";
 import { useRoute, useRouter, RouterLink } from "vue-router";
@@ -13,13 +17,17 @@ import { originHint, originLabel } from "@/domain/origin";
 import { SourcesRail } from "@/components/knowledge/sources-rail";
 import { useKbScope } from "@/composables/useKbScope";
 import { UPager } from "@/components/knowledge/kit";
+/* 引文高亮切段（reskin-b4 归一）+ PageHeader（reskin-b1 自 gvdata 迁入） */
+import { highlightSegments } from "@/utils/highlightSegments";
+import PageHeader from "@/components/PageHeader/index.vue";
 
 const DOC_PAGE = 12;
 
 const route = useRoute();
 const router = useRouter();
-// KbScope 对等物（每个 kb 页面 setup 调一次）
-useKbScope();
+// KbScope 对等物（每个 kb 页面 setup 调一次）；库名给页头副题（纯展示）
+const scope = useKbScope();
+const kbName = computed(() => scope.kb.value?.name ?? "");
 const kbId = computed(
   () => (route.params as { kbId?: string } | undefined)?.kbId ?? ""
 );
@@ -32,6 +40,10 @@ const chunk = computed(() =>
 const quote = computed(() =>
   typeof route.query.quote === "string" ? route.query.quote : ""
 );
+/** 引文高亮词条（纯展示，final-sprint T2）：?quote= 的那一句交给
+    highlightSegments 在目标分块里切出命中段（空/超长的进不了地址栏——
+    quoteParam 的闸在前，这里只管展示） */
+const quoteTerms = computed(() => (quote.value ? [quote.value] : []));
 
 const detail = useQuery({
   queryKey: computed(() => ["docDetail", docId.value]),
@@ -125,31 +137,30 @@ const docDate = computed(() =>
           {{ String(detail.error.value) }}
         </div>
         <template v-else-if="doc">
-          <div class="mb-6">
-            <div class="flex items-baseline justify-between gap-4">
-              <h1 class="min-w-0 break-words text-page font-extrabold text-ink">
-                {{ doc.filename }}
-              </h1>
+          <!-- 页头（重造要素一）：标题=文档名、副题=库名；extra=回文库。
+               原 h1 行的元信息（块数/大小/文档日期/上传日）落在页头下 -->
+          <PageHeader class-name="mb-1" :title="doc.filename" :subtitle="kbName">
+            <template #extra>
               <RouterLink
                 :to="`/kb/${kbId}/library`"
                 class="link-inline shrink-0 text-body"
               >
                 {{ S.doc.backToLibrary }}
               </RouterLink>
-            </div>
-            <p class="mt-1 text-sub text-ink-2">
-              {{ chunks.length }} {{ S.doc.sections }} ·
-              {{ (doc.size_bytes / 1024).toFixed(0) }} KB ·
-              <template v-if="docDate">
-                <span :title="S.doc.docDateFromContent">
-                  {{ S.doc.docDate }}: {{ docDate }}
-                </span>
-                ·
-              </template>
-              {{ S.doc.uploadedAt }}
-              {{ new Date(doc.created_at).toLocaleDateString() }}
-            </p>
-          </div>
+            </template>
+          </PageHeader>
+          <p class="mb-6 text-sub text-ink-2">
+            {{ chunks.length }} {{ S.doc.sections }} ·
+            {{ (doc.size_bytes / 1024).toFixed(0) }} KB ·
+            <template v-if="docDate">
+              <span :title="S.doc.docDateFromContent">
+                {{ S.doc.docDate }}: {{ docDate }}
+              </span>
+              ·
+            </template>
+            {{ S.doc.uploadedAt }}
+            {{ new Date(doc.created_at).toLocaleDateString() }}
+          </p>
 
           <div class="space-y-3">
             <div
@@ -162,13 +173,12 @@ const docDate = computed(() =>
               "
               class="flex gap-3"
             >
+              <!-- 原文卡（重造要素二）：chunk 分块排版（.card + .chunk 过渡）；
+                   引用跳转点亮在 scoped 落令牌（.card 未分层压过 utilities，
+                   原 border-line-strong/bg-fill 两态在这里同值兑现） -->
               <div
-                class="chunk min-w-0 flex-1 whitespace-pre-wrap rounded-card border p-4 text-body leading-relaxed"
-                :class="
-                  c.id === chunk && flash
-                    ? 'border-line-strong bg-fill'
-                    : 'border-line bg-card'
-                "
+                class="chunk card min-w-0 flex-1 whitespace-pre-wrap text-body leading-relaxed"
+                :class="c.id === chunk && flash ? 'is-flash' : ''"
               >
                 <div class="mb-2 text-sub text-ink-2">
                   {{ S.doc.section }} {{ c.seq + 1 }}
@@ -187,7 +197,16 @@ const docDate = computed(() =>
                     {{ S.doc.citedHere }}
                   </span>
                 </div>
-                {{ c.text }}
+                <!-- 引文高亮（重造要素三）：?quote= 的那一句在目标分块里用检索
+                     命中同款琥珀标出（reskin-b4 归一的 highlightSegments——
+                     对不上的引文不标；非目标分块整段原样） -->
+                <template
+                  v-for="(seg, i) in highlightSegments(c.text, c.id === chunk ? quoteTerms : [])"
+                  :key="i"
+                >
+                  <mark v-if="seg.hit" class="mark">{{ seg.text }}</mark>
+                  <span v-else>{{ seg.text }}</span>
+                </template>
               </div>
 
               <!-- 抽取对照栏：这个分块产出了哪些事实（实体可跳图谱）。
@@ -265,3 +284,14 @@ const docDate = computed(() =>
     </div>
   </div>
 </template>
+
+<style scoped lang="scss">
+/* 引用跳转点亮（final-sprint T2）：chunk 卡的基态皮 .card 在 theme.scss
+   （未分层，恒压 tailwind utilities 层）——点亮/常态两态在这里落令牌
+   （原 border-line-strong/bg-fill 同值；.chunk 的 700ms 过渡挂在
+   utopia-pages.css，对 scoped 覆盖同样生效） */
+.chunk.is-flash {
+  border-color: var(--color-line-strong);
+  background: var(--color-fill);
+}
+</style>

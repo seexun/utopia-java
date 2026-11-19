@@ -1,0 +1,33 @@
+== 1. 打开 http://localhost:80/ 并登录 admin/admin123 ==
+   ✓ 登录后离开登录页（http://localhost/kb/0190d3e0-0000-7d5a-8000-0000000000f2/graph）
+== 2. mappings 列表（PageHeader+UPill 过滤条+el-table 卡）==
+   ✓ 页头标题=数据映射（实测「数据映射」）
+   ✓ 页头副题=库名（实测「演示：智造产业链」）
+   ✓ 状态过滤条 4 档药丸（实测 4）
+   ✓ 表头列集（实测 ["概念","数据源","怎么算","状态",""]）
+   ✓ 全部档行数 ≥3（seed 确认2+待审1，实测 3）
+   ✓ 映射列表请求已发出（/api/v1/kbs/0190d3e0-0000-7d5a-8000-000000000001/mappings?limit=25&offset=0）
+   ✓ 页头 extra=定义/数据源两档 segmented
+== 3. 过滤切换：待审批 → 已拒绝（请求带 status + 行数随档变）==
+   ✓ 待审批档请求带 status=proposed（/api/v1/kbs/0190d3e0-0000-7d5a-8000-000000000001/mappings?status=proposed&limit=25&offset=0）
+   ✓ 选中片 is-on=待审批（实测「待审批1」）
+   ✓ 待审批档行数=1（实测 1）
+   ✓ 已拒绝档请求带 status=rejected（/api/v1/kbs/0190d3e0-0000-7d5a-8000-000000000001/mappings?status=rejected&limit=25&offset=0）
+   ✓ 空档空态文案（实测「没有符合条件的口径。」）
+   ✓ 切回全部档行数复原（3/3）
+== 4. 数据源档（segmented 切换）==
+   ✓ 数据源档渲染（sourcesHint 可见）
+== 5. doc-viewer：从文库行点入 ==
+   ✓ 页头标题=文档名（实测「人事与融资公告.md」）
+   ✓ 页头副题=库名（实测「演示：智造产业链」）
+   ✓ chunk 原文卡 ≥1（实测 2）
+== 6. 引文高亮：?chunk=&quote= 琥珀 .mark + 跳转点亮 ==
+   ✓ docDetail 响应已捕获（chunks=2）
+   ✓ 琥珀 .mark 命中可见（引文「人事公告 林晚清于2019年3月出任」→ mark「人事公告
+
+林晚清于2019年3月出任」）
+   ✓ 跳转点亮 is-flash 挂在目标分块（实测 1，2.6s 窗口内）
+== 7. console 零 error ==
+   ✓ console/pageerror 共 0 条
+
+== 结论: PASS ==
