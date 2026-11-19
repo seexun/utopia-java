@@ -1,6 +1,8 @@
 <!-- 单点登录管理（对照旧仓 pages/Sso.tsx 的 SsoAdmin）：三行配置只读 +
      身份表 + 解绑（打字前确认）。没有替人绑定的入口——那是一条冒充别人登录的路。
-     解绑前先看 oidcStatus：没配的部署上整节是一句「未启用」。 -->
+     解绑前先看 oidcStatus：没配的部署上整节是一句「未启用」。
+     reskin-b4 模板层重造（script 零动）：三行只读配置入卡（与表格卡同款卡语言），
+     身份表与解绑接线原样。 -->
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/vue-query";
@@ -44,23 +46,28 @@ const rows = computed<OidcIdentity[]>(() => identities.data.value?.identities ??
     </div>
 
     <template v-else>
-      <!-- 三行信息展示，只读——issuer/client_id/redirect_uri 由环境变量定 -->
+      <!-- 三行信息展示，只读——issuer/client_id/redirect_uri 由环境变量定
+           （reskin-b4：入卡，与同 tab 的身份表格同一副卡语言） -->
       <div
         v-if="identities.data.value"
-        class="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 text-aux text-ink-2"
+        class="rounded-card border border-line bg-card px-5 py-4"
       >
-        <span>{{ S.settings.sso.issuer }}</span>
-        <span class="truncate font-mono" :title="identities.data.value.issuer">
-          {{ identities.data.value.issuer }}
-        </span>
-        <span>{{ S.settings.sso.clientId }}</span>
-        <span class="truncate font-mono" :title="identities.data.value.client_id">
-          {{ identities.data.value.client_id }}
-        </span>
-        <span>{{ S.settings.sso.redirectUri }}</span>
-        <span class="truncate font-mono" :title="identities.data.value.redirect_uri">
-          {{ identities.data.value.redirect_uri }}
-        </span>
+        <div
+          class="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 text-aux text-ink-2"
+        >
+          <span>{{ S.settings.sso.issuer }}</span>
+          <span class="truncate font-mono" :title="identities.data.value.issuer">
+            {{ identities.data.value.issuer }}
+          </span>
+          <span>{{ S.settings.sso.clientId }}</span>
+          <span class="truncate font-mono" :title="identities.data.value.client_id">
+            {{ identities.data.value.client_id }}
+          </span>
+          <span>{{ S.settings.sso.redirectUri }}</span>
+          <span class="truncate font-mono" :title="identities.data.value.redirect_uri">
+            {{ identities.data.value.redirect_uri }}
+          </span>
+        </div>
       </div>
 
       <div

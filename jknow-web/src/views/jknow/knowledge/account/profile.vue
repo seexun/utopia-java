@@ -1,5 +1,8 @@
 <!-- 个人资料页（对照旧仓 pages/Account.tsx + Sso.tsx 的 SsoAccount）：头像、显示名、
-     邮箱、改密码、单点登录绑定（写面：绑定跳身份提供方由本人完成，解绑走确认）。 -->
+     邮箱、改密码、单点登录绑定（写面：绑定跳身份提供方由本人完成，解绑走确认）。
+     reskin-b4 模板层重造（script 逻辑零动，仅 import 换装）：h1 升 PageHeader，
+     三张内容卡统一表单卡语言（卡头标题+主行动 / 卡身字段）；头像底从渐变字面量
+     令牌化为 primary-soft 圆盘。 -->
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/vue-query";
@@ -9,6 +12,8 @@ import { message } from "@/utils/message";
 import { toast } from "@/domain/toast";
 import { navigation } from "@/api/knowledge/client";
 import { DangerConfirm } from "@/components/knowledge/dialog";
+/* PageHeader（reskin-b1 自 gvdata 零改写迁入）：22/800 标题 + 副题 */
+import PageHeader from "@/components/PageHeader/index.vue";
 
 const confirmUnlink = ref(false);
 const unlinkMe = useMutation({
@@ -97,28 +102,23 @@ void field;
   <div class="px-8 py-6">
     <!-- 与管理页同一副身材：内容居中限宽，行长不随窗口拉长 -->
     <div class="mx-auto w-full max-w-4xl">
-      <div class="mb-6">
-        <div class="flex items-baseline justify-between gap-4">
-          <h1 class="min-w-0 break-words text-page font-extrabold text-ink">
-            {{ S.account.profileTitle }}
-          </h1>
+      <!-- 页头（reskin-b4）：导航已由 shell 页签承担，页头只报页名 -->
+      <PageHeader :title="S.account.profileTitle" />
+
+      <!-- 身份卡：卡头=头像圆盘（primary-soft 令牌底）+说明；卡身=显示名（保存
+           跟着这一格）与邮箱。字段宽度仍限 max-w-xl——行长不随卡片拉长 -->
+      <div class="mb-4 rounded-card border border-line bg-card">
+        <div class="flex items-center gap-4 border-b border-line px-5 py-4">
+          <span
+            class="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary-soft text-title font-bold text-primary"
+          >
+            {{ initials }}
+          </span>
+          <p class="min-w-0 text-sub text-ink-2">{{ S.account.avatarHint }}</p>
         </div>
-      </div>
-
-      <div class="mb-4 rounded-card border border-line bg-card p-6">
-        <div class="max-w-xl">
-          <div class="mb-6 flex items-center gap-4">
-            <span
-              class="grid h-14 w-14 shrink-0 place-items-center rounded-full text-title font-bold text-white"
-              style="background: linear-gradient(135deg, #1677ff, #06b6d4)"
-            >
-              {{ initials }}
-            </span>
-            <p class="text-sub text-ink-2">{{ S.account.avatarHint }}</p>
-          </div>
-
-          <div class="mb-4">
-            <div class="mb-1 text-aux font-medium text-ink-2">
+        <div class="space-y-4 px-5 py-4">
+          <div class="max-w-xl">
+            <div class="mb-1 text-sub font-medium text-ink-2">
               {{ S.account.displayName }}
             </div>
             <div class="flex gap-2">
@@ -133,21 +133,33 @@ void field;
               </el-button>
             </div>
           </div>
-
-          <div class="mb-1 text-aux font-medium text-ink-2">
-            {{ S.account.email }}
+          <div class="max-w-xl">
+            <div class="mb-1 text-sub font-medium text-ink-2">
+              {{ S.account.email }}
+            </div>
+            <div class="text-body text-ink-2">{{ me.data.value?.email }}</div>
           </div>
-          <div class="px-1 text-body text-ink-2">{{ me.data.value?.email }}</div>
         </div>
       </div>
 
-      <div class="rounded-card border border-line bg-card p-6">
-        <div class="max-w-xl">
-          <h2 class="mb-4 text-body font-medium text-ink">
+      <!-- 密码卡：一卡一主行动——更新密码在卡头（禁用闸原样） -->
+      <div class="rounded-card border border-line bg-card">
+        <div class="flex-bc gap-3 border-b border-line px-5 py-4">
+          <div class="text-body font-semibold text-ink">
             {{ S.account.passwordTitle }}
-          </h2>
-          <div class="mb-4">
-            <div class="mb-1 text-aux font-medium text-ink-2">
+          </div>
+          <el-button
+            type="primary"
+            size="small"
+            :disabled="!curPw || newPw.length < 8 || changePw.isPending.value"
+            @click="changePw.mutate()"
+          >
+            {{ S.account.changePassword }}
+          </el-button>
+        </div>
+        <div class="space-y-3 px-5 py-4">
+          <div class="max-w-xl">
+            <div class="mb-1 text-sub font-medium text-ink-2">
               {{ S.account.currentPassword }}
             </div>
             <el-input
@@ -158,8 +170,8 @@ void field;
               autocomplete="current-password"
             />
           </div>
-          <div class="mb-4">
-            <div class="mb-1 text-aux font-medium text-ink-2">
+          <div class="max-w-xl">
+            <div class="mb-1 text-sub font-medium text-ink-2">
               {{ S.account.newPassword }}
             </div>
             <el-input
@@ -170,38 +182,25 @@ void field;
               autocomplete="new-password"
             />
           </div>
-          <div class="flex justify-end">
-            <el-button
-              type="primary"
-              size="small"
-              :disabled="!curPw || newPw.length < 8 || changePw.isPending.value"
-              @click="changePw.mutate()"
-            >
-              {{ S.account.changePassword }}
-            </el-button>
-          </div>
         </div>
       </div>
 
       <!-- 单点登录：我自己的绑定（0056）。**绑定由本人完成**——跳到身份提供方，
-          回来时服务端核对还是那个已登录的人才写绑定；解绑走确认 -->
+          回来时服务端核对还是那个已登录的人才写绑定；解绑走确认（主行动在卡头） -->
       <div
         v-if="sso.data.value?.enabled"
-        class="mt-4 rounded-card border border-line bg-card p-6"
+        class="mt-4 rounded-card border border-line bg-card"
       >
-        <div class="max-w-xl">
-          <h2 class="mb-2 text-body font-medium text-ink">
-            {{ S.account.sso.title }}
-          </h2>
-          <p class="mb-4 text-sub text-ink-2">{{ S.account.sso.hint }}</p>
-          <div class="flex items-center gap-3">
-            <span class="min-w-0 flex-1 truncate text-body text-ink-2">
-              {{
-                sso.data.value.linked && sso.data.value.subject
-                  ? S.account.sso.linkedAs(sso.data.value.subject)
-                  : S.account.sso.notLinked
-              }}
-            </span>
+        <div class="flex-bc gap-3 border-b border-line px-5 py-4">
+          <div class="min-w-0">
+            <div class="text-body font-semibold text-ink">
+              {{ S.account.sso.title }}
+            </div>
+            <div class="mt-0.5 text-sub text-ink-2">
+              {{ S.account.sso.hint }}
+            </div>
+          </div>
+          <div class="flex shrink-0 items-center gap-2">
             <el-button
               v-if="sso.data.value.linked"
               size="small"
@@ -218,6 +217,15 @@ void field;
               {{ S.account.sso.link }}
             </el-button>
           </div>
+        </div>
+        <div class="px-5 py-4">
+          <p class="max-w-xl truncate text-body text-ink-2">
+            {{
+              sso.data.value.linked && sso.data.value.subject
+                ? S.account.sso.linkedAs(sso.data.value.subject)
+                : S.account.sso.notLinked
+            }}
+          </p>
         </div>
       </div>
 

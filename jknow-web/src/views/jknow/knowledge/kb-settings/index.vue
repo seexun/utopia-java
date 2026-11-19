@@ -1,10 +1,13 @@
-<!-- 知识库设置（对照旧仓 pages/KbSettings.tsx 全量）：左栏分节（General /
+<!-- 知识库设置（对照旧仓 pages/KbSettings.tsx 全量）：分节（General /
      Members / Activity / Danger）。**每张卡一个保存**——PATCH 本来就是部分更新，
      改名字那一下不该把下面的开关一起送上去（九字段分四卡：name/description /
      visibility / materialize_inferences+auto_type_resolution+governance+
      inference_interval_minutes / ontology_lang）。Members 是成员管理写面
      （加人/改角色/移出——open 库没有 viewer 可授）；Activity 是审计台账
-     （筛选 + 分页）；Danger 是删库（打字级确认，默认库无此节）。 -->
+     （筛选 + 分页）；Danger 是删库（打字级确认，默认库无此节）。
+     reskin-b4 模板层重造（script 逻辑零动，仅 import 换装）：左栏 rail 退役，
+     分节上移为页头（设置·库名）下的 el-tabs（全局形态自动跟随），
+     四节内容/表单卡/弹窗的结构与接线原样。 -->
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -29,7 +32,9 @@ import { localDateTime } from "@/domain/ui";
 import { useKbScope } from "@/composables/useKbScope";
 import { useKbRole } from "@/composables/useKbRole";
 import { DangerConfirm } from "@/components/knowledge/dialog";
-import { RailItem, UPager } from "@/components/knowledge/kit";
+import { UPager } from "@/components/knowledge/kit";
+/* PageHeader（reskin-b1 自 gvdata 零改写迁入）：22/800 标题 + 库名副题 */
+import PageHeader from "@/components/PageHeader/index.vue";
 
 type Section = "general" | "members" | "activity" | "danger";
 
@@ -290,37 +295,38 @@ function resetAudit(fn: () => void) {
 </script>
 
 <template>
-  <div class="knowledge-page flex h-full">
-    <!-- 分节导航：未来的抽取设置/保留策略/令牌等在此扩展 -->
-    <aside
-      class="flex w-64 shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-line bg-card px-2 py-3"
-    >
-      <RailItem
-        v-for="s in sections"
-        :key="s.key"
-        :active="section === s.key"
-        @click="section = s.key"
-      >
-        <template #icon>
-          <Icon
-            :icon="s.icon"
-            width="14"
-            height="14"
-            :class="s.warn ? 'text-warning' : undefined"
-          />
-        </template>
-        {{ s.label }}
-      </RailItem>
-    </aside>
+  <!-- reskin-b4：整页单列滚动（检索/文库/审查同款根）；左栏分节 rail 退役，
+       分节上移为页头下的 el-tabs（全局形态自动跟随）。section ref 仍是
+       分节的唯一事实源——四节内容、成员/台账查询的 enabled 闸、弹窗接线
+       原样（每张卡一个保存的语义不变）。 -->
+  <div class="knowledge-page h-full overflow-y-auto overscroll-contain px-8 py-6">
+    <!-- 设置是读一列字段，不是铺一张桌子：内容居中限宽 -->
+    <div class="mx-auto w-full max-w-4xl">
+      <!-- 页头（重造要素一）：标题=设置，副题=库名（独立路由位 /kb/:kbId/settings）；
+           页级无主行动——每张卡的保存是卡内动作 -->
+      <PageHeader :title="S.kbset.title" :subtitle="kb.data.value?.name ?? ''" />
 
-    <div class="min-w-0 flex-1 overflow-y-auto overscroll-contain px-8 py-6">
-      <!-- 设置是读一列字段，不是铺一张桌子：内容居中限宽 -->
-      <div class="mx-auto w-full max-w-4xl">
-        <div class="mb-6">
-          <h1 class="wrap-break-word text-page font-extrabold text-ink">
-            {{ S.kbset.title }}
-          </h1>
-        </div>
+      <!-- 分节页签（重造要素二）：danger 节默认库不出现（sections computed 原样，
+           图标与警示色随迁 label 插槽） -->
+      <el-tabs
+        :model-value="section"
+        class="mb-4"
+        @tab-change="(name: string | number) => (section = name as Section)"
+      >
+        <el-tab-pane v-for="s in sections" :key="s.key" :name="s.key">
+          <template #label>
+            <span class="flex items-center gap-1.5">
+              <Icon
+                :icon="s.icon"
+                width="14"
+                height="14"
+                :class="s.warn ? 'text-warning' : undefined"
+              />
+              {{ s.label }}
+            </span>
+          </template>
+        </el-tab-pane>
+      </el-tabs>
 
         <!-- ======== General：一张卡是一个保存单位 ======== -->
         <div v-if="section === 'general'" class="space-y-4">
@@ -842,7 +848,6 @@ function resetAudit(fn: () => void) {
         </div>
 
         <p v-if="error" class="mt-3 text-body text-danger">{{ error }}</p>
-      </div>
     </div>
 
     <!-- 把一个已有账号加进这个库。picker 在弹窗里也仍然常驻：没人可加时它自己会说 -->

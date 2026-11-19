@@ -1,7 +1,9 @@
 <!-- 个人令牌页（对照旧仓 pages/Tokens.tsx 全量）：我发过的令牌表 + 发放弹窗 +
      撤销（两击确认）。明文只在发放那一次的响应里出现——所以发放的下一秒就是
      「把它抄走」：一个窗口两副内容，先是表单，发出来之后是明文 + MCP 配置片段，
-     中间不关窗，关掉就再也看不到它了。撤销过的沉底但仍然列着。 -->
+     中间不关窗，关掉就再也看不到它了。撤销过的沉底但仍然列着。
+     reskin-b4 模板层重造（script 逻辑零动，仅 import 换装）：h1 行升 PageHeader
+     （hint 作副题、新令牌主行动入 extra），表格/发放弹窗结构与接线原样。 -->
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/vue-query";
@@ -16,6 +18,8 @@ import { toast } from "@/domain/toast";
 import { copyAndSay } from "@/domain/clipboard";
 import { useKbContextHook } from "@/store/knowledge/modules/kb";
 import { UDialog } from "@/components/knowledge/dialog";
+/* PageHeader（reskin-b1 自 gvdata 零改写迁入）：22/800 标题 + 副题 + extra 动作区 */
+import PageHeader from "@/components/PageHeader/index.vue";
 
 defineOptions({ name: "AccountTokens" });
 
@@ -135,18 +139,15 @@ const snippetCandidates = computed(() => {
 <template>
   <div class="px-8 py-6">
     <div class="mx-auto w-full max-w-4xl">
-      <div class="mb-6">
-        <div class="flex items-baseline justify-between gap-4">
-          <h1 class="min-w-0 break-words text-page font-extrabold text-ink">
-            {{ S.account.tokensTitle }}
-          </h1>
-          <!-- 发令牌是个动作，不是这一页的常驻内容：表单住在弹窗里 -->
+      <!-- 页头（reskin-b4）：hint 升副题；唯一主行动=新令牌（发放是个动作，
+           不是这一页的常驻内容：表单住在弹窗里） -->
+      <PageHeader :title="S.account.tokensTitle" :subtitle="S.account.tokensHint">
+        <template #extra>
           <el-button type="primary" size="small" @click="creating = true">
             {{ S.account.newToken }}
           </el-button>
-        </div>
-        <p class="mt-1 text-sub text-ink-2">{{ S.account.tokensHint }}</p>
-      </div>
+        </template>
+      </PageHeader>
 
       <div
         v-if="list.data.value && rows.length === 0"

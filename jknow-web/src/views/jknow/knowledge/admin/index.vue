@@ -1,7 +1,9 @@
 <!-- 部署管理（对照旧仓 pages/Settings.tsx 的 Settings 主组件）：五个页签
      （模型/成员/数据源/SSO/部署），页签落在地址上（?tab=，AccountShell 的
      子导航写它）——刷新、回退、把链接发给同事都落回同一节（旧仓注释原话）。
-     各页签本体分文件同目录。 -->
+     各页签本体分文件同目录。
+     reskin-b4 模板层重造（script 逻辑零动，仅 import 换装）：h1 升 PageHeader
+     （admin 经 /admin 有自己的路由位，页头报当前节名——与旧 h1 同源）。 -->
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -12,6 +14,8 @@ import MembersTab from "./members-tab.vue";
 import DataSourcesTab from "./datasources-tab.vue";
 import SsoTab from "./sso-tab.vue";
 import DeploymentTab from "./deployment-tab.vue";
+/* PageHeader（reskin-b1 自 gvdata 零改写迁入）：22/800 标题 + 副题 */
+import PageHeader from "@/components/PageHeader/index.vue";
 
 defineOptions({ name: "AdminSettings" });
 
@@ -40,11 +44,11 @@ function goTab(key: string) {
 <template>
   <div class="knowledge-page px-8 py-6">
     <div class="mx-auto w-full max-w-4xl">
-      <div class="mb-6">
-        <h1 class="break-words text-page font-extrabold text-ink">
-          {{ TABS.find(t => t.key === tab)?.label() ?? S.settings.title }}
-        </h1>
-      </div>
+      <!-- 页头（reskin-b4）：/admin 独立路由位——页头报当前节名（与旧 h1 同源，
+           shell 子页签之上再放大一档） -->
+      <PageHeader
+        :title="TABS.find(t => t.key === tab)?.label() ?? S.settings.title"
+      />
       <ModelsTab v-if="tab === 'models'" />
       <MembersTab v-else-if="tab === 'members'" />
       <DataSourcesTab v-else-if="tab === 'datasources'" />

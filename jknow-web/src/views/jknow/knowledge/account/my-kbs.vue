@@ -1,7 +1,9 @@
 <!-- 我的知识库页（对照旧仓 pages/MyKbs.tsx 全量）：可访问的库 + 我的角色 +
      加入信息 + 概览统计 + 新建知识库弹窗（缺省 restricted，不污染全员库列表；
      建库不是系统管理员专属——工作区 Admin 起就能建）。?create=true 落地即开表单
-     （「新建」深链指到这里）。 -->
+     （「新建」深链指到这里）。
+     reskin-b4 模板层重造（script 逻辑零动，仅 import 换装）：h1 行升 PageHeader
+     （新建知识库主行动入 extra，权限闸原样），表格/弹窗结构与接线原样。 -->
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
@@ -16,6 +18,8 @@ import { S } from "@/i18n";
 import { toast } from "@/domain/toast";
 import { useKbContextHook } from "@/store/knowledge/modules/kb";
 import { UDialog } from "@/components/knowledge/dialog";
+/* PageHeader（reskin-b1 自 gvdata 零改写迁入）：22/800 标题 + 副题 + extra 动作区 */
+import PageHeader from "@/components/PageHeader/index.vue";
 
 defineOptions({ name: "AccountMyKbs" });
 
@@ -124,12 +128,10 @@ async function create() {
 <template>
   <div class="px-8 py-6">
     <div class="mx-auto w-full max-w-4xl">
-      <div class="mb-6">
-        <div class="flex items-baseline justify-between gap-4">
-          <h1 class="min-w-0 break-words text-page font-extrabold text-ink">
-            {{ S.account.kbsTitle }}
-          </h1>
-          <!-- 建库不是系统管理员专属——工作区 Admin 起就能建（api/kbs.rs 的 create） -->
+      <!-- 页头（reskin-b4）：唯一主行动=新建知识库，建库权限闸原样
+           （建库不是系统管理员专属——工作区 Admin 起就能建，api/kbs.rs 的 create） -->
+      <PageHeader :title="S.account.kbsTitle">
+        <template #extra>
           <el-button
             v-if="me.data.value?.is_admin || ['admin', 'owner'].includes(wsRole.data.value?.role ?? '')"
             type="primary"
@@ -138,8 +140,8 @@ async function create() {
           >
             {{ S.settings.kbs.newKb }}
           </el-button>
-        </div>
-      </div>
+        </template>
+      </PageHeader>
 
       <!-- 筛这份名单的东西在面板外面（DESIGN.md 6） -->
       <div class="relative mb-4">
