@@ -6,8 +6,8 @@
      全库重建（清算语义，KB admin，打字级确认）。
      reskin-b1 模板层重造（script 逻辑零动，仅 import + 纯展示 computed）：
      PageHeader + 统计卡条 + 搜索行/表格一体卡（el-table，形态来自 theme.scss
-     全局 .el-table 规则）+ 空库虚线拖放卡；行内容自 write.tsx DocRow 逐格迁入模板，
-     交互接线（mutation/弹窗）全部原样。 -->
+     全局 .el-table 规则）+ 空库虚线拖放卡；行内容自旧壳 write.tsx 行组件逐格
+     迁入模板，交互接线（mutation/弹窗）全部原样。 -->
 <script setup lang="ts">
 import { ref, computed, watch, h, type Component } from "vue";
 import { useRoute, RouterLink } from "vue-router";
@@ -50,9 +50,10 @@ import {
   type LibrarySelection
 } from "@/components/knowledge/sources-rail";
 import { RunsPanel } from "./runs-panel";
-/* DocRow 不再被本页消费（reskin-b1：行内容逐格迁入 el-table 列模板），组件
-   本体保留在 ./write 供回归对照与后续批次清理；弹窗与已删视图仍在此取用 */
-import { DeletedTable, DropsModal, ErrorModal } from "./write";
+/* reskin-b2 拆解收敛：write.tsx 已退役（reskin-b1 起行内容逐格迁入 el-table
+   列模板，行组件死导出随之消亡）；仍在用的已删视图与两张详情窗独立成文件 */
+import { DeletedTable } from "./DeletedTable";
+import { DropsModal, ErrorModal } from "./modals";
 /* 新建来源弹窗（W3 走查收口补迁）：W1 曾记「新建来源弹窗族留任务 6」，
    任务 6 漏交——对照帧里旧栏的「新建来源」行在新栏缺席，十三种拉取/推送来源
    从此无处可建。弹窗 + 令牌窗都在 ./source-modal。 */
@@ -359,7 +360,7 @@ type SourceDoc = { source_id: string | null };
    所选作用域——all 视图即全库）；文本块 = 当前页文档行 chunk_count 之和
    （列表侧聚合，无全库分块端点）；来源数 = sources 列表长度。 ---------- */
 
-/** 表格行内动作的联动禁用（原 DocRow busy prop 等值，纯展示） */
+/** 表格行内动作的联动禁用（原 write.tsx 行组件 busy prop 等值，纯展示） */
 const rowBusy = computed(
   () =>
     remove.isPending.value ||
@@ -370,7 +371,7 @@ const rowBusy = computed(
 const chunkSum = computed(() =>
   pagedDocs.value.reduce((n, d) => n + (d.chunk_count ?? 0), 0)
 );
-/** 状态/图谱列文案查表（原 DocRow 内同款，纯展示） */
+/** 状态/图谱列文案查表（原 write.tsx 行组件内同款，纯展示） */
 function statusText(d: { status: string }): string {
   return S.library.status[d.status as keyof typeof S.library.status] ?? d.status;
 }
@@ -382,7 +383,7 @@ function graphText(d: { graph_status: string }): string {
   );
 }
 /** 来源列图标（纯展示）：返回组件交 <component :is> 渲染（VNode 不能进 :is，
-    rowIcon 的 h() 形态留给 DocRow prop 工厂） */
+    rowIcon 的 h() 形态留给旧壳行组件的 prop 工厂） */
 function rowSourceIcon(row: SourceDoc): Component | null {
   const s = docSource(row);
   return s ? sourceIconData(s) : null;
@@ -704,7 +705,7 @@ function rowSourceIcon(row: SourceDoc): Component | null {
             <!-- 文档表（reskin-b1 六要素之四：el-table 形态来自 theme.scss
                  全局 .el-table 规则；table-style-optimized.scss 留仓零改写，
                  待真实消费点（终审收口：原页内装配系空转，已移除））。列集与原表一一对应不增删：文件/[来源]/
-                 状态/图谱/文本块/大小/动作两列；行内容=DocRow 逐格迁入模板，
+                 状态/图谱/文本块/大小/动作两列；行内容=旧壳 write.tsx 行组件逐格迁入模板，
                  删除/重跑解析/重抽/失败原文/丢弃详情的接线全部原样 -->
             <el-table
               v-else-if="hasDocs"
