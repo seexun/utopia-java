@@ -345,7 +345,8 @@
   color: var(--color-ink-2);
   font-size: var(--text-aux);
 }
-.pill:hover { background: var(--color-neutral-soft); }
+/* hover 用 border 档（比基态 neutral-soft 深一档）：同令牌会零反馈（终审 I1） */
+.pill:hover { background: var(--color-border); }
 .pill.is-on { color: var(--color-ink); }
 .pill.is-static { cursor: default; }
 .pill.is-static:hover {

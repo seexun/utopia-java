@@ -922,8 +922,7 @@ const composerSendDisabled = computed(
             </div>
           </div>
         </div>
-        </div>
-
+      </div>
       <DangerConfirm
         v-if="pendingDelete"
         :title="S.ask.deleteTitle"
