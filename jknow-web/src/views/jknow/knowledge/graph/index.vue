@@ -39,6 +39,7 @@ import { me as meApi } from "@/api/knowledge/auth";
 import type { GraphEdge, GraphNode } from "@/api/knowledge/types";
 import { S } from "@/i18n";
 import { nextStep } from "@/domain/nextStep";
+import { highlightSegments } from "@/utils/highlightSegments";
 import { useKbContextHook } from "@/store/knowledge/modules/kb";
 import { useKbScope } from "@/composables/useKbScope";
 import {
@@ -272,30 +273,11 @@ const searchHits = computed(() =>
   inSubgraph.value ? subgraphHits.value : (candidates.data.value?.entities ?? [])
 );
 
-/** 实体名按命中词切段（纯展示，reskin-b3 mark 形态统一）：hit 段渲染成
-    <mark>——与检索结果卡 .result-quote mark 同一形态（主色 glow 底+主色深档
-    字），两消费点同改勿单边漂移。只读 searchQ 做展示切分，不碰上面的过滤 */
-function nameSegments(name: string): { text: string; hit: boolean }[] {
-  const q = searchQ.value.trim();
-  if (!q) return [{ text: name, hit: false }];
-  const esc = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  let re: RegExp;
-  try {
-    re = new RegExp(`(${esc})`, "gi");
-  } catch {
-    return [{ text: name, hit: false }];
-  }
-  const segs: { text: string; hit: boolean }[] = [];
-  let last = 0;
-  for (const m of name.matchAll(re)) {
-    const i = m.index ?? 0;
-    if (i > last) segs.push({ text: name.slice(last, i), hit: false });
-    segs.push({ text: m[0], hit: true });
-    last = i + m[0].length;
-  }
-  if (last < name.length) segs.push({ text: name.slice(last), hit: false });
-  return segs;
-}
+/* 实体名按命中词切段（reskin-b4 归一到 highlightSegments）：hit 段渲染成
+   <mark>——与检索结果卡 .result-quote mark 同一形态（主色 glow 底+主色深档字，
+   蓝=检索/浮搜命中；琥珀 warning 系是 chat 引用预览/docs 查看器的引文定位——
+   两色区分是设计意图，见规格 §3），切段语义（长词优先/转义/全命中都标）与
+   检索/对话引用/docs 同一份实现。只读 searchQ 做展示切分，不碰上面的过滤 */
 
 /* ---------- 图例（类型显隐） ---------- */
 
@@ -1325,7 +1307,7 @@ const statsText = computed(() => {
                 />
                 <span class="truncate">
                   <template
-                    v-for="(seg, i) in nameSegments(c.name)"
+                    v-for="(seg, i) in highlightSegments(c.name, [searchQ.trim()])"
                     :key="i"
                   >
                     <mark v-if="seg.hit">{{ seg.text }}</mark>

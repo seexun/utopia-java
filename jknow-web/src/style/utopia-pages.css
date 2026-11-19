@@ -193,7 +193,7 @@
 }
 .tool.is-on {
   color: var(--color-ink);
-  background: #e2e8f0;
+  background: var(--color-border);
 }
 .tool:focus-visible {
   outline: 2px solid var(--color-primary);
@@ -220,11 +220,11 @@
   color: var(--color-ink-2);
 }
 
-/* 检索命中：警示琥珀浅底 */
+/* 检索命中：警示琥珀浅底（warning 系令牌，暗态随令牌翻档） */
 .mark {
   border-radius: 3px;
   padding: 0 0.25rem;
-  background: rgba(180, 83, 9, 0.16);
+  background: var(--color-warning-soft);
   color: var(--color-warning-text);
 }
 

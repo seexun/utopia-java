@@ -16,6 +16,7 @@ import { me as meApi } from "@/api/knowledge/auth";
 import type { SearchResult } from "@/api/knowledge/types";
 import { S } from "@/i18n";
 import { nextStep } from "@/domain/nextStep";
+import { highlightSegments } from "@/utils/highlightSegments";
 import { useKbContextHook } from "@/store/knowledge/modules/kb";
 import { useKbScope } from "@/composables/useKbScope";
 import { Spinner } from "@/components/knowledge/kit";
@@ -84,38 +85,10 @@ const paged = computed(() => {
 /* ---------- 重造新增的纯展示辅助（reskin-b1）：只读上面已有的展示态，
    不碰 useQuery/submit/step/#313 任何语义 ---------- */
 
-/** 命中词正则（纯展示）：提交过的查询词按空白拆开、长词优先（免得「星辰智造」
-    先被单字吃掉），正则元字符转义。只服务引文 mark 高亮，不影响查询本身——
+/** 命中词（纯展示）：提交过的查询词按空白拆开，交 highlightSegments 切段
+    （长词优先/转义/全命中都标），只服务引文 mark 高亮，不影响查询本身——
     混合检索的语义命中没有字面命中时，引文整段原样（无 mark） */
-const hitRe = computed<RegExp | null>(() => {
-  const terms = query.value
-    .split(/\s+/)
-    .filter(Boolean)
-    .sort((a, b) => b.length - a.length);
-  if (!terms.length) return null;
-  const esc = terms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  try {
-    return new RegExp(`(${esc.join("|")})`, "gi");
-  } catch {
-    return null;
-  }
-});
-
-/** 引文按命中词切段（纯展示）：hit 段在模板里渲染成 <mark> */
-function quoteSegments(text: string): { text: string; hit: boolean }[] {
-  const re = hitRe.value;
-  if (!re) return [{ text, hit: false }];
-  const segs: { text: string; hit: boolean }[] = [];
-  let last = 0;
-  for (const m of text.matchAll(re)) {
-    const i = m.index ?? 0;
-    if (i > last) segs.push({ text: text.slice(last, i), hit: false });
-    segs.push({ text: m[0], hit: true });
-    last = i + m[0].length;
-  }
-  if (last < text.length) segs.push({ text: text.slice(last), hit: false });
-  return segs;
-}
+const hitTerms = computed(() => query.value.split(/\s+/).filter(Boolean));
 
 /** 来源徽章色档（纯展示）：--cat-1..6 按 document_id 稳定轮转——
     同一文档的分块同色，翻页/换词颜色不闪变 */
@@ -211,7 +184,7 @@ function srcCat(documentId: string): string {
             </span>
           </div>
           <p class="result-quote">
-            <template v-for="(seg, i) in quoteSegments(r.text)" :key="i">
+            <template v-for="(seg, i) in highlightSegments(r.text, hitTerms)" :key="i">
               <mark v-if="seg.hit">{{ seg.text }}</mark>
               <template v-else>{{ seg.text }}</template>
             </template>

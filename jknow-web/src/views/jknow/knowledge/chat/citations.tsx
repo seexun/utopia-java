@@ -18,7 +18,8 @@ import { documentDetail } from "@/api/knowledge/documents";
 import type { Source } from "@/api/knowledge/types";
 import { S } from "@/i18n";
 import { originLabel } from "@/domain/origin";
-import { quoteParam, quotePieces, sourceLead } from "@/domain/quotes";
+import { quoteParam, sourceLead } from "@/domain/quotes";
+import { highlightSegments } from "@/utils/highlightSegments";
 import BookOpenIcon from "~icons/lucide/book-open";
 import ArrowUpRightIcon from "~icons/lucide/arrow-up-right";
 import { ElPopover } from "element-plus";
@@ -133,8 +134,8 @@ const QuotedText = defineComponent({
   },
   setup(props) {
     return () =>
-      quotePieces(props.text, props.quotes).map((p, i) =>
-        p.quoted ? (
+      highlightSegments(props.text, props.quotes ?? []).map((p, i) =>
+        p.hit ? (
           <mark key={i} class="mark">
             {p.text}
           </mark>
@@ -189,7 +190,7 @@ const SourcePreview = defineComponent({
           originLabel(chunk.value?.origin, chunk.value?.anchor) ?? undefined
         }
         /* 引文命中高亮（#968 的后续）：被引到的那几句用检索命中的样子标出来，
-           对不上的引文不标（quotePieces 的判定）。I-3 接回——body 走 VNode */
+           对不上的引文不标（highlightSegments 的判定）。I-3 接回——body 走 VNode */
         body={
           <QuotedText
             text={chunk.value?.text ?? props.s.excerpt}
