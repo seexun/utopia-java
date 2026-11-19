@@ -982,10 +982,15 @@ function rowSourceIcon(row: SourceDoc): Component | null {
   padding-left: 34px;
 }
 
-/* ===== 统计卡条（styleGuide StatCard 形态同构；列节奏直接用全局
-   .stat-grid——桌面 4 列、≤1200px 降 2 列（theme.scss），页内只留间距）===== */
+/* ===== 统计卡条（styleGuide StatCard 形态同构；3 卡满轨 3 列，窄屏降
+   2 列——断点对齐全局 .stat-grid 的 ≤1200px 语义；观感取舍：不收空位）===== */
 .lib-stats {
+  grid-template-columns: repeat(3, 1fr);
   margin-bottom: 16px;
+
+  @media (max-width: 1200px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 .lib-stat {
