@@ -47,8 +47,10 @@ function streamFailure(data: string): string {
 }
 
 /** 若依鉴权头：未登录不带（登录页自身的请求没有 token 可言——与 client.ts 同裁）。
- *  通用请求与两条对话流（fetch 直连，不走 axios 拦截器）共用这一处。 */
-function bearerHeaders(): Record<string, string> {
+ *  通用请求与两条对话流（fetch 直连，不走 axios 拦截器）共用这一处；
+ *  现网对话页的流式请求（api/knowledge/chat.ts，fetch 直连同因）也从这里引——全
+ *  站 fetch 直连的 Bearer 只有这一个真源。 */
+export function bearerHeaders(): Record<string, string> {
   const token = getToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }

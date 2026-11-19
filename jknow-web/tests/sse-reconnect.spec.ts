@@ -489,6 +489,31 @@ describe("one notification stream per page (#1028)", () => {
     expect(documents.fetch).toHaveBeenCalledTimes(1);
   });
 
+  it("gives up a pending reconnect too when the page hides through a dropout (#1028 让出闸)", async () => {
+    const page = fakePage(true);
+    pages.push(page);
+    const client = createClient();
+    const documents = await watch(client, ["documents", "kb-a"]);
+    const { source } = mount(() => useKbEvents(ref("kb-a")));
+    await vi.advanceTimersByTimeAsync(0);
+    // 掉线（退避挂着）且断网：重试全败，页面随即藏起来直到让出到点
+    source!.drop();
+    FakeEventStream.blackout = true;
+    page.show(false);
+    await vi.advanceTimersByTimeAsync(HIDDEN_RELEASE_MS + 1);
+    // 让出必须把挂起的退避一并取消：网络恢复（黑障解除）后不再重建——隐藏的页
+    // 不持有连接（若只看 controller 放行挂着的 retry，此处会冒出第二条连接）
+    FakeEventStream.blackout = false;
+    await vi.advanceTimersByTimeAsync(HIDDEN_RELEASE_MS * 2);
+    expect(FakeEventStream.instances).toHaveLength(1);
+    expect(documents.fetch).toHaveBeenCalledTimes(1);
+    // 回前台照常重连补刷（missed 在让出时打上，重连成功即刷）
+    page.show(true);
+    await vi.advanceTimersByTimeAsync(RECONNECT_MS + 1);
+    expect(FakeEventStream.instances).toHaveLength(2);
+    expect(documents.fetch).toHaveBeenCalledTimes(2);
+  });
+
   it("waits for a page opened in the background to be shown before connecting", async () => {
     const page = fakePage(false);
     pages.push(page);

@@ -6,7 +6,8 @@
    kbEventsCore.test.ts，均钉在生产 Vue 面上）；Vue composable
    （composables/useKbEvents.ts）从这里取纯函数。 */
 // KB 事件流订阅：收到事件只做 react-query 失效重取（事件不带业务数据，天然幂等）。
-// EventSource 断线自动重连，重连成功后补刷漏掉的变化；替代 Library/Review 的轮询。
+// EventSource 已退役（T1 fetch 化）——事件流断线由 eventStream.ts 自动重连，
+// 重连成功后补刷漏掉的变化；替代 Library/Review 的轮询。
 // 告警也从这条流来：一页只占一条通知用的连接（见 `eventStream`）。
 //
 // **失效是合并着做的。** 一篇文档抽取时每落一条事实就发一个 graph 事件，

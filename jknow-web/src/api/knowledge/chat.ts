@@ -2,6 +2,7 @@
 // SSE 走 fetch 不走 axios：axios 在浏览器侧不支持流式读响应体。
 // SSE 解析是内建的一份最小实现（只认 utopia 的帧），不引 eventsource-parser 依赖。
 import { http, ApiError, refusalMessage, streamFailure } from "./client";
+import { bearerHeaders } from "@/domain/api";
 import { S } from "@/i18n";
 import type {
   ConversationRow,
@@ -80,6 +81,7 @@ export function reattachChat(
     signal =>
       fetch(`/api/v1/kbs/${kbId}/conversations/${conversationId}/stream`, {
         credentials: "include",
+        headers: bearerHeaders(),
         signal
       }),
     handlers,
@@ -102,7 +104,7 @@ export function streamChat(
       fetch(`/api/v1/kbs/${kbId}/chat`, {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...bearerHeaders() },
         body: JSON.stringify(body),
         signal
       }),

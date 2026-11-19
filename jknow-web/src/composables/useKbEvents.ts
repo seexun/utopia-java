@@ -1,7 +1,8 @@
 // KB 事件流订阅的 Vue 面（对照旧仓 useKbEvents.ts 的 React hook——该文件与
 // useEventReconnect.test.ts 作为行为规格随迁保留，生产代码不再引用 react）。
-// 收到事件只做失效重取（事件不带业务数据，天然幂等）；EventSource 断线自动重连，
-// 重连成功后补刷漏掉的变化。失效合并（一阵事件只换一次重取）的纯逻辑在
+// 收到事件只做失效重取（事件不带业务数据，天然幂等）；事件流断线自动重连
+// （eventStream.ts 的 fetch 流式读，T1 起带若依 Bearer），重连成功后补刷漏掉的
+// 变化。失效合并（一阵事件只换一次重取）的纯逻辑在
 // domain/kbEventsCore.ts（与 React 随迁件逐字同源，仅 partialMatchKey 来自
 // vue-query——两包同源 query-core，同一实现）。
 import { watch, onScopeDispose } from "vue";

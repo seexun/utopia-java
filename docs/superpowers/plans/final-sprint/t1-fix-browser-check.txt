@@ -1,0 +1,17 @@
+== 1. 打开 http://localhost:80/ ==
+   landed: http://localhost/login?redirect=/graph
+== 2. 若依登录 admin/admin123 ==
+   captcha input visible: false
+   after login: http://localhost/kb/0190d3e0-0000-7d5a-8000-0000000000f2/graph
+== 3. 进对话页 /kb/0190d3e0-0000-7d5a-8000-0000000000f2/chat 并发一条消息 ==
+   chat page url: http://localhost/kb/0190d3e0-0000-7d5a-8000-0000000000f2/chat
+== 4. 请求断言 ==
+   [req] POST http://localhost/api/v1/kbs/0190d3e0-0000-7d5a-8000-0000000000f2/chat
+         Authorization: Bearer eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJh... (Bearer ✓)
+== 5. 响应断言（非若依 401-in-200）==
+   [res] 422 application/json http://localhost/api/v1/kbs/0190d3e0-0000-7d5a-8000-0000000000f2/chat
+         body: {"error":"Chat model not configured. Go to Settings → Models.","code":"no_chat_model"}
+         若依401信封: 否 ✓
+   chat POST 判定: HTTP 422 no_chat_model ✓（过鉴权链，领域层拒绝）
+
+== 结论: PASS——现网对话流携带 Bearer 且过若依鉴权链 ==

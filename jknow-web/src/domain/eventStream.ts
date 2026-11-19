@@ -118,7 +118,9 @@ export function subscribeEvents(
     }
     release = setTimeout(() => {
       release = null;
-      if (!controller) return;
+      // 连接着（controller）或掉线退避挂着（retry）都要让出：只清掉 retry 不放行的话，
+      // 隐藏期间网络一恢复，退避到点会在藏起来的页面上重建连接并无限期持有（#1028）
+      if (!controller && retry === null) return;
       close();
       missed = true;
     }, HIDDEN_RELEASE_MS);
