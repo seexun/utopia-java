@@ -21,10 +21,13 @@ export let NODE_BORDER_BASE = "#909090"; // 淡入渐变的描边兜底（原 #7
 /** 白描边与 hover 白环的那一个白。不是令牌：这是画布节点语言自带的白，
  *  在 #f6f8fb 的纸底与白卡停靠面板上都立得住（规格 §2） */
 export const STROKE_WHITE = "#ffffff";
-/** 选中态的主色（与 --color-primary #1677ff 同值，规格 §2）。胶囊 v2 里它
- *  是悬停/选中那圈主色描边的色值（drawNodeLabel：1.5/2px 两档）；节点本体
- *  的环宽是程序级全局值，选中的分量由胶囊边的粗细扛 */
-export const RING_SELECT = "#1677ff";
+/** 选中态的主色（规格 §2）。胶囊 v2 里它是悬停/选中那圈主色描边的色值
+ *  （drawNodeLabel：1.5/2px 两档）；节点本体的环宽是程序级全局值，选中的
+ *  分量由胶囊边的粗细扛。
+ *  双蓝收口（reskin-b1）：初值 #1677ff 是旧 antd 蓝的兜底，refreshPalette
+ *  里与 node-core/edge-focus 同法读 --color-primary——节点主色已随令牌层
+ *  换 #2563eb 而选中环还停在旧蓝，就是这次要修的「双蓝」 */
+export let RING_SELECT = "#1677ff";
 export const TRANSPARENT = "rgba(0,0,0,0)";
 export let MUTED_SHELL = "#151515";
 /* 悬停时其余的压暗程度。**比选中轻**（选中是压到底）：悬停是随鼠标走的、
@@ -411,6 +414,7 @@ export function refreshPalette() {
   EDGE_INFERRED = token("--color-ink-2", EDGE_INFERRED); // 原 edge-inferred：#cbd5e1
   EDGE_DIM = token("--color-border", EDGE_DIM); // 原 edge-dim：#e5eaf1
   EDGE_FOCUS = token("--color-primary", EDGE_FOCUS); // 原 edge-focus：#1677ff
+  RING_SELECT = token("--color-primary", RING_SELECT); // 选中环与节点主色同源（双蓝收口，reskin-b1）
   EDGE_DERIVED = token("--color-violet", EDGE_DERIVED); // 原 edge-derived：#7c3aed
   EDGE_DERIVED_DIM = LIGHT_EDGE_DERIVED_DIM; // 原 edge-derived-dim：#ddd6fe（常量）
   EDGE_FOCUS_DERIVED = token("--color-violet", EDGE_FOCUS_DERIVED); // 原 edge-derived-focus：#7c3aed
