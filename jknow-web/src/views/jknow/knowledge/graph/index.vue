@@ -100,6 +100,8 @@ import {
   URow,
   CanvasLoading
 } from "@/components/knowledge/kit";
+/* 重造新增 import（reskin-b2）：页头组件（首批 search/library 同款范式） */
+import PageHeader from "@/components/PageHeader/index.vue";
 
 defineOptions({ name: "UtopiaGraphPage" });
 
@@ -1245,490 +1247,517 @@ const statsText = computed(() => {
 </script>
 
 <template>
-  <div class="knowledge-page relative h-full">
-    <!-- 顶部悬浮条：搜索 + 图例 + 状态 -->
-    <div
-      class="pointer-events-none absolute left-3 right-3 top-3 z-10 flex items-start gap-2"
-    >
-      <div class="relative pointer-events-auto">
-        <div class="relative">
-          <SearchIcon
-            class="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-ink-2"
-            width="12"
-            height="12"
-          />
-          <el-input
-            v-model="searchInput"
-            class="graph-search w-58"
-            :placeholder="
-              inSubgraph ? S.graph.searchInSubgraph : S.graph.searchEntity
-            "
-          />
-        </div>
-        <!-- 搜索建议框 -->
-        <div
-          v-if="searchQ && searchHits.length > 0"
-          class="absolute mt-1 w-full overflow-hidden rounded-card border border-line bg-card shadow-pop"
-        >
-          <URow
-            v-for="c in searchHits"
-            :key="c.id"
-            density="menu"
-            @click="
-              () => {
-                if (!inSubgraph) focusEntity = c.id;
-                selected = c.id;
-                searchInput = '';
-                searchQ = '';
-                syncUrl();
-              }
-            "
-          >
-            <span class="flex min-w-0 items-center gap-2">
-              <span
-                class="h-2.5 w-2.5 shrink-0 rounded-full"
-                :style="{ background: c.color }"
-              />
-              <span class="truncate">{{ c.name }}</span>
-              <span
-                v-if="c.disambiguator && c.disambiguator !== c.type_label"
-                class="min-w-0 max-w-[40%] truncate text-sub text-ink-2"
-              >
-                · {{ c.disambiguator }}
-              </span>
-            </span>
-            <template #trailing>{{ c.type_label }}</template>
-          </URow>
-          <!-- 还有更多没显示。说清剩多少 -->
-          <el-button
-            v-if="
-              !inSubgraph &&
-              (candidates.data.value?.total ?? 0) > searchHits.length
-            "
-            class="w-full justify-start rounded-none border-t border-line"
-            size="small"
-            text
-            @click="searchLimit += 20"
-          >
-            {{
-              S.graph.searchMore(
-                candidates.data.value!.total - searchHits.length
-              )
-            }}
-          </el-button>
-        </div>
-      </div>
-      <el-button
-        v-if="focusEntity"
-        class="pointer-events-auto graph-shadow"
-        @click="
-          () => {
-            focusEntity = null;
-            syncUrl();
-          }
-        "
+  <div class="knowledge-page flex h-full flex-col p-6">
+    <!-- 页头（reskin-b2 六要素之一）：主行动在画布工具条内（每页唯一），页头不放 extra -->
+    <PageHeader :title="S.nav.graph" :subtitle="kb?.name ?? ''" />
+
+    <!-- 画布主卡：全幅画布 + 浮动 UI 骨架原样收进卡内——卡形态只在外框/圆角，
+         画布无边距全填充（内距归零见 scoped .graph-canvas-card） -->
+    <div class="card graph-canvas-card relative min-h-0 flex-1">
+      <!-- 顶部悬浮条：搜索 + 图例 + 状态 -->
+      <div
+        class="pointer-events-none absolute left-3 right-3 top-3 z-10 flex items-start gap-2"
       >
-        {{ S.graph.backToOverview }}
-      </el-button>
-
-      <!-- 图例（点击切换类型显隐）。只摆前 LEGEND_MAX 个 -->
-      <div class="pointer-events-auto flex flex-wrap gap-2">
-        <UPill
-          v-for="[key, t] in legendShown"
-          :key="key"
-          :dim="hiddenTypes.has(key)"
-          @click="toggleHidden(key)"
-        >
-          <span
-            :class="[
-              'h-2 w-2',
-              t.shape === 'square' ? 'scale-90' : 'rounded-full'
-            ]"
-            :style="{ background: t.color }"
-          />
-          <span>{{ t.label }}</span>
-        </UPill>
-
-        <!-- +N 个类：弹层里全列表（查找 / 全开 / 全关 / 只看这个） -->
-        <el-popover v-if="legendRest.length > 0" width="288" trigger="click">
-          <template #reference>
-            <UPill :title="S.graph.legendAllHint">
-              {{ S.graph.legendMore(types.length) }}
-              <span
-                v-if="legendRest.some(([k]) => hiddenTypes.has(k))"
-                class="h-1.5 w-1.5 rounded-full bg-ink-2"
-              />
-            </UPill>
-          </template>
-          <div
-            class="border-b border-line px-3 py-2 text-body font-medium text-ink"
-          >
-            {{ S.graph.legendMore(types.length) }}
-          </div>
-          <div class="flex items-center gap-2 border-b border-line px-3 py-2">
-            <button
-              type="button"
-              class="link-inline text-sub"
-              :disabled="hiddenTypes.size === 0"
-              @click="
-                () => {
-                  hiddenTypes = new Set();
-                  sigmaRef?.refresh();
-                }
-              "
-            >
-              {{ S.graph.legendShowAll(hiddenTypes.size) }}
-            </button>
-            <button
-              type="button"
-              class="link-inline ml-auto text-sub"
-              :disabled="hiddenTypes.size === types.length"
-              @click="
-                () => {
-                  hiddenTypes = new Set(types.map(([k]) => k));
-                  sigmaRef?.refresh();
-                }
-              "
-            >
-              {{ S.graph.legendHideAll }}
-            </button>
-          </div>
-          <div class="border-b border-line px-3 py-2">
+        <div class="relative pointer-events-auto">
+          <div class="relative">
+            <SearchIcon
+              class="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-ink-2"
+              width="12"
+              height="12"
+            />
             <el-input
-              v-model="legendQ"
-              :placeholder="S.graph.legendSearch"
-              size="small"
+              v-model="searchInput"
+              class="graph-search w-58"
+              :placeholder="
+                inSubgraph ? S.graph.searchInSubgraph : S.graph.searchEntity
+              "
             />
           </div>
-          <div class="max-h-64 overflow-y-auto overscroll-contain px-2 py-1">
-            <div
-              v-for="[key, t] in legendRestFiltered"
-              :key="key"
-              class="group flex items-center gap-2"
+          <!-- 搜索建议框 -->
+          <div
+            v-if="searchQ && searchHits.length > 0"
+            class="absolute mt-1 w-full overflow-hidden rounded-card border border-line bg-card shadow-pop"
+          >
+            <URow
+              v-for="c in searchHits"
+              :key="c.id"
+              density="menu"
+              @click="
+                () => {
+                  if (!inSubgraph) focusEntity = c.id;
+                  selected = c.id;
+                  searchInput = '';
+                  searchQ = '';
+                  syncUrl();
+                }
+              "
             >
-              <button
-                type="button"
-                class="flex min-w-0 flex-1 items-center justify-start rounded-none px-0"
-                @click="toggleHidden(key)"
-              >
+              <span class="flex min-w-0 items-center gap-2">
                 <span
-                  class="h-2 w-2 shrink-0"
-                  :class="t.shape === 'square' ? 'scale-90' : 'rounded-full'"
-                  :style="{
-                    background: t.color,
-                    opacity: hiddenTypes.has(key) ? 0.35 : 1
-                  }"
+                  class="h-2.5 w-2.5 shrink-0 rounded-full"
+                  :style="{ background: c.color }"
                 />
+                <span class="truncate">{{ c.name }}</span>
                 <span
-                  :class="[
-                    'truncate text-sub',
-                    hiddenTypes.has(key)
-                      ? 'text-ink-2 line-through'
-                      : 'text-ink'
-                  ]"
+                  v-if="c.disambiguator && c.disambiguator !== c.type_label"
+                  class="min-w-0 max-w-[40%] truncate text-sub text-ink-2"
                 >
-                  {{ t.label }}
+                  · {{ c.disambiguator }}
                 </span>
-              </button>
+              </span>
+              <template #trailing>{{ c.type_label }}</template>
+            </URow>
+            <!-- 还有更多没显示。说清剩多少 -->
+            <el-button
+              v-if="
+                !inSubgraph &&
+                (candidates.data.value?.total ?? 0) > searchHits.length
+              "
+              class="w-full justify-start rounded-none border-t border-line"
+              size="small"
+              text
+              @click="searchLimit += 20"
+            >
+              {{
+                S.graph.searchMore(
+                  candidates.data.value!.total - searchHits.length
+                )
+              }}
+            </el-button>
+          </div>
+        </div>
+        <el-button
+          v-if="focusEntity"
+          class="pointer-events-auto graph-shadow"
+          @click="
+            () => {
+              focusEntity = null;
+              syncUrl();
+            }
+          "
+        >
+          {{ S.graph.backToOverview }}
+        </el-button>
+
+        <!-- 图例（点击切换类型显隐）。只摆前 LEGEND_MAX 个 -->
+        <div class="pointer-events-auto flex flex-wrap gap-2">
+          <UPill
+            v-for="[key, t] in legendShown"
+            :key="key"
+            :dim="hiddenTypes.has(key)"
+            @click="toggleHidden(key)"
+          >
+            <span
+              :class="[
+                'h-2 w-2',
+                t.shape === 'square' ? 'scale-90' : 'rounded-full'
+              ]"
+              :style="{ background: t.color }"
+            />
+            <span>{{ t.label }}</span>
+          </UPill>
+
+          <!-- +N 个类：弹层里全列表（查找 / 全开 / 全关 / 只看这个） -->
+          <el-popover v-if="legendRest.length > 0" width="288" trigger="click">
+            <template #reference>
+              <UPill :title="S.graph.legendAllHint">
+                {{ S.graph.legendMore(types.length) }}
+                <span
+                  v-if="legendRest.some(([k]) => hiddenTypes.has(k))"
+                  class="h-1.5 w-1.5 rounded-full bg-ink-2"
+                />
+              </UPill>
+            </template>
+            <div
+              class="border-b border-line px-3 py-2 text-body font-medium text-ink"
+            >
+              {{ S.graph.legendMore(types.length) }}
+            </div>
+            <div class="flex items-center gap-2 border-b border-line px-3 py-2">
               <button
                 type="button"
-                class="reveal shrink-0 text-sub text-ink-2 hover:text-ink"
+                class="link-inline text-sub"
+                :disabled="hiddenTypes.size === 0"
                 @click="
                   () => {
-                    hiddenTypes = new Set(
-                      types.map(([k]) => k).filter(k => k !== key)
-                    );
+                    hiddenTypes = new Set();
                     sigmaRef?.refresh();
                   }
                 "
               >
-                {{ S.graph.legendOnly }}
+                {{ S.graph.legendShowAll(hiddenTypes.size) }}
               </button>
-              <span class="shrink-0 tabular-nums text-aux text-ink-2">
-                {{ t.count }}
-              </span>
+              <button
+                type="button"
+                class="link-inline ml-auto text-sub"
+                :disabled="hiddenTypes.size === types.length"
+                @click="
+                  () => {
+                    hiddenTypes = new Set(types.map(([k]) => k));
+                    sigmaRef?.refresh();
+                  }
+                "
+              >
+                {{ S.graph.legendHideAll }}
+              </button>
+            </div>
+            <div class="border-b border-line px-3 py-2">
+              <el-input
+                v-model="legendQ"
+                :placeholder="S.graph.legendSearch"
+                size="small"
+              />
+            </div>
+            <div class="max-h-64 overflow-y-auto overscroll-contain px-2 py-1">
+              <div
+                v-for="[key, t] in legendRestFiltered"
+                :key="key"
+                class="group flex items-center gap-2"
+              >
+                <button
+                  type="button"
+                  class="flex min-w-0 flex-1 items-center justify-start rounded-none px-0"
+                  @click="toggleHidden(key)"
+                >
+                  <span
+                    class="h-2 w-2 shrink-0"
+                    :class="t.shape === 'square' ? 'scale-90' : 'rounded-full'"
+                    :style="{
+                      background: t.color,
+                      opacity: hiddenTypes.has(key) ? 0.35 : 1
+                    }"
+                  />
+                  <span
+                    :class="[
+                      'truncate text-sub',
+                      hiddenTypes.has(key)
+                        ? 'text-ink-2 line-through'
+                        : 'text-ink'
+                    ]"
+                  >
+                    {{ t.label }}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  class="reveal shrink-0 text-sub text-ink-2 hover:text-ink"
+                  @click="
+                    () => {
+                      hiddenTypes = new Set(
+                        types.map(([k]) => k).filter(k => k !== key)
+                      );
+                      sigmaRef?.refresh();
+                    }
+                  "
+                >
+                  {{ S.graph.legendOnly }}
+                </button>
+                <span class="shrink-0 tabular-nums text-aux text-ink-2">
+                  {{ t.count }}
+                </span>
+              </div>
+              <div
+                v-if="legendRestFiltered.length === 0"
+                class="px-2 py-2 text-sub text-ink-2"
+              >
+                {{ S.graph.legendNone }}
+              </div>
+            </div>
+          </el-popover>
+        </div>
+
+        <!-- 右上：能调「画多少个」+ 统计 + 边语义图例 -->
+        <div class="ml-auto flex flex-col items-end gap-1">
+          <div class="flex items-start gap-2">
+            <div
+              class="pointer-events-auto flex items-center overflow-hidden rounded-ctl border border-line"
+            >
+              <button
+                type="button"
+                class="px-2 py-1.5 text-ink-2 hover:bg-fill disabled:opacity-40"
+                :title="S.graph.nodeBudgetLess"
+                :disabled="nodeBudget <= NODE_BUDGETS[0]"
+                @click="
+                  nodeBudget =
+                    NODE_BUDGETS[Math.max(0, NODE_BUDGETS.indexOf(nodeBudget) - 1)]
+                "
+              >
+                −
+              </button>
+              <button
+                type="button"
+                class="px-2 py-1.5 text-ink-2 hover:bg-fill disabled:opacity-40"
+                :title="S.graph.nodeBudgetMore"
+                :disabled="
+                  !capped || nodeBudget >= NODE_BUDGETS[NODE_BUDGETS.length - 1]
+                "
+                @click="
+                  nodeBudget =
+                    NODE_BUDGETS[
+                      Math.min(
+                        NODE_BUDGETS.length - 1,
+                        NODE_BUDGETS.indexOf(nodeBudget) + 1
+                      )
+                    ]
+                "
+              >
+                +
+              </button>
             </div>
             <div
-              v-if="legendRestFiltered.length === 0"
-              class="px-2 py-2 text-sub text-ink-2"
+              class="pointer-events-none pt-1 tabular-nums text-aux text-ink-2"
             >
-              {{ S.graph.legendNone }}
+              {{ statsText }}
             </div>
           </div>
-        </el-popover>
-      </div>
-
-      <!-- 右上：能调「画多少个」+ 统计 + 边语义图例 -->
-      <div class="ml-auto flex flex-col items-end gap-1">
-        <div class="flex items-start gap-2">
           <div
-            class="pointer-events-auto flex items-center overflow-hidden rounded-ctl border border-line"
+            v-if="stabilizing"
+            class="flex items-center gap-2 text-aux text-ink-2"
           >
-            <button
-              type="button"
-              class="px-2 py-1.5 text-ink-2 hover:bg-fill disabled:opacity-40"
-              :title="S.graph.nodeBudgetLess"
-              :disabled="nodeBudget <= NODE_BUDGETS[0]"
-              @click="
-                nodeBudget =
-                  NODE_BUDGETS[Math.max(0, NODE_BUDGETS.indexOf(nodeBudget) - 1)]
-              "
-            >
-              −
-            </button>
-            <button
-              type="button"
-              class="px-2 py-1.5 text-ink-2 hover:bg-fill disabled:opacity-40"
-              :title="S.graph.nodeBudgetMore"
-              :disabled="
-                !capped || nodeBudget >= NODE_BUDGETS[NODE_BUDGETS.length - 1]
-              "
-              @click="
-                nodeBudget =
-                  NODE_BUDGETS[
-                    Math.min(
-                      NODE_BUDGETS.length - 1,
-                      NODE_BUDGETS.indexOf(nodeBudget) + 1
-                    )
-                  ]
-              "
-            >
-              +
-            </button>
+            {{ S.graph.stabilizing }}
           </div>
+          <!-- 边语义图例：常显（规格 graph-edge-legend.md §1） -->
           <div
-            class="pointer-events-none pt-1 tabular-nums text-aux text-ink-2"
+            class="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-ctl border border-line bg-card/90 px-2.5 py-1 text-aux text-ink-3"
           >
-            {{ statsText }}
+            <span class="font-semibold">{{ S.graph.edgeLegend }}</span>
+            <span class="flex items-center gap-1.5">
+              <span
+                class="inline-block h-[3px] w-4 rounded-full"
+                :style="{ background: EDGE }"
+              />
+              {{ S.graph.edgeFact }}
+            </span>
+            <span class="flex items-center gap-1.5">
+              <span
+                class="inline-block h-[3px] w-4 rounded-full"
+                :style="{ background: EDGE_INFERRED }"
+              />
+              {{ S.graph.edgeInferred }}
+            </span>
+            <span class="flex items-center gap-1.5">
+              <span
+                class="inline-block h-[4px] w-4 rounded-full"
+                :style="{ background: EDGE_DERIVED }"
+              />
+              {{ S.graph.edgeDerived }}
+            </span>
+            <span class="flex items-center gap-1.5">
+              <span
+                class="inline-block h-[4px] w-4 rounded-full"
+                :style="{ background: EDGE_CONTEST }"
+              />
+              ⚠ {{ S.graph.edgeContested }}
+            </span>
+            <span class="flex items-center gap-1.5">
+              <span
+                class="inline-block h-[2px] w-4 rounded-full"
+                :style="{ background: edgeGhost() }"
+              />
+              {{ S.graph.edgeBlocked }}
+            </span>
           </div>
         </div>
-        <div
-          v-if="stabilizing"
-          class="flex items-center gap-2 text-aux text-ink-2"
-        >
-          {{ S.graph.stabilizing }}
-        </div>
-        <!-- 边语义图例：常显（规格 graph-edge-legend.md §1） -->
-        <div
-          class="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-ctl border border-line bg-card/90 px-2.5 py-1 text-aux text-ink-3"
-        >
-          <span class="font-semibold">{{ S.graph.edgeLegend }}</span>
-          <span class="flex items-center gap-1.5">
-            <span
-              class="inline-block h-[3px] w-4 rounded-full"
-              :style="{ background: EDGE }"
-            />
-            {{ S.graph.edgeFact }}
-          </span>
-          <span class="flex items-center gap-1.5">
-            <span
-              class="inline-block h-[3px] w-4 rounded-full"
-              :style="{ background: EDGE_INFERRED }"
-            />
-            {{ S.graph.edgeInferred }}
-          </span>
-          <span class="flex items-center gap-1.5">
-            <span
-              class="inline-block h-[4px] w-4 rounded-full"
-              :style="{ background: EDGE_DERIVED }"
-            />
-            {{ S.graph.edgeDerived }}
-          </span>
-          <span class="flex items-center gap-1.5">
-            <span
-              class="inline-block h-[4px] w-4 rounded-full"
-              :style="{ background: EDGE_CONTEST }"
-            />
-            ⚠ {{ S.graph.edgeContested }}
-          </span>
-          <span class="flex items-center gap-1.5">
-            <span
-              class="inline-block h-[2px] w-4 rounded-full"
-              :style="{ background: edgeGhost() }"
-            />
-            {{ S.graph.edgeBlocked }}
-          </span>
-        </div>
       </div>
-    </div>
 
-    <!-- 画布：世界坐标网格层垫在 sigma WebGL 层下 -->
-    <div class="absolute inset-0">
-      <canvas ref="gridRef" class="absolute inset-0 h-full w-full" />
-      <div ref="containerRef" class="absolute inset-0" />
-    </div>
+      <!-- 画布：世界坐标网格层垫在 sigma WebGL 层下 -->
+      <div class="absolute inset-0">
+        <canvas ref="gridRef" class="absolute inset-0 h-full w-full" />
+        <div ref="containerRef" class="absolute inset-0" />
+      </div>
 
-    <!-- 左下控件塔：推出来的边 + 布局切换 + 相机 -->
-    <div class="absolute bottom-4 left-3 z-10 flex flex-col items-start gap-2">
-      <ToolTower v-if="derivedCount > 0">
-        <ToolButton
-          :active="showDerived"
-          :label="S.graph.viewDerived"
-          :title="`${S.graph.derivedEdges(derivedCount)} · ${S.graph.derivedHint}`"
-          @click="
-            () => {
-              showDerived = !showDerived;
-              sigmaRef?.refresh();
-            }
-          "
-        >
-          <template #icon>
-            <WaypointsIcon
-              width="15"
-              height="15"
-              :style="showDerived ? { color: EDGE_FOCUS_DERIVED } : undefined"
-            />
-          </template>
-        </ToolButton>
-      </ToolTower>
-      <ToolTower>
-        <ToolButton
-          :active="layoutMode === 'force'"
-          :label="S.graph.layoutForce"
-          @click="
-            () => {
-              layoutMode = 'force';
-              layoutCtlRef?.apply('force');
-            }
-          "
-        >
-          <template #icon>
-            <OrbitIcon width="15" height="15" />
-          </template>
-        </ToolButton>
-        <ToolButton
-          :active="layoutMode === 'circular'"
-          :label="S.graph.layoutCircular"
-          @click="
-            () => {
-              layoutMode = 'circular';
-              layoutCtlRef?.apply('circular');
-            }
-          "
-        >
-          <template #icon>
-            <CircleDashedIcon width="15" height="15" />
-          </template>
-        </ToolButton>
-        <ToolButton
-          :active="layoutMode === 'pack'"
-          :label="S.graph.layoutPack"
-          @click="
-            () => {
-              layoutMode = 'pack';
-              layoutCtlRef?.apply('pack');
-            }
-          "
-        >
-          <template #icon>
-            <GrapeIcon width="15" height="15" />
-          </template>
-        </ToolButton>
-      </ToolTower>
-      <ToolTower>
-        <ToolButton
-          :label="S.graph.zoomIn"
-          @click="sigmaRef?.getCamera().animatedZoom({ duration: 220 })"
-        >
-          <template #icon>
-            <ZoomInIcon width="15" height="15" />
-          </template>
-        </ToolButton>
-        <ToolButton
-          :label="S.graph.zoomOut"
-          @click="sigmaRef?.getCamera().animatedUnzoom({ duration: 220 })"
-        >
-          <template #icon>
-            <ZoomOutIcon width="15" height="15" />
-          </template>
-        </ToolButton>
-        <ToolDivider />
-        <ToolButton
-          :label="S.graph.fitView"
-          @click="sigmaRef?.getCamera().animatedReset({ duration: 300 })"
-        >
-          <template #icon>
-            <Maximize2Icon width="15" height="15" />
-          </template>
-        </ToolButton>
-      </ToolTower>
-    </div>
-
-    <!-- 取数失败给一行错误（与 Search 的错误行同构）：空画布会读成“库是空的”，
-        那是另一回事（旧仓 KbScope 注释的同一条判断） -->
-    <p
-      v-if="data.isError.value"
-      class="pointer-events-none absolute left-1/2 top-20 z-10 -translate-x-1/2 text-body text-danger"
-    >
-      {{ String(data.error.value) }}
-    </p>
-
-    <CanvasLoading v-if="data.isPending.value" />
-
-    <!-- 空状态：readiness 统一判定（#313），步骤话术 + 至多一个动作 -->
-    <div
-      v-if="empty"
-      class="pointer-events-none absolute inset-0 grid place-items-center pb-20"
-    >
-      <div class="pointer-events-auto">
-        <div class="max-w-xs text-center text-body text-ink-2">
-          {{ step?.line ?? (S.steps.nothingExtracted as string) }}
-          <RouterLink
-            v-if="step?.action"
-            class="link-inline mt-3 block"
-            :to="{ path: step.action.to, query: step.action.search as never }"
+      <!-- 左下控件塔：推出来的边 + 布局切换 + 相机 -->
+      <div class="absolute bottom-4 left-3 z-10 flex flex-col items-start gap-2">
+        <ToolTower v-if="derivedCount > 0">
+          <ToolButton
+            :active="showDerived"
+            :label="S.graph.viewDerived"
+            :title="`${S.graph.derivedEdges(derivedCount)} · ${S.graph.derivedHint}`"
+            @click="
+              () => {
+                showDerived = !showDerived;
+                sigmaRef?.refresh();
+              }
+            "
           >
-            {{ step.action.label }}
-          </RouterLink>
+            <template #icon>
+              <WaypointsIcon
+                width="15"
+                height="15"
+                :style="showDerived ? { color: EDGE_FOCUS_DERIVED } : undefined"
+              />
+            </template>
+          </ToolButton>
+        </ToolTower>
+        <ToolTower>
+          <ToolButton
+            :active="layoutMode === 'force'"
+            :label="S.graph.layoutForce"
+            @click="
+              () => {
+                layoutMode = 'force';
+                layoutCtlRef?.apply('force');
+              }
+            "
+          >
+            <template #icon>
+              <OrbitIcon width="15" height="15" />
+            </template>
+          </ToolButton>
+          <ToolButton
+            :active="layoutMode === 'circular'"
+            :label="S.graph.layoutCircular"
+            @click="
+              () => {
+                layoutMode = 'circular';
+                layoutCtlRef?.apply('circular');
+              }
+            "
+          >
+            <template #icon>
+              <CircleDashedIcon width="15" height="15" />
+            </template>
+          </ToolButton>
+          <ToolButton
+            :active="layoutMode === 'pack'"
+            :label="S.graph.layoutPack"
+            @click="
+              () => {
+                layoutMode = 'pack';
+                layoutCtlRef?.apply('pack');
+              }
+            "
+          >
+            <template #icon>
+              <GrapeIcon width="15" height="15" />
+            </template>
+          </ToolButton>
+        </ToolTower>
+        <ToolTower>
+          <ToolButton
+            :label="S.graph.zoomIn"
+            @click="sigmaRef?.getCamera().animatedZoom({ duration: 220 })"
+          >
+            <template #icon>
+              <ZoomInIcon width="15" height="15" />
+            </template>
+          </ToolButton>
+          <ToolButton
+            :label="S.graph.zoomOut"
+            @click="sigmaRef?.getCamera().animatedUnzoom({ duration: 220 })"
+          >
+            <template #icon>
+              <ZoomOutIcon width="15" height="15" />
+            </template>
+          </ToolButton>
+          <ToolDivider />
+          <ToolButton
+            :label="S.graph.fitView"
+            @click="sigmaRef?.getCamera().animatedReset({ duration: 300 })"
+          >
+            <template #icon>
+              <Maximize2Icon width="15" height="15" />
+            </template>
+          </ToolButton>
+        </ToolTower>
+      </div>
+
+      <!-- 取数失败给一行错误（与 Search 的错误行同构）：空画布会读成“库是空的”，
+          那是另一回事（旧仓 KbScope 注释的同一条判断） -->
+      <p
+        v-if="data.isError.value"
+        class="pointer-events-none absolute left-1/2 top-20 z-10 -translate-x-1/2 text-body text-danger"
+      >
+        {{ String(data.error.value) }}
+      </p>
+
+      <CanvasLoading v-if="data.isPending.value" />
+
+      <!-- 空状态：readiness 统一判定（#313），步骤话术 + 至多一个动作 -->
+      <div
+        v-if="empty"
+        class="pointer-events-none absolute inset-0 grid place-items-center pb-20"
+      >
+        <div class="pointer-events-auto">
+          <div class="max-w-xs text-center text-body text-ink-2">
+            {{ step?.line ?? (S.steps.nothingExtracted as string) }}
+            <RouterLink
+              v-if="step?.action"
+              class="link-inline mt-3 block"
+              :to="{ path: step.action.to, query: step.action.search as never }"
+            >
+              {{ step.action.label }}
+            </RouterLink>
+          </div>
         </div>
       </div>
+
+      <!-- 底部居中悬浮时间岛（双时间轴过滤） -->
+      <TimeScrubber
+        v-if="edgeCount > 0 && data.data.value"
+        :edges="data.data.value.edges"
+        :value="timeT"
+        :playing="playing"
+        @change="
+          (v: number | null) => {
+            timeT = v;
+            syncUrl();
+          }
+        "
+        @playing-change="(v: boolean) => (playing = v)"
+      />
+
+      <!-- 实体侧栏。取消选中之后还要多留 170ms：那段时间它在演退场 -->
+      <EntityPanel
+        v-if="(selected || exiting) && kbId"
+        :key="(selected ?? exiting)!"
+        :kb-id="kbId"
+        :entity-id="(selected ?? exiting)!"
+        :exiting="!selected"
+        :pinned-fact="pinnedFact"
+        :intent="panelIntentHolder"
+        @close="deselect"
+        @navigate="
+          (id: string) => {
+            focusEntity = id;
+            selected = id;
+            syncUrl();
+          }
+        "
+        @point-fact="pointFact"
+        @focus-fact="focusFact"
+        @point-entity="pointEntity"
+      />
     </div>
-
-    <!-- 底部居中悬浮时间岛（双时间轴过滤） -->
-    <TimeScrubber
-      v-if="edgeCount > 0 && data.data.value"
-      :edges="data.data.value.edges"
-      :value="timeT"
-      :playing="playing"
-      @change="
-        (v: number | null) => {
-          timeT = v;
-          syncUrl();
-        }
-      "
-      @playing-change="(v: boolean) => (playing = v)"
-    />
-
-    <!-- 实体侧栏。取消选中之后还要多留 170ms：那段时间它在演退场 -->
-    <EntityPanel
-      v-if="(selected || exiting) && kbId"
-      :key="(selected ?? exiting)!"
-      :kb-id="kbId"
-      :entity-id="(selected ?? exiting)!"
-      :exiting="!selected"
-      :pinned-fact="pinnedFact"
-      :intent="panelIntentHolder"
-      @close="deselect"
-      @navigate="
-        (id: string) => {
-          focusEntity = id;
-          selected = id;
-          syncUrl();
-        }
-      "
-      @point-fact="pointFact"
-      @focus-fact="focusFact"
-      @point-entity="pointEntity"
-    />
   </div>
 </template>
 
 <style scoped>
-.graph-search :deep(.el-input__wrapper) {
-  box-shadow: 0 1px 2px rgb(15 23 42 / 6%);
-  padding-left: 30px;
+/* 重造层（reskin-b2）：只引令牌（--color-* / --radius-* / --shadow-*），
+   禁硬编码色值；卡容器形态来自全局 .card（theme.scss） */
+
+/* 画布主卡：sigma 画布全幅无内距（.card 的 20px 内距归零），圆角由
+   overflow 收口（WebGL 层随容器矩形，超出圆角部分由卡裁掉） */
+.graph-canvas-card {
+  padding: 0;
+  overflow: hidden;
 }
+
+/* 浮动搜索卡（anivia 查询卡语言，对齐首批 search 查询卡）：圆角 --radius-card、
+   实底卡面、pop 浮层阴影；focus 光晕由全局主题层提供
+   （theme.scss：.el-input__wrapper.is-focus → primary 描边 + glow） */
+.graph-search :deep(.el-input__wrapper),
+.graph-search :deep(.el-input__wrapper:hover) {
+  padding-left: 30px;
+  border-radius: var(--radius-card);
+  background-color: var(--color-card);
+  box-shadow:
+    0 0 0 1px var(--color-border) inset,
+    var(--shadow-pop);
+}
+
+/* 顶部「全图」返回钮：与搜索卡同一浮层海拔（原硬编码 rgb() 阴影令牌化） */
 .graph-shadow {
-  box-shadow: 0 1px 2px rgb(15 23 42 / 6%);
+  box-shadow: var(--shadow-pop);
 }
 </style>

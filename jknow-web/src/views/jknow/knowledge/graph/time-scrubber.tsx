@@ -195,7 +195,13 @@ export const TimeScrubber = defineComponent({
             "scrub-island absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 rounded-card border border-line bg-card px-3 py-2",
             props.playing && "solid"
           ]}
-          style={{ width: `min(${trackW.value}px, calc(100vw - 4rem))` }}
+          /* 外壳卡化（reskin-b2，仅容器层）：浮层海拔对齐实体面板（shadow-pop；
+             .scrub-island 全局类是未分层 CSS，utility 压不过，inline 顶开）；
+             宽度基准从视口改为定位卡（reskin 后画布收进卡内，100vw 会溢出卡缘） */
+          style={{
+            width: `min(${trackW.value}px, calc(100% - 2rem))`,
+            boxShadow: "var(--shadow-pop)"
+          }}
         >
           <button
             type="button"
