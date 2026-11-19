@@ -1,15 +1,17 @@
-<!-- 审核页（对照旧仓 pages/Review.tsx，W2 裁决流全量迁入）：左栏队列 + 右侧
+<!-- 审核页（对照旧仓 pages/Review.tsx，W2 裁决流全量迁入）：页头 + 队列过滤条 +
      单档列表 + 单一分页。写动作（W2）：decide 单条（理由 0026）/batch 多选一批
      一个动作（#428）/agent 建议回答（merge/keep/revert）/各档裁决（待确认点头
      0015/低置信/时态冲突三出路/未再提及闭合/公理违规三出路/本体缺陷两出路/
      对齐绑定/勘误批驳）/一致性检查（同步纯计算，零和零不一样）/合并史撤销。
      错误文案：agent 正在裁的 409 走 reviewErrors 的 Ⅰ类映射；权限闸
-     canManage（editor+，与服务端 require_kb(Role::Editor) 同口径）。 -->
+     canManage（editor+，与服务端 require_kb(Role::Editor) 同口径）。
+     reskin-b4 模板层重造（script 逻辑零动，仅 import 换装）：左栏 rail 改
+     PageHeader（审查·库名）+ 14 档队列过滤条（UPill，计数徽章 badge-soft），
+     行卡列表与概览统计的结构/接线原样。 -->
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { useRoute, useRouter, RouterLink } from "vue-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/vue-query";
-import LayoutDashboardIcon from "~icons/lucide/layout-dashboard";
 import {
   review as reviewApi,
   reviewSummary,
@@ -73,7 +75,9 @@ import {
   MergeRow,
   DecisionRow
 } from "./rows";
-import { RailItem, UPager, Loading } from "@/components/knowledge/kit";
+import { UPill, UPager, Loading } from "@/components/knowledge/kit";
+/* PageHeader（reskin-b1 自 gvdata 零改写迁入）：22/800 标题 + 库名副题 */
+import PageHeader from "@/components/PageHeader/index.vue";
 
 const DUP_PAGE = 6;
 const FACT_PAGE = 10;
@@ -545,79 +549,97 @@ function setPicked(on: boolean, id?: string) {
 </script>
 
 <template>
-  <!-- W3 走查收口：根高从 h-full 改显式视口高。纯-admin 主区是页级滚动
-       （内容窗口=视口-固定导航 48px），h-full 在无界的滚动内容里解析不出——
-       左栏 mt-auto 的数据映射出口被推到视口外（对照帧里旧壳压底、新壳不见）。
-       jknow 落位：kb 页是独立整页路由（不经若依 Layout，无 48px 导航条），
-       偏移重推导为 0——整页即内容窗口。 -->
-  <div class="knowledge-page flex h-screen">
-    <!-- 左栏：队列分类 + 历史，各带实时计数（SSE 推动刷新） -->
-    <aside
-      class="flex w-64 shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-line bg-card"
-    >
-      <div class="flex flex-col gap-0.5 px-2 pt-3">
-        <RailItem
+  <!-- reskin-b4：整页单列滚动（检索/文库同款根）；rail 左栏退役，档位选择
+       上移为页头下的队列过滤条。kb 页在若依 Layout 的 AppMain 内渲染
+       （h-full 即内容窗口高，与批次 1-3 六页同根）。 -->
+  <div class="knowledge-page h-full overflow-y-auto overscroll-contain px-8 py-6">
+    <div>
+      <!-- 页头（重造要素一）：标题=审查，副题=库名；页级唯一主行动留空
+           （各档的裁决/检查是档内动作，不是页级动作） -->
+      <PageHeader :title="S.review.title" :subtitle="kb?.name ?? ''" />
+
+      <!-- 队列过滤条（重造要素二）：14 档一排药丸——总览 / 九队列 + agent /
+           历史（台账 + 合并史）/ 数据映射（外链）。计数徽章 badge-soft 读
+           服务端 COUNT（SSE 推动刷新）；agent 跑动中的琥珀脉冲点保留。
+           选中 primary-soft（scoped 补皮），bg-primary-soft 类同时留在
+           元素上——w1-review spec 以它为选中锚 -->
+      <div class="mb-6 flex flex-wrap items-center gap-1.5">
+        <UPill
           :active="active === 'overview'"
+          :class="['queue-pill', active === 'overview' && 'bg-primary-soft']"
           @click="select('overview')"
         >
-          <template #icon>
-            <LayoutDashboardIcon width="14" height="14" />
-          </template>
           {{ S.review.railOverview }}
-        </RailItem>
-      </div>
-      <div class="flex flex-col gap-0.5 px-2 pt-1">
-        <RailItem
+        </UPill>
+        <span class="mx-1 h-4 w-px shrink-0 bg-line-strong" aria-hidden />
+        <UPill
           v-for="q in QUEUE_ORDER"
           :key="q"
           :active="active === q"
-          :count="counts[q]"
+          :class="['queue-pill', active === q && 'bg-primary-soft']"
           @click="select(q)"
         >
-          {{ RAIL_LABEL[q] }}
-        </RailItem>
+          <span class="truncate">{{ RAIL_LABEL[q] }}</span>
+          <span
+            v-if="counts[q] > 0"
+            class="badge-soft badge-soft-info tabular-nums"
+          >
+            {{ counts[q] }}
+          </span>
+        </UPill>
         <!-- agent 的队列（0025）：徽标是等人回答的建议数 -->
-        <RailItem
+        <UPill
           :active="active === 'agent'"
-          :count="counts.agent"
-          :dot="agentRunning ? 'bg-warning animate-pulse' : undefined"
+          :class="['queue-pill', active === 'agent' && 'bg-primary-soft']"
           @click="select('agent')"
         >
-          {{ S.review.railAgent }}
-        </RailItem>
-      </div>
-      <!-- 历史小节头 -->
-      <div class="mx-2 px-3 pb-2 pt-4 text-sub font-medium text-ink-2">
-        {{ S.review.tabHistory }}
-      </div>
-      <div class="flex flex-col gap-0.5 px-2">
-        <RailItem :active="active === 'decisions'" @click="select('decisions')">
+          <span class="truncate">{{ S.review.railAgent }}</span>
+          <span
+            v-if="agentRunning"
+            class="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-warning"
+          />
+          <span
+            v-if="counts.agent > 0"
+            class="badge-soft badge-soft-info tabular-nums"
+          >
+            {{ counts.agent }}
+          </span>
+        </UPill>
+        <span class="mx-1 h-4 w-px shrink-0 bg-line-strong" aria-hidden />
+        <!-- 历史组：台账 + 合并史 -->
+        <span class="mr-1 shrink-0 text-aux font-medium text-ink-3">
+          {{ S.review.tabHistory }}
+        </span>
+        <UPill
+          :active="active === 'decisions'"
+          :class="['queue-pill', active === 'decisions' && 'bg-primary-soft']"
+          @click="select('decisions')"
+        >
           {{ S.review.railDecisions }}
-        </RailItem>
-        <RailItem
+        </UPill>
+        <UPill
           :active="active === 'merges'"
-          :count="counts.merges"
+          :class="['queue-pill', active === 'merges' && 'bg-primary-soft']"
           @click="select('merges')"
         >
-          {{ S.review.railMerges }}
-        </RailItem>
-      </div>
-
-      <!-- 数据映射：两组都不属于，压在底部单独一条。计数留着——收件箱该说「有几条等你」 -->
-      <div class="mt-auto border-t border-line px-2 py-2">
-        <RouterLink
-          class="group flex w-full items-center gap-2 rounded-ctl px-3 py-1.5 text-left text-body font-medium text-ink-2 transition-colors hover:bg-fill hover:text-ink"
-          :to="`/kb/${kbId}/mappings`"
-        >
-          <span class="flex min-w-0 items-center gap-2">
-            <span class="truncate">{{ S.review.railMappings }}</span>
-            <!-- 此队列跳外链无内容区标题，ⓘ 留在行内（旧仓第 5 轮例外，同位） -->
-            <el-tooltip :content="S.review.railMappingsHint" placement="top">
-              <span
-                class="inline-grid size-[14px] shrink-0 cursor-help place-items-center rounded-full border border-ink-3 text-aux text-ink-3"
-              >i</span>
-            </el-tooltip>
+          <span class="truncate">{{ S.review.railMerges }}</span>
+          <span
+            v-if="counts.merges > 0"
+            class="badge-soft badge-soft-info tabular-nums"
+          >
+            {{ counts.merges }}
           </span>
+        </UPill>
+        <span class="mx-1 h-4 w-px shrink-0 bg-line-strong" aria-hidden />
+        <!-- 数据映射：两组都不属的外链。计数留着——收件箱该说「有几条等你」；
+             无内容区标题，ⓘ 留在行内（旧仓第 5 轮例外，同位） -->
+        <RouterLink class="pill" :to="`/kb/${kbId}/mappings`">
+          <span class="truncate">{{ S.review.railMappings }}</span>
+          <el-tooltip :content="S.review.railMappingsHint" placement="top">
+            <span
+              class="inline-grid size-[14px] shrink-0 cursor-help place-items-center rounded-full border border-ink-3 text-aux text-ink-3"
+            >i</span>
+          </el-tooltip>
           <span
             v-if="counts.mappings > 0"
             class="badge-soft badge-soft-info tabular-nums"
@@ -626,415 +648,426 @@ function setPicked(on: boolean, id?: string) {
           </span>
         </RouterLink>
       </div>
-    </aside>
 
-    <!-- 右侧：一次只显示选中的一类，单一分页 -->
-    <div class="min-w-0 flex-1 overflow-y-auto overscroll-contain px-8 py-6">
-      <div>
-        <Loading v-if="review.isLoading.value && isQueueSel" />
-        <p v-if="review.isError.value" class="text-body text-danger">
-          {{ String(review.error.value) }}
-        </p>
+      <!-- 一次只显示选中的一类，单一分页 -->
+      <Loading v-if="review.isLoading.value && isQueueSel" />
+      <p v-if="review.isError.value" class="text-body text-danger">
+        {{ String(review.error.value) }}
+      </p>
 
-        <section v-if="reviewData || sel === 'decisions' || sel === 'overview'">
-          <div class="mb-6">
-            <div class="flex items-baseline justify-between gap-4">
-              <h1 class="flex min-w-0 items-baseline gap-2 break-words text-page font-extrabold text-ink">
-                {{ SECTION[active].title }}
-                <!-- ⓘ 悬停短句（railXxxHint）：第 4 轮走查从左栏行内移来（旧仓同位） -->
-                <el-tooltip
-                  v-if="SECTION[active].infoHint"
-                  :content="SECTION[active].infoHint"
-                  placement="right"
+      <section v-if="reviewData || sel === 'decisions' || sel === 'overview'">
+        <!-- 档标题行：队列过滤条已承担导航，这里降一档（text-title）保留
+             档名 + ⓘ 悬停短句 + 白纸黑字的长版 hint（信息零丢失） -->
+        <div class="mb-4">
+          <div class="flex items-center gap-2">
+            <h2 class="text-title font-bold text-ink">
+              {{ SECTION[active].title }}
+            </h2>
+            <!-- ⓘ 悬停短句（railXxxHint）：第 4 轮走查从左栏行内移来（旧仓同位） -->
+            <el-tooltip
+              v-if="SECTION[active].infoHint"
+              :content="SECTION[active].infoHint"
+              placement="right"
+            >
+              <span
+                class="inline-grid size-[14px] shrink-0 cursor-help place-items-center rounded-full border border-ink-3 text-aux text-ink-3"
+              >i</span>
+            </el-tooltip>
+          </div>
+          <p v-if="SECTION[active].hint" class="mt-1 text-sub text-ink-2">
+            {{ SECTION[active].hint }}
+          </p>
+        </div>
+
+        <!-- 空态：整个待办全清 vs 单类清空（公理/缺陷两档除外） -->
+        <div
+          v-if="isQueueSel && active !== 'violations' && active !== 'defects' && counts[active] === 0"
+          class="rounded-card border border-line bg-card p-8 text-center text-body text-ink-2"
+        >
+          {{ queueEmpty ? S.review.empty : S.review.categoryEmpty }}
+        </div>
+
+        <!-- 总览 -->
+        <template v-if="active === 'overview'">
+          <Loading v-if="summary.isLoading.value" />
+          <p v-else-if="summary.isError.value" class="text-body text-danger">
+            {{ String(summary.error.value) }}
+          </p>
+          <ReviewOverview
+            v-else-if="summary.data.value"
+            :summary="summary.data.value"
+            :governance="kb?.governance ?? kbDetail.data.value?.governance ?? false"
+            :settings-to="`/kb/${kbId}/settings`"
+            @pick="(q: string) => select(q as Sel)"
+          />
+        </template>
+
+        <!-- 重复项（带类型筛选 + 批量裁决 #428） -->
+        <template v-if="active === 'duplicates' && counts.duplicates > 0">
+          <div class="space-y-3">
+            <div class="flex flex-wrap items-center gap-3">
+              <div class="flex gap-1 rounded-ctl bg-fill p-1">
+                <button
+                  v-for="t in ([
+                    { v: 'any', label: S.review.typesAny, n: counts.duplicates },
+                    { v: 'same', label: S.review.typesSame, n: dupSame },
+                    { v: 'conflict', label: S.review.typesConflict, n: dupConflict }
+                  ] as const)"
+                  :key="t.v"
+                  type="button"
+                  class="flex items-center justify-center gap-1 rounded-ctl px-2 py-1 text-aux font-medium transition-colors"
+                  :class="types === t.v ? 'bg-card text-primary shadow-card' : 'text-ink-2 hover:text-ink'"
+                  @click="((types = t.v as ReviewTypeFilter), (page = 0))"
                 >
-                  <span
-                    class="inline-grid size-[14px] shrink-0 translate-y-0.5 cursor-help place-items-center rounded-full border border-ink-3 text-aux text-ink-3"
-                  >i</span>
-                </el-tooltip>
-              </h1>
-            </div>
-            <p v-if="SECTION[active].hint" class="mt-1 text-sub text-ink-2">
-              {{ SECTION[active].hint }}
-            </p>
-          </div>
-
-          <!-- 空态：整个待办全清 vs 单类清空（公理/缺陷两档除外） -->
-          <div
-            v-if="isQueueSel && active !== 'violations' && active !== 'defects' && counts[active] === 0"
-            class="rounded-card border border-line bg-card p-8 text-center text-body text-ink-2"
-          >
-            {{ queueEmpty ? S.review.empty : S.review.categoryEmpty }}
-          </div>
-
-          <!-- 总览 -->
-          <template v-if="active === 'overview'">
-            <Loading v-if="summary.isLoading.value" />
-            <p v-else-if="summary.isError.value" class="text-body text-danger">
-              {{ String(summary.error.value) }}
-            </p>
-            <ReviewOverview
-              v-else-if="summary.data.value"
-              :summary="summary.data.value"
-              :governance="kb?.governance ?? kbDetail.data.value?.governance ?? false"
-              :settings-to="`/kb/${kbId}/settings`"
-              @pick="(q: string) => select(q as Sel)"
-            />
-          </template>
-
-          <!-- 重复项（带类型筛选 + 批量裁决 #428） -->
-          <template v-if="active === 'duplicates' && counts.duplicates > 0">
-            <div class="space-y-3">
-              <div class="flex flex-wrap items-center gap-3">
-                <div class="flex gap-1 rounded-ctl bg-fill p-1">
-                  <button
-                    v-for="t in ([
-                      { v: 'any', label: S.review.typesAny, n: counts.duplicates },
-                      { v: 'same', label: S.review.typesSame, n: dupSame },
-                      { v: 'conflict', label: S.review.typesConflict, n: dupConflict }
-                    ] as const)"
-                    :key="t.v"
-                    type="button"
-                    class="flex items-center justify-center gap-1 rounded-ctl px-2 py-1 text-aux font-medium transition-colors"
-                    :class="types === t.v ? 'bg-card text-primary shadow-card' : 'text-ink-2 hover:text-ink'"
-                    @click="((types = t.v as ReviewTypeFilter), (page = 0))"
-                  >
-                    {{ t.label }}
-                    <span class="tabular-nums">{{ t.n }}</span>
-                  </button>
-                </div>
-                <!-- 批量：勾选这一页的，一个动作裁一批。按钮只在有选中时出现 -->
-                <el-checkbox
-                  v-if="selectable.length > 0 && canDecide"
-                  class="ml-auto"
-                  :model-value="selectable.length > 0 && selectable.every(d => picked.has(d.id))"
+                  {{ t.label }}
+                  <span class="tabular-nums">{{ t.n }}</span>
+                </button>
+              </div>
+              <!-- 批量：勾选这一页的，一个动作裁一批。按钮只在有选中时出现 -->
+              <el-checkbox
+                v-if="selectable.length > 0 && canDecide"
+                class="ml-auto"
+                :model-value="selectable.length > 0 && selectable.every(d => picked.has(d.id))"
+                :disabled="batch.isPending.value"
+                :label="S.review.selectPage"
+                @change="(v: unknown) => setPicked(!!v)"
+              />
+              <template v-if="picked.size > 0">
+                <span class="tabular-nums text-sub text-ink-2">
+                  {{ S.review.selected(picked.size) }}
+                </span>
+                <!-- 一批一句理由（0026）：这一批为什么一起这么定 -->
+                <el-input
+                  v-model="batchWhy"
+                  size="small"
+                  style="width: 11rem"
+                  :placeholder="S.review.rationalePlaceholder"
                   :disabled="batch.isPending.value"
-                  :label="S.review.selectPage"
-                  @change="(v: unknown) => setPicked(!!v)"
                 />
-                <template v-if="picked.size > 0">
-                  <span class="tabular-nums text-sub text-ink-2">
-                    {{ S.review.selected(picked.size) }}
-                  </span>
-                  <!-- 一批一句理由（0026）：这一批为什么一起这么定 -->
-                  <el-input
-                    v-model="batchWhy"
-                    size="small"
-                    style="width: 11rem"
-                    :placeholder="S.review.rationalePlaceholder"
-                    :disabled="batch.isPending.value"
-                  />
-                  <el-button
-                    size="small"
-                    :disabled="batch.isPending.value"
-                    @click="batch.mutate({ ids: [...picked], action: 'keep', rationale: batchWhy })"
-                  >
-                    {{ S.review.keepSelected }}
-                  </el-button>
-                  <el-button
-                    type="primary"
-                    size="small"
-                    :disabled="batch.isPending.value"
-                    @click="batch.mutate({ ids: [...picked], action: 'merge', rationale: batchWhy })"
-                  >
-                    {{ S.review.mergeSelected }}
-                  </el-button>
-                </template>
-              </div>
-              <div
-                v-if="dupItems.length === 0"
-                class="rounded-card border border-line bg-card p-8 text-center text-body text-ink-2"
-              >
-                {{ S.review.typesEmpty }}
-              </div>
-              <DuplicateCard
-                v-for="item in dupItems"
-                :key="item.id"
-                :item="item"
-                :locked="lockedByAgent(item)"
-                :picked="picked.has(item.id)"
-                :busy="
-                  (decide.isPending.value && decide.variables.value?.id === item.id) ||
-                  (batch.isPending.value && picked.has(item.id))
-                "
-                :can-decide="canDecide"
-                @pick="(on: boolean) => setPicked(on, item.id)"
-                @decide="
-                  (action: 'merge' | 'keep', rationale?: string) =>
-                    decide.mutate({ id: item.id, action, rationale })
-                "
-              />
-            </div>
-          </template>
-
-          <template v-if="active === 'conflicts' && counts.conflicts > 0">
-            <div class="space-y-3">
-              <ConflictRow
-                v-for="c in conflictItems"
-                :key="c.id"
-                :conflict="c"
-                :busy="conflictAction.isPending.value && conflictAction.variables.value?.id === c.id"
-                :can-decide="canDecide"
-                @resolve="
-                  (action: 'close' | 'keep' | 'reject_new', closeAt?: string, closeAtPrecision?: string) =>
-                    conflictAction.mutate({ id: c.id, action, closeAt, closeAtPrecision })
-                "
-              />
-            </div>
-          </template>
-
-          <!-- 未再提及：Reject（抽取错误）或 Close at date（这事结束了） -->
-          <template v-if="active === 'unconfirmed' && counts.unconfirmed > 0">
-            <div class="space-y-3">
-              <UnconfirmedRow
-                v-for="f in factItems"
-                :key="f.id"
-                :fact="f"
-                :busy="
-                  (factAction.isPending.value && factAction.variables.value?.id === f.id) ||
-                  (closeFactAction.isPending.value && closeFactAction.variables.value?.id === f.id)
-                "
-                :can-decide="canDecide"
-                @reject="factAction.mutate({ id: f.id, action: 'reject' })"
-                @close="
-                  (validTo: string, precision: string) =>
-                    closeFactAction.mutate({ id: f.id, validTo, precision })
-                "
-              />
-            </div>
-          </template>
-
-          <!-- 等人点头的事实（0015）：确认进账本，驳回记进 rejected_facts -->
-          <template v-if="active === 'pending' && counts.pending > 0">
-            <div class="space-y-3">
-              <PendingFactRow
-                v-for="f in pendingItems"
-                :key="f.id"
-                :fact="f"
-                :busy="pendingAction.isPending.value && pendingAction.variables.value?.id === f.id"
-                :can-decide="canDecide"
-                @confirm="pendingAction.mutate({ id: f.id, action: 'confirm' })"
-                @reject="pendingAction.mutate({ id: f.id, action: 'reject' })"
-              />
-            </div>
-          </template>
-
-          <template v-if="active === 'lowconf' && counts.lowconf > 0">
-            <div class="space-y-3">
-              <FactRow
-                v-for="f in factItems"
-                :key="f.id"
-                :fact="f"
-                :busy="factAction.isPending.value && factAction.variables.value?.id === f.id"
-                :can-decide="canDecide"
-                @confirm="factAction.mutate({ id: f.id, action: 'confirm' })"
-                @reject="factAction.mutate({ id: f.id, action: 'reject' })"
-              />
-            </div>
-          </template>
-
-          <!-- 本体缺陷（defects）：两出路 -->
-          <template v-if="active === 'defects'">
-            <div class="space-y-3">
-              <div
-                v-if="counts.defects === 0"
-                class="rounded-card border border-line bg-card p-8 text-center text-body text-ink-2"
-              >
-                {{ S.review.categoryEmpty }}
-              </div>
-              <DefectRow
-                v-for="d in defectItems"
-                :key="d.id"
-                :defect="d"
-                :busy="defectAction.isPending.value && defectAction.variables.value?.id === d.id"
-                :can-decide="canDecide"
-                @decide="
-                  (resolution: 'fixed' | 'accepted') =>
-                    defectAction.mutate({ id: d.id, resolution })
-                "
-              />
-            </div>
-          </template>
-
-          <!-- 勘误（errata）：批了就执行，否了只记 -->
-          <template v-if="active === 'errata'">
-            <div class="space-y-3">
-              <div
-                v-if="counts.errata === 0"
-                class="rounded-card border border-line bg-card p-8 text-center text-body text-ink-2"
-              >
-                {{ S.review.categoryEmpty }}
-              </div>
-              <ErrataRow
-                v-for="i in errataItems"
-                :key="i.id"
-                :item="i"
-                :busy="errataAction.isPending.value && errataAction.variables.value?.id === i.id"
-                :can-decide="canDecide"
-                @decide="(approve: boolean) => errataAction.mutate({ id: i.id, approve })"
-              />
-            </div>
-          </template>
-
-          <!-- 对齐（alignment）：短语绑定 / 蕴含规则 / 类别词，三种行三种表单 -->
-          <template v-if="active === 'alignment'">
-            <div class="space-y-3">
-              <div
-                v-if="counts.alignment === 0"
-                class="rounded-card border border-line bg-card p-8 text-center text-body text-ink-2"
-              >
-                {{ S.review.categoryEmpty }}
-              </div>
-              <template
-                v-for="i in alignmentItems"
-                :key="'id' in i ? i.id : i.kind_word"
-              >
-                <AlignmentPhraseRow
-                  v-if="i.kind === 'phrase'"
-                  :item="i"
-                  :properties="ontology.data.value?.relation_types ?? []"
-                  :busy="alignmentPhraseAction.isPending.value && alignmentPhraseAction.variables.value?.id === i.id"
-                  :can-decide="canDecide"
-                  @decide="
-                    (property: string | null, direction: 'forward' | 'reverse', marks: AlignmentMarks | null) =>
-                      alignmentPhraseAction.mutate({ id: i.id, property, direction, marks })
-                  "
-                />
-                <AlignmentRuleRow
-                  v-else-if="i.kind === 'rule'"
-                  :item="i"
-                  :busy="alignmentRuleAction.isPending.value && alignmentRuleAction.variables.value?.id === i.id"
-                  :can-decide="canDecide"
-                  @decide="(approve: boolean) => alignmentRuleAction.mutate({ id: i.id, approve })"
-                />
-                <AlignmentKindWordRow
-                  v-else
-                  :item="i"
-                  :classes="ontology.data.value?.entity_types ?? []"
-                  :busy="alignmentKindWordAction.isPending.value && alignmentKindWordAction.variables.value?.kindWord === i.kind_word"
-                  :can-decide="canDecide"
-                  @decide="(cls: string | null) => alignmentKindWordAction.mutate({ kindWord: i.kind_word, cls })"
-                />
-              </template>
-            </div>
-          </template>
-
-          <!-- 公理违规（violations）：检查按钮在这一档里，报告留在按钮旁边 -->
-          <template v-if="active === 'violations'">
-            <div class="space-y-3">
-              <div class="flex items-center gap-3">
                 <el-button
                   size="small"
-                  :disabled="runCheck.isPending.value"
-                  @click="runCheck.mutate()"
+                  :disabled="batch.isPending.value"
+                  @click="batch.mutate({ ids: [...picked], action: 'keep', rationale: batchWhy })"
                 >
-                  {{ runCheck.isPending.value ? S.review.checking : S.review.runCheck }}
+                  {{ S.review.keepSelected }}
                 </el-button>
-                <span v-if="runCheck.data.value" class="text-sub text-ink-2">
-                  <!-- 三种结果说三句话。**`found` 不是要报的数**：
-                      重跑会把已裁决的那些重新算出来 -->
-                  {{
-                    runCheck.data.value.predicates_with_axioms === 0
-                      ? S.review.checkNoAxioms
-                      : runCheck.data.value.inserted > 0
-                        ? S.review.checkFound(runCheck.data.value.inserted)
-                        : runCheck.data.value.found > 0
-                          ? S.review.checkNothingNew
-                          : S.review.checkClean(runCheck.data.value.edges)
-                  }}
-                </span>
-              </div>
-              <div
-                v-if="counts.violations === 0 && !runCheck.data.value"
-                class="rounded-card border border-line bg-card p-8 text-center text-body text-ink-2"
-              >
-                {{ S.review.checkNeverRun }}
-              </div>
-              <div
-                v-for="v in violationItems"
-                :key="v.id"
-                :class="v.id === itemParam ? 'rounded-card ring-1' : ''"
-                :style="v.id === itemParam ? { boxShadow: '0 0 0 1px var(--color-warning)' } : undefined"
-              >
-                <ViolationRow
-                  :violation="v"
-                  :busy="violationAction.isPending.value && violationAction.variables.value?.id === v.id"
-                  :can-decide="canDecide"
-                  @decide="
-                    (resolution: ViolationResolution, opts?: DecideOpts) =>
-                      violationAction.mutate({ id: v.id, resolution, opts })
-                  "
-                  @duplicates="select('duplicates')"
-                  @ontology="router.push('/kb/' + kbId + '/ontology')"
-                />
-              </div>
+                <el-button
+                  type="primary"
+                  size="small"
+                  :disabled="batch.isPending.value"
+                  @click="batch.mutate({ ids: [...picked], action: 'merge', rationale: batchWhy })"
+                >
+                  {{ S.review.mergeSelected }}
+                </el-button>
+              </template>
             </div>
-          </template>
-
-          <!-- agent（0025）：建议等人答，自动裁的可撤 -->
-          <template v-if="active === 'agent'">
             <div
-              v-if="agentRows === 0"
+              v-if="dupItems.length === 0"
               class="rounded-card border border-line bg-card p-8 text-center text-body text-ink-2"
             >
-              {{ S.review.agentEmpty }}
+              {{ S.review.typesEmpty }}
             </div>
-            <div v-else class="space-y-2">
-              <AgentRow
-                v-for="d in agentItems"
-                :key="d.id"
-                :d="d"
-                :busy="answerAgent.isPending.value && answerAgent.variables.value?.id === d.id"
+            <DuplicateCard
+              v-for="item in dupItems"
+              :key="item.id"
+              :item="item"
+              :locked="lockedByAgent(item)"
+              :picked="picked.has(item.id)"
+              :busy="
+                (decide.isPending.value && decide.variables.value?.id === item.id) ||
+                (batch.isPending.value && picked.has(item.id))
+              "
+              :can-decide="canDecide"
+              @pick="(on: boolean) => setPicked(on, item.id)"
+              @decide="
+                (action: 'merge' | 'keep', rationale?: string) =>
+                  decide.mutate({ id: item.id, action, rationale })
+              "
+            />
+          </div>
+        </template>
+
+        <template v-if="active === 'conflicts' && counts.conflicts > 0">
+          <div class="space-y-3">
+            <ConflictRow
+              v-for="c in conflictItems"
+              :key="c.id"
+              :conflict="c"
+              :busy="conflictAction.isPending.value && conflictAction.variables.value?.id === c.id"
+              :can-decide="canDecide"
+              @resolve="
+                (action: 'close' | 'keep' | 'reject_new', closeAt?: string, closeAtPrecision?: string) =>
+                  conflictAction.mutate({ id: c.id, action, closeAt, closeAtPrecision })
+              "
+            />
+          </div>
+        </template>
+
+        <!-- 未再提及：Reject（抽取错误）或 Close at date（这事结束了） -->
+        <template v-if="active === 'unconfirmed' && counts.unconfirmed > 0">
+          <div class="space-y-3">
+            <UnconfirmedRow
+              v-for="f in factItems"
+              :key="f.id"
+              :fact="f"
+              :busy="
+                (factAction.isPending.value && factAction.variables.value?.id === f.id) ||
+                (closeFactAction.isPending.value && closeFactAction.variables.value?.id === f.id)
+              "
+              :can-decide="canDecide"
+              @reject="factAction.mutate({ id: f.id, action: 'reject' })"
+              @close="
+                (validTo: string, precision: string) =>
+                  closeFactAction.mutate({ id: f.id, validTo, precision })
+              "
+            />
+          </div>
+        </template>
+
+        <!-- 等人点头的事实（0015）：确认进账本，驳回记进 rejected_facts -->
+        <template v-if="active === 'pending' && counts.pending > 0">
+          <div class="space-y-3">
+            <PendingFactRow
+              v-for="f in pendingItems"
+              :key="f.id"
+              :fact="f"
+              :busy="pendingAction.isPending.value && pendingAction.variables.value?.id === f.id"
+              :can-decide="canDecide"
+              @confirm="pendingAction.mutate({ id: f.id, action: 'confirm' })"
+              @reject="pendingAction.mutate({ id: f.id, action: 'reject' })"
+            />
+          </div>
+        </template>
+
+        <template v-if="active === 'lowconf' && counts.lowconf > 0">
+          <div class="space-y-3">
+            <FactRow
+              v-for="f in factItems"
+              :key="f.id"
+              :fact="f"
+              :busy="factAction.isPending.value && factAction.variables.value?.id === f.id"
+              :can-decide="canDecide"
+              @confirm="factAction.mutate({ id: f.id, action: 'confirm' })"
+              @reject="factAction.mutate({ id: f.id, action: 'reject' })"
+            />
+          </div>
+        </template>
+
+        <!-- 本体缺陷（defects）：两出路 -->
+        <template v-if="active === 'defects'">
+          <div class="space-y-3">
+            <div
+              v-if="counts.defects === 0"
+              class="rounded-card border border-line bg-card p-8 text-center text-body text-ink-2"
+            >
+              {{ S.review.categoryEmpty }}
+            </div>
+            <DefectRow
+              v-for="d in defectItems"
+              :key="d.id"
+              :defect="d"
+              :busy="defectAction.isPending.value && defectAction.variables.value?.id === d.id"
+              :can-decide="canDecide"
+              @decide="
+                (resolution: 'fixed' | 'accepted') =>
+                  defectAction.mutate({ id: d.id, resolution })
+              "
+            />
+          </div>
+        </template>
+
+        <!-- 勘误（errata）：批了就执行，否了只记 -->
+        <template v-if="active === 'errata'">
+          <div class="space-y-3">
+            <div
+              v-if="counts.errata === 0"
+              class="rounded-card border border-line bg-card p-8 text-center text-body text-ink-2"
+            >
+              {{ S.review.categoryEmpty }}
+            </div>
+            <ErrataRow
+              v-for="i in errataItems"
+              :key="i.id"
+              :item="i"
+              :busy="errataAction.isPending.value && errataAction.variables.value?.id === i.id"
+              :can-decide="canDecide"
+              @decide="(approve: boolean) => errataAction.mutate({ id: i.id, approve })"
+            />
+          </div>
+        </template>
+
+        <!-- 对齐（alignment）：短语绑定 / 蕴含规则 / 类别词，三种行三种表单 -->
+        <template v-if="active === 'alignment'">
+          <div class="space-y-3">
+            <div
+              v-if="counts.alignment === 0"
+              class="rounded-card border border-line bg-card p-8 text-center text-body text-ink-2"
+            >
+              {{ S.review.categoryEmpty }}
+            </div>
+            <template
+              v-for="i in alignmentItems"
+              :key="'id' in i ? i.id : i.kind_word"
+            >
+              <AlignmentPhraseRow
+                v-if="i.kind === 'phrase'"
+                :item="i"
+                :properties="ontology.data.value?.relation_types ?? []"
+                :busy="alignmentPhraseAction.isPending.value && alignmentPhraseAction.variables.value?.id === i.id"
                 :can-decide="canDecide"
-                @answer="
-                  (action: 'merge' | 'keep' | 'revert', rationale?: string) =>
-                    answerAgent.mutate({ id: d.id, action, rationale })
+                @decide="
+                  (property: string | null, direction: 'forward' | 'reverse', marks: AlignmentMarks | null) =>
+                    alignmentPhraseAction.mutate({ id: i.id, property, direction, marks })
                 "
               />
-            </div>
-          </template>
+              <AlignmentRuleRow
+                v-else-if="i.kind === 'rule'"
+                :item="i"
+                :busy="alignmentRuleAction.isPending.value && alignmentRuleAction.variables.value?.id === i.id"
+                :can-decide="canDecide"
+                @decide="(approve: boolean) => alignmentRuleAction.mutate({ id: i.id, approve })"
+              />
+              <AlignmentKindWordRow
+                v-else
+                :item="i"
+                :classes="ontology.data.value?.entity_types ?? []"
+                :busy="alignmentKindWordAction.isPending.value && alignmentKindWordAction.variables.value?.kindWord === i.kind_word"
+                :can-decide="canDecide"
+                @decide="(cls: string | null) => alignmentKindWordAction.mutate({ kindWord: i.kind_word, cls })"
+              />
+            </template>
+          </div>
+        </template>
 
-          <template v-if="active === 'merges'">
+        <!-- 公理违规（violations）：检查按钮在这一档里，报告留在按钮旁边 -->
+        <template v-if="active === 'violations'">
+          <div class="space-y-3">
+            <div class="flex items-center gap-3">
+              <el-button
+                size="small"
+                :disabled="runCheck.isPending.value"
+                @click="runCheck.mutate()"
+              >
+                {{ runCheck.isPending.value ? S.review.checking : S.review.runCheck }}
+              </el-button>
+              <span v-if="runCheck.data.value" class="text-sub text-ink-2">
+                <!-- 三种结果说三句话。**`found` 不是要报的数**：
+                    重跑会把已裁决的那些重新算出来 -->
+                {{
+                  runCheck.data.value.predicates_with_axioms === 0
+                    ? S.review.checkNoAxioms
+                    : runCheck.data.value.inserted > 0
+                      ? S.review.checkFound(runCheck.data.value.inserted)
+                      : runCheck.data.value.found > 0
+                        ? S.review.checkNothingNew
+                        : S.review.checkClean(runCheck.data.value.edges)
+                }}
+              </span>
+            </div>
             <div
-              v-if="counts.merges === 0"
+              v-if="counts.violations === 0 && !runCheck.data.value"
               class="rounded-card border border-line bg-card p-8 text-center text-body text-ink-2"
             >
-              {{ S.review.historyEmpty }}
+              {{ S.review.checkNeverRun }}
             </div>
-            <div v-else class="space-y-2">
-              <MergeRow
-                v-for="m in mergeItems"
-                :key="m.id"
-                :merge="m"
-                :busy="revert.isPending.value && revert.variables.value === m.id"
+            <div
+              v-for="v in violationItems"
+              :key="v.id"
+              :class="v.id === itemParam ? 'rounded-card ring-1' : ''"
+              :style="v.id === itemParam ? { boxShadow: '0 0 0 1px var(--color-warning)' } : undefined"
+            >
+              <ViolationRow
+                :violation="v"
+                :busy="violationAction.isPending.value && violationAction.variables.value?.id === v.id"
                 :can-decide="canDecide"
-                @revert="revert.mutate(m.id)"
+                @decide="
+                  (resolution: ViolationResolution, opts?: DecideOpts) =>
+                    violationAction.mutate({ id: v.id, resolution, opts })
+                "
+                @duplicates="select('duplicates')"
+                @ontology="router.push('/kb/' + kbId + '/ontology')"
               />
             </div>
-          </template>
+          </div>
+        </template>
 
-          <template v-if="active === 'decisions'">
-            <Loading v-if="history.isLoading.value" />
-            <div
-              v-else-if="historyTotal === 0"
-              class="rounded-card border border-line bg-card p-8 text-center text-body text-ink-2"
-            >
-              {{ S.review.decisionsEmpty }}
-            </div>
-            <div v-else class="space-y-2">
-              <DecisionRow v-for="e in historyEvents" :key="e.id" :e="e" />
-            </div>
-          </template>
+        <!-- agent（0025）：建议等人答，自动裁的可撤 -->
+        <template v-if="active === 'agent'">
+          <div
+            v-if="agentRows === 0"
+            class="rounded-card border border-line bg-card p-8 text-center text-body text-ink-2"
+          >
+            {{ S.review.agentEmpty }}
+          </div>
+          <div v-else class="space-y-2">
+            <AgentRow
+              v-for="d in agentItems"
+              :key="d.id"
+              :d="d"
+              :busy="answerAgent.isPending.value && answerAgent.variables.value?.id === d.id"
+              :can-decide="canDecide"
+              @answer="
+                (action: 'merge' | 'keep' | 'revert', rationale?: string) =>
+                  answerAgent.mutate({ id: d.id, action, rationale })
+              "
+            />
+          </div>
+        </template>
 
-          <!-- 单一分页 -->
-          <UPager
-            v-if="active !== 'overview'"
-            :total="pagedTotal"
-            :page-size="PAGE_SIZE[active as Exclude<Sel, 'overview'>]"
-            :page="page"
-            @page="(p: number) => (page = p)"
-          />
-        </section>
-      </div>
+        <template v-if="active === 'merges'">
+          <div
+            v-if="counts.merges === 0"
+            class="rounded-card border border-line bg-card p-8 text-center text-body text-ink-2"
+          >
+            {{ S.review.historyEmpty }}
+          </div>
+          <div v-else class="space-y-2">
+            <MergeRow
+              v-for="m in mergeItems"
+              :key="m.id"
+              :merge="m"
+              :busy="revert.isPending.value && revert.variables.value === m.id"
+              :can-decide="canDecide"
+              @revert="revert.mutate(m.id)"
+            />
+          </div>
+        </template>
+
+        <template v-if="active === 'decisions'">
+          <Loading v-if="history.isLoading.value" />
+          <div
+            v-else-if="historyTotal === 0"
+            class="rounded-card border border-line bg-card p-8 text-center text-body text-ink-2"
+          >
+            {{ S.review.decisionsEmpty }}
+          </div>
+          <div v-else class="space-y-2">
+            <DecisionRow v-for="e in historyEvents" :key="e.id" :e="e" />
+          </div>
+        </template>
+
+        <!-- 单一分页 -->
+        <UPager
+          v-if="active !== 'overview'"
+          :total="pagedTotal"
+          :page-size="PAGE_SIZE[active as Exclude<Sel, 'overview'>]"
+          :page="page"
+          @page="(p: number) => (page = p)"
+        />
+      </section>
     </div>
   </div>
 </template>
+
+<style scoped lang="scss">
+/* 队列过滤条（reskin-b4）：UPill 的基态皮 .pill 在 utopia-pages.css（未分层，
+   恒压 tailwind utilities 层）——选中态的 primary-soft 底/主色深档字在这里补，
+   并一并压过 .pill:hover（免得悬停时选中片闪回 border 档）。bg-primary-soft
+   工具类同时留在选中元素上：w1-review spec 以它为选中锚（实际着色以本条为准，
+   未分层的 .pill 背景会压过 utilities 层的它） */
+.queue-pill.is-on,
+.queue-pill.is-on:hover {
+  color: var(--color-primary-text);
+  background: var(--color-primary-soft);
+}
+</style>

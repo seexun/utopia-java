@@ -1,7 +1,10 @@
 /* 审核队列各档的行（对照旧仓 Review.tsx / PendingFacts.tsx 的行组件，W2 写面全量
    迁入）：每档的裁决按钮组、理由框（0026）、批量勾选、agent 建议回答、闭合日期、
    对齐绑定表单。类型按档收窄；写按钮显隐由 canDecide（editor+，与服务端
-   require_kb(Role::Editor) 同口径）门控——403 兜底在 client 层。 */
+   require_kb(Role::Editor) 同口径）门控——403 兜底在 client 层。
+   reskin-b4 样式层（数据/接线零动）：行卡统一 hover neutral-soft（bg-fill 同源
+   令牌，URow 行 hover 同档反馈），置信度/来源（谁说的、勘误的文档）升为带
+   --cat-N 色点的 badge-soft 徽章（检索页来源色点同款取法，键稳定同色）。 */
 import { computed, defineComponent, ref, type PropType } from "vue";
 import type {
   AlignmentMarks,
@@ -33,6 +36,24 @@ import {
 
 /** 卡片页脚（旧仓 CARD_ACTIONS 逐字）：动作在左，「谁说的」推到右边 */
 const CARD_ACTIONS = "mt-3 flex flex-wrap items-center gap-2";
+
+/** 行卡皮（reskin-b4）：卡容器 + 行 hover neutral-soft。内距三档（p-4 大卡 /
+    p-3 密卡 / px-4 py-3 紧凑行）由各行列自行叠加 */
+const ROW_CARD =
+  "rounded-card border border-line bg-card transition-colors hover:bg-fill";
+
+/** 来源/置信度徽章的 cat 色点（reskin-b4，纯展示）：--cat-1..6 按行键稳定
+    轮转——同一来源/同一行跨重渲染、翻页不换色（检索页 srcCat 同款取法） */
+function catDot(key: string) {
+  let h = 0;
+  for (const ch of key) h = (h * 31 + (ch.codePointAt(0) ?? 0)) >>> 0;
+  return (
+    <span
+      class="h-1.5 w-1.5 shrink-0 rounded-full"
+      style={{ background: `var(--cat-${(h % 6) + 1})` }}
+    />
+  );
+}
 
 const ym = (iso: string | null) => (iso ? iso.slice(0, 7) : null);
 
@@ -116,10 +137,7 @@ export const DuplicateCard = defineComponent({
     const why = ref("");
     return () => (
       <div
-        class={[
-          "rounded-card border border-line bg-card p-4",
-          props.picked && "border-line-strong"
-        ]}
+        class={[ROW_CARD, "p-4", props.picked && "border-line-strong"]}
       >
         {/* 为什么是这一对，写在两边之前：等谁裁、类型对不对得上、agent 建议什么、凭什么说它们像 */}
         <div class="mb-3 flex flex-wrap items-center gap-3">
@@ -250,7 +268,7 @@ export const PendingFactRow = defineComponent({
           : null;
       const qualifiers = f.qualifiers ?? [];
       return (
-        <div class="rounded-card border border-line bg-card p-4">
+        <div class={[ROW_CARD, "p-4"]}>
           {/* 原句先出。它是人自己说的，判断的依据就是它 */}
           <p class="text-sub italic text-ink-2">“{sentence(f.quote)}”</p>
           <div class="mt-3 flex flex-wrap items-center gap-2">
@@ -317,14 +335,18 @@ export const PendingFactRow = defineComponent({
                 </el-button>
               </>
             )}
+            {/* 「谁说的」= 这条事实的来源（reskin-b4）：cat 色点按提出者稳定轮转 */}
             {f.proposed_by_name && (
-              <span class="ml-auto truncate text-aux text-ink-2">
-                {f.proposed_token_name
-                  ? S.review.pendingSaidVia(
-                      f.proposed_by_name,
-                      f.proposed_token_name
-                    )
-                  : S.review.pendingSaidBy(f.proposed_by_name)}
+              <span class="ml-auto flex min-w-0 shrink-0 items-center gap-1 text-aux text-ink-2">
+                {catDot(f.proposed_by_name)}
+                <span class="truncate">
+                  {f.proposed_token_name
+                    ? S.review.pendingSaidVia(
+                        f.proposed_by_name,
+                        f.proposed_token_name
+                      )
+                    : S.review.pendingSaidBy(f.proposed_by_name)}
+                </span>
               </span>
             )}
           </div>
@@ -347,7 +369,7 @@ export const FactRow = defineComponent({
     const fact = props.fact;
     const range = dateRange(fact.valid_from, fact.valid_to);
     return () => (
-      <div class="rounded-card border border-line bg-card p-4">
+      <div class={[ROW_CARD, "p-4"]}>
         <div class="flex flex-wrap items-center gap-2">
           <span class="text-body font-medium text-ink">
             {fact.subject_name}
@@ -369,7 +391,9 @@ export const FactRow = defineComponent({
           {range && (
             <span class="tabular-nums text-sub text-ink-2">({range})</span>
           )}
-          <span class="ml-auto shrink-0 tabular-nums text-sub text-ink-2">
+          {/* 置信度徽章（reskin-b4）：cat 色点按行 id 稳定轮转 */}
+          <span class="badge-soft badge-soft-info ml-auto shrink-0 tabular-nums">
+            {catDot(fact.id)}
             {S.review.confidence(Math.round(fact.confidence * 100))}
           </span>
         </div>
@@ -420,7 +444,7 @@ export const UnconfirmedRow = defineComponent({
     const closeParsed = computed(() => parseDateInput(closeAt.value.trim()));
     const range = dateRange(fact.valid_from, fact.valid_to);
     return () => (
-      <div class="rounded-card border border-line bg-card p-4">
+      <div class={[ROW_CARD, "p-4"]}>
         <div class="flex flex-wrap items-center gap-2">
           <span class="text-body font-medium text-ink">
             {fact.subject_name}
@@ -506,7 +530,7 @@ export const ConflictRow = defineComponent({
     // 写多少位就是多少精度（time.ts）：「2023-06」闭合在那个月，不编一个 1 日
     const closeParsed = computed(() => parseDateInput(closeAt.value.trim()));
     return () => (
-      <div class="rounded-card border border-line bg-card p-4">
+      <div class={[ROW_CARD, "p-4"]}>
         <div class="flex flex-wrap items-center gap-2">
           <span class="text-body font-medium text-ink">{c.old_subject}</span>
           <span class="text-sub text-ink-2">— {c.predicate_label} →</span>
@@ -618,7 +642,7 @@ export const DefectRow = defineComponent({
         ? (((d.detail as Record<string, unknown>).rules as unknown[]) ?? [])
         : [];
     return () => (
-      <div class="rounded-card border border-line bg-card p-3">
+      <div class={[ROW_CARD, "p-3"]}>
         <div class="flex flex-wrap items-baseline gap-2">
           <span class="text-body text-danger">{what}</span>
           {d.subject_label && (
@@ -763,7 +787,7 @@ export const AlignmentPhraseRow = defineComponent({
     // 状态属性下单个日期标什么没有预选：人选了才能绑
     const unread = computed(() => state.value && marks.value === null);
     return () => (
-      <div class="rounded-card border border-line bg-card p-3">
+      <div class={[ROW_CARD, "p-3"]}>
         <div class="flex flex-wrap items-baseline gap-2">
           <span class="text-body text-ink">“{item.phrase}”</span>
           <span class="text-sub text-ink-2">
@@ -916,7 +940,7 @@ export const AlignmentRuleRow = defineComponent({
               item.object_is_value ? "value" : (item.object_class ?? "?")
             }`;
       return (
-        <div class="rounded-card border border-line bg-card p-3">
+        <div class={[ROW_CARD, "p-3"]}>
           <div class="text-body font-medium">{shape}</div>
           <div class="mt-1 text-sub">
             {S.review.alignmentRuleImplies(
@@ -977,7 +1001,7 @@ export const AlignmentKindWordRow = defineComponent({
     const second = item.votes?.second ?? null;
     const cls = ref<string>(first ?? second ?? "");
     return () => (
-      <div class="rounded-card border border-line bg-card p-3">
+      <div class={[ROW_CARD, "p-3"]}>
         <div class="flex flex-wrap items-baseline gap-2">
           <span class="text-body text-ink">{item.kind_word}</span>
           {item.words.length > 0 && (
@@ -1055,8 +1079,12 @@ export const ErrataRow = defineComponent({
           : S.review.errataAdd;
     const p = item.proposed;
     return () => (
-      <div class="rounded-card border border-line bg-card p-3">
-        <div class="text-sub text-ink-2">{item.document}</div>
+      <div class={[ROW_CARD, "p-3"]}>
+        {/* 来源文档（reskin-b4）：cat 色点按文档名稳定轮转 */}
+        <div class="flex items-center gap-1 text-sub text-ink-2">
+          {catDot(item.document)}
+          <span class="truncate">{item.document}</span>
+        </div>
         <div class="mt-1 text-body">
           <span class="font-medium">{verb}</span>{" "}
           {p ? `${p.subject} —${p.property}→ ${p.object}` : ""}
@@ -1160,7 +1188,7 @@ export const ViolationRow = defineComponent({
                 { id: v.right_fact, text: v.right_text }
               ];
       return (
-        <div class="rounded-card border border-line bg-card p-3">
+        <div class={[ROW_CARD, "p-3"]}>
           <div class="flex flex-wrap items-baseline gap-2">
             <span class="text-body text-warning">{what}</span>
             {v.predicate && (
@@ -1258,7 +1286,7 @@ const ContradictionRow = defineComponent({
       const parsed = parseDateInput(closeAt.value.trim());
       return (
         <div
-          class="rounded-card border border-line bg-card p-3"
+          class={[ROW_CARD, "p-3"]}
           style={{
             borderColor:
               "color-mix(in srgb, var(--color-warning) 35%, transparent)"
@@ -1410,7 +1438,7 @@ export const AgentRow = defineComponent({
       () => precedents.value.length > 0 || trace.value.length > 0
     );
     return () => (
-      <div class="rounded-card border border-line bg-card px-4 py-3">
+      <div class={[ROW_CARD, "px-4 py-3"]}>
         <div class="flex items-center gap-3">
           <UStatus tone={AGENT_ACTION_TONE[d.action] as never}>
             {S.review.agentActions[d.action]}
@@ -1418,7 +1446,9 @@ export const AgentRow = defineComponent({
           <span class="min-w-0 truncate text-body text-ink-2">
             {d.left ?? "?"} ≟ {d.right ?? "?"}
           </span>
-          <span class="shrink-0 tabular-nums text-sub text-ink-2">
+          {/* 置信度徽章（reskin-b4）：cat 色点按行 id 稳定轮转 */}
+          <span class="badge-soft badge-soft-info shrink-0 tabular-nums">
+            {catDot(d.id)}
             {Math.round(d.confidence * 100)}%
           </span>
           <UStatus
@@ -1553,7 +1583,7 @@ export const MergeRow = defineComponent({
   setup(props, { emit }) {
     const m = props.merge;
     return () => (
-      <div class="flex items-center gap-3 rounded-card border border-line bg-card px-4 py-3">
+      <div class={[ROW_CARD, "flex items-center gap-3 px-4 py-3"]}>
         <div class="min-w-0 flex-1">
           <div class="truncate text-body text-ink-2">
             <span>{m.source_name}</span>
@@ -1625,7 +1655,7 @@ export const DecisionRow = defineComponent({
     return () => {
       const d = e.detail as Record<string, unknown>;
       return (
-        <div class="flex items-center gap-3 rounded-card border border-line bg-card px-4 py-3">
+        <div class={[ROW_CARD, "flex items-center gap-3 px-4 py-3"]}>
           <UChip tone={(DECISION_TONE[e.action] ?? "neutral") as never}>
             {S.review.decisionActions[
               e.action as keyof typeof S.review.decisionActions
@@ -1639,7 +1669,8 @@ export const DecisionRow = defineComponent({
             <span class="min-w-0 truncate text-sub text-ink-2">“{d.why}”</span>
           )}
           {typeof d.confidence === "number" && (
-            <span class="shrink-0 tabular-nums text-sub text-ink-2">
+            <span class="badge-soft badge-soft-info shrink-0 tabular-nums">
+              {catDot(e.id)}
               {Math.round(d.confidence * 100)}%
             </span>
           )}

@@ -1,25 +1,68 @@
 /* 审核总览（对照旧仓 pages/ReviewOverview.tsx 逐行）：等着办的 / 办过的 /
    agent 做过的 / 库的成色。数据全来自 GET /review/summary，这里只画，不算。
-   「去处理」的跳转由父组件接（emit）。 */
+   「去处理」的跳转由父组件接（emit）。
+   reskin-b4 样式层（数据/跳转零动）：统计卡复用文库统计卡语言（.stat-grid +
+   icon 圆盘 --*-soft 底/深档字 + 大数），段头升 GroupLabel（kit 原件，计数尾随）。 */
 import { defineComponent, type PropType } from "vue";
 import { RouterLink } from "vue-router";
 import type { ReviewSummary } from "@/api/knowledge/types";
 import { S } from "@/i18n";
-import { UChip } from "@/components/knowledge/kit";
+import { UChip, GroupLabel } from "@/components/knowledge/kit";
+import ClockIcon from "~icons/lucide/clock";
+import CopyIcon from "~icons/lucide/copy";
+import TriangleAlertIcon from "~icons/lucide/triangle-alert";
+import CircleDashedIcon from "~icons/lucide/circle-dashed";
+import GaugeIcon from "~icons/lucide/gauge";
+import ScaleIcon from "~icons/lucide/scale";
+import BoxesIcon from "~icons/lucide/boxes";
+import Link2Icon from "~icons/lucide/link-2";
+import BotIcon from "~icons/lucide/bot";
+import HistoryIcon from "~icons/lucide/history";
+import CheckCheckIcon from "~icons/lucide/check-check";
+import Undo2Icon from "~icons/lucide/undo-2";
+import SwordsIcon from "~icons/lucide/swords";
 
 /** 总览里能点进去的七档 */
 export type WaitingQueue = keyof ReviewSummary["waiting"];
 
-/** 七档队列在总览里的顺序与左栏一致 */
-const WAITING: { key: WaitingQueue; label: string }[] = [
-  { key: "pending", label: S.review.railPending },
-  { key: "duplicates", label: S.review.railDuplicates },
-  { key: "conflicts", label: S.review.railConflicts },
-  { key: "unconfirmed", label: S.review.railUnconfirmed },
-  { key: "lowconf", label: S.review.railLowConfidence },
-  { key: "violations", label: S.review.railViolations },
-  { key: "defects", label: S.review.railDefects },
-  { key: "alignment", label: S.review.railAlignment }
+/** icon 圆盘的软底/深档字档位（文库统计卡 .lib-stat-icon 的 is-* 同语言，
+    令牌直引） */
+type StatTone = "primary" | "success" | "warning" | "danger" | "neutral";
+const STAT_TONE: Record<StatTone, { color: string; background: string }> = {
+  primary: {
+    color: "var(--color-primary-text)",
+    background: "var(--color-primary-soft)"
+  },
+  success: {
+    color: "var(--color-success-text)",
+    background: "var(--color-success-soft)"
+  },
+  warning: {
+    color: "var(--color-warning-text)",
+    background: "var(--color-warning-soft)"
+  },
+  danger: {
+    color: "var(--color-danger-text)",
+    background: "var(--color-danger-soft)"
+  },
+  neutral: { color: "var(--color-ink-2)", background: "var(--color-neutral-soft)" }
+};
+
+/** 七档队列在总览里的顺序与队列过滤条一致；各配 icon 与色档（纯展示） */
+const WAITING: {
+  key: WaitingQueue;
+  label: string;
+  icon: typeof ClockIcon;
+  tone: StatTone;
+}[] = [
+  { key: "pending", label: S.review.railPending, icon: ClockIcon, tone: "primary" },
+  { key: "duplicates", label: S.review.railDuplicates, icon: CopyIcon, tone: "primary" },
+  { key: "conflicts", label: S.review.railConflicts, icon: TriangleAlertIcon, tone: "warning" },
+  { key: "unconfirmed", label: S.review.railUnconfirmed, icon: CircleDashedIcon, tone: "neutral" },
+  { key: "lowconf", label: S.review.railLowConfidence, icon: GaugeIcon, tone: "warning" },
+  { key: "violations", label: S.review.railViolations, icon: ScaleIcon, tone: "danger" },
+  { key: "defects", label: S.review.railDefects, icon: BoxesIcon, tone: "warning" },
+  { key: "alignment", label: S.review.railAlignment, icon: Link2Icon, tone: "primary" }
 ];
 
 /** 从某个时刻到现在整几天；不满一天算 0 */
@@ -30,25 +73,38 @@ function daysSince(iso: string): number {
   );
 }
 
-/** 一格统计：大数在上，说明在下。卡片本身不是控件——想进那一档，点下面的句子 */
+/** 一格统计（文库统计卡语言）：icon 圆盘 + 大数 + 说明。卡片本身不是控件——
+    想进那一档，点下面的句子 */
 function Stat(props: {
   value: number | string;
   label: string;
   note?: string | null;
   action?: { label: string; to?: string };
+  icon?: typeof ClockIcon;
+  tone?: StatTone;
 }) {
   return (
-    <div class="stat-card">
-      <div class="stat-value">{props.value}</div>
-      <div class="stat-label">{props.label}</div>
-      {props.note && <div class="text-aux text-ink-2">{props.note}</div>}
-      {props.action && props.action.to && (
-        <div class="mt-2">
-          <RouterLink class="link-inline text-sub" to={props.action.to}>
-            {props.action.label}
-          </RouterLink>
-        </div>
+    <div class="stat-card flex items-center gap-3.5">
+      {props.icon && (
+        <span
+          class="flex size-[42px] shrink-0 items-center justify-center rounded-full"
+          style={STAT_TONE[props.tone ?? "neutral"]}
+        >
+          <props.icon width={20} height={20} />
+        </span>
       )}
+      <div class="min-w-0">
+        <div class="stat-value">{props.value}</div>
+        <div class="stat-label">{props.label}</div>
+        {props.note && <div class="text-aux text-ink-2">{props.note}</div>}
+        {props.action && props.action.to && (
+          <div class="mt-2">
+            <RouterLink class="link-inline text-sub" to={props.action.to}>
+              {props.action.label}
+            </RouterLink>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -109,9 +165,9 @@ export const ReviewOverview = defineComponent({
         <div class="space-y-8">
           {/* 等着办的 */}
           <section>
-            <div class="mb-3 text-sub font-medium text-ink-2">
+            <GroupLabel class="mb-3" count={waitingTotal}>
               {S.review.overviewWaiting}
-            </div>
+            </GroupLabel>
             {waitingTotal === 0 ? (
               <div class="rounded-card border border-line bg-card p-8 text-center text-body text-ink-2">
                 {S.review.overviewAllClear}
@@ -125,6 +181,8 @@ export const ReviewOverview = defineComponent({
                       key={w.key}
                       value={q.count}
                       label={w.label}
+                      icon={w.icon}
+                      tone={w.tone}
                       note={
                         q.oldest_at
                           ? S.review.overviewOldest(daysSince(q.oldest_at))
@@ -143,18 +201,22 @@ export const ReviewOverview = defineComponent({
 
           {/* 办过的 */}
           <section>
-            <div class="mb-3 text-sub font-medium text-ink-2">
+            <GroupLabel class="mb-3" count={decided.last_30d.total}>
               {S.review.overviewDecided}
-            </div>
+            </GroupLabel>
             <div class="grid grid-cols-2 gap-3">
               <Stat
                 value={decided.last_7d.total}
                 label={S.review.overviewLast7}
+                icon={HistoryIcon}
+                tone="primary"
                 note={S.review.overviewAutomatic(decided.last_7d.automatic)}
               />
               <Stat
                 value={decided.last_30d.total}
                 label={S.review.overviewLast30}
+                icon={HistoryIcon}
+                tone="neutral"
                 note={S.review.overviewAutomatic(decided.last_30d.automatic)}
               />
             </div>
@@ -208,9 +270,9 @@ export const ReviewOverview = defineComponent({
 
           {/* agent 做过的（0025）：开关关着且什么都没做过时只说一句去哪里打开 */}
           <section>
-            <div class="mb-3 text-sub font-medium text-ink-2">
+            <GroupLabel class="mb-3" count={agent.open}>
               {S.review.overviewAgent}
-            </div>
+            </GroupLabel>
             {!props.governance && (
               <p class="mb-3 text-sub text-ink-2">
                 {S.review.overviewAgentOff}{" "}
@@ -236,6 +298,8 @@ export const ReviewOverview = defineComponent({
                 <Stat
                   value={agent.open}
                   label={S.review.overviewAgentOpen}
+                  icon={BotIcon}
+                  tone="primary"
                   action={
                     agent.open > 0
                       ? { label: S.review.overviewOpen, to: "?queue=agent" }
@@ -245,16 +309,22 @@ export const ReviewOverview = defineComponent({
                 <Stat
                   value={agent.last_7d.applied}
                   label={S.review.overviewAgentApplied}
+                  icon={BotIcon}
+                  tone="success"
                   note={S.review.overviewLast7}
                 />
                 <Stat
                   value={agent.last_30d.accepted}
                   label={S.review.overviewAgentAccepted}
+                  icon={CheckCheckIcon}
+                  tone="success"
                   note={S.review.overviewAgentOverridden(agent.last_30d.overridden)}
                 />
                 <Stat
                   value={agent.last_30d.reverted}
                   label={S.review.overviewAgentReverted}
+                  icon={Undo2Icon}
+                  tone="neutral"
                   note={S.review.overviewLast30}
                 />
               </div>
@@ -263,9 +333,9 @@ export const ReviewOverview = defineComponent({
 
           {/* 库的成色 */}
           <section>
-            <div class="mb-3 text-sub font-medium text-ink-2">
+            <GroupLabel class="mb-3" count={health.facts}>
               {S.review.overviewHealth}
-            </div>
+            </GroupLabel>
             <p class="mb-3 text-sub text-ink-2">
               {S.review.overviewFacts(health.facts)}
             </p>
@@ -273,16 +343,22 @@ export const ReviewOverview = defineComponent({
               <Stat
                 value={health.low_confidence}
                 label={S.review.railLowConfidence}
+                icon={GaugeIcon}
+                tone="warning"
                 note={share(health.low_confidence)}
               />
               <Stat
                 value={health.unconfirmed}
                 label={S.review.railUnconfirmed}
+                icon={CircleDashedIcon}
+                tone="neutral"
                 note={share(health.unconfirmed)}
               />
               <Stat
                 value={health.contested}
                 label={S.review.overviewContested}
+                icon={SwordsIcon}
+                tone="danger"
                 note={share(health.contested)}
               />
             </div>
