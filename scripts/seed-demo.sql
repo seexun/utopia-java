@@ -13,14 +13,15 @@
 -- 幂等：先按 kb_id / 固定 uuid DELETE 再 INSERT，可重跑。
 -- 拆卸：scripts/teardown-demo.sql（按 kb_id 级联清 + 非 kb 表按固定 uuid 清）。
 -- 注意：audit_events 是 append-only（触发器禁 UPDATE/DELETE），本脚本对它
---       ON CONFLICT (id) DO NOTHING；teardown 不删它（残行无 FK，库删后不可见）。
+--       ON CONFLICT (id) DO NOTHING；teardown 以 superuser 停触发器清演示库的
+--       审计行再恢复（库 uuid 固定，不清则残行在重建后的裁决史里继续可见）。
 --
 -- 确定性 UUID：全部字面量，形如 0190d3e0-0000-7d5a-8000-00000000nnnn
 -- （uuidv7 形态：版本位 7、变体位 8；尾部 nnnn 为十六进制流水号）。
 --
 -- 流水号总账（其余行内注释就地标注）：
 --   0001 kb                    0aa1 kb_members
---   0002..0008 entity_types    000a..0012 relation_types
+--   0002..0008 entity_types    000a..0014 relation_types（0013/0014 为待审谓语落库补）
 --   0020..0032 entities        0040/0041 documents  0042..0044 document_versions
 --   0050..0055 chunks          0060..0070 known_as 事实
 --   0071..0086 断言事实         0087..0089/008c 开放陈述
@@ -184,7 +185,14 @@ INSERT INTO relation_types
     ('0190d3e0-0000-7d5a-8000-000000000011', '0190d3e0-0000-7d5a-8000-000000000001', 'revenue',     '营收',     'state', false, false, 'attribute', 'number', '亿元',
      false, false, false, false, '年度营业收入（亿元）', '2026-11-08T09:02:07+08:00', '2026-11-08T09:02:07+08:00'),
     ('0190d3e0-0000-7d5a-8000-000000000012', '0190d3e0-0000-7d5a-8000-000000000001', 'founded',     '成立于',   'eternal', false, false, 'attribute', 'date', NULL,
-     false, false, false, false, '注册成立年份', '2026-11-08T09:02:08+08:00', '2026-11-08T09:02:08+08:00');
+     false, false, false, false, '注册成立年份', '2026-11-08T09:02:08+08:00', '2026-11-08T09:02:08+08:00'),
+    -- 待审谓语落库补（收尾冲刺缺口 3）：待审 00a1/00a2 原先只有 proposed_predicate
+    -- 没有 relation_types 行——队列/裁决快照的谓语 join 不上，渲染面成问号。
+    -- 固定 uuid 尾号 0013/0014，V0000 不造 relation_types，无冲突。
+    ('0190d3e0-0000-7d5a-8000-000000000013', '0190d3e0-0000-7d5a-8000-000000000001', 'co_builds',  '共建',   'state', false, false, 'relation', NULL, NULL,
+     false, true,  false, true,  '共建联合实验室/联合机构（公司间，对称）', '2026-11-08T09:02:09+08:00', '2026-11-08T09:02:09+08:00'),
+    ('0190d3e0-0000-7d5a-8000-000000000014', '0190d3e0-0000-7d5a-8000-000000000001', 'expands_at', '扩产',   'state', false, false, 'relation', NULL, NULL,
+     false, false, true,  true,  '在既有基地/城市扩产产能（公司 → 落点）', '2026-11-08T09:02:10+08:00', '2026-11-08T09:02:10+08:00');
 
 -- ceo_of ⊑ works_at（子属性 → 推导链）
 UPDATE relation_types SET sub_property_of = '0190d3e0-0000-7d5a-8000-00000000000b'
@@ -200,7 +208,9 @@ INSERT INTO relation_type_domains (relation_type_id, entity_type_id) VALUES
     ('0190d3e0-0000-7d5a-8000-000000000010', '0190d3e0-0000-7d5a-8000-000000000005'),  -- located_in: 研发基地
     ('0190d3e0-0000-7d5a-8000-000000000010', '0190d3e0-0000-7d5a-8000-000000000002'),  --   与公司
     ('0190d3e0-0000-7d5a-8000-000000000011', '0190d3e0-0000-7d5a-8000-000000000002'),  -- 营收: 公司
-    ('0190d3e0-0000-7d5a-8000-000000000012', '0190d3e0-0000-7d5a-8000-000000000002');  -- 成立: 公司
+    ('0190d3e0-0000-7d5a-8000-000000000012', '0190d3e0-0000-7d5a-8000-000000000002'),  -- 成立: 公司
+    ('0190d3e0-0000-7d5a-8000-000000000013', '0190d3e0-0000-7d5a-8000-000000000002'),  -- 共建: 公司
+    ('0190d3e0-0000-7d5a-8000-000000000014', '0190d3e0-0000-7d5a-8000-000000000002');  -- 扩产: 公司
 
 INSERT INTO relation_type_ranges (relation_type_id, entity_type_id) VALUES
     ('0190d3e0-0000-7d5a-8000-00000000000b', '0190d3e0-0000-7d5a-8000-000000000002'),  -- works_at: 公司
@@ -210,7 +220,9 @@ INSERT INTO relation_type_ranges (relation_type_id, entity_type_id) VALUES
     ('0190d3e0-0000-7d5a-8000-00000000000f', '0190d3e0-0000-7d5a-8000-000000000002'),  -- supplies_to: 公司
     ('0190d3e0-0000-7d5a-8000-000000000010', '0190d3e0-0000-7d5a-8000-000000000006'),  -- located_in: 城市
     ('0190d3e0-0000-7d5a-8000-000000000011', '0190d3e0-0000-7d5a-8000-000000000007'),  -- 营收: 指标（值事实挂口径概念，画边）
-    ('0190d3e0-0000-7d5a-8000-000000000012', '0190d3e0-0000-7d5a-8000-000000000008');  -- 成立: 维度（年份口径）
+    ('0190d3e0-0000-7d5a-8000-000000000012', '0190d3e0-0000-7d5a-8000-000000000008'),  -- 成立: 维度（年份口径）
+    ('0190d3e0-0000-7d5a-8000-000000000013', '0190d3e0-0000-7d5a-8000-000000000002'),  -- 共建: 公司
+    ('0190d3e0-0000-7d5a-8000-000000000014', '0190d3e0-0000-7d5a-8000-000000000006');  -- 扩产: 城市
 
 -- 两对 disjoint：人物 ⊥ 公司（双向落行，本体视图按 a_id 读）
 INSERT INTO entity_type_disjoint (kb_id, a_id, b_id) VALUES
@@ -681,12 +693,25 @@ UPDATE pending_facts p
   FROM chunks c
  WHERE c.id = '0190d3e0-0000-7d5a-8000-000000000054'
    AND p.id = '0190d3e0-0000-7d5a-8000-0000000000a0';
+-- 时间词补 char_start/char_end（收尾冲刺缺口 2）：PendingService.confirmOpen 逐条
+-- 校验 text+char_start（缺了 422 time_word_shape），timeMentions.record 落
+-- time_mentions(char_start)；偏移按 chunks.text 实算码点（与 strpos/locate 同基）。
+UPDATE pending_facts p
+   SET time_words = jsonb_build_array(jsonb_build_object(
+           'text', '2025年3月',
+           'char_start', strpos(c.text, '2025年3月') - 1,
+           'char_end',   strpos(c.text, '2025年3月') - 1 + char_length('2025年3月'),
+           'role', 'when'))
+  FROM chunks c
+ WHERE c.id = '0190d3e0-0000-7d5a-8000-000000000054'
+   AND p.id = '0190d3e0-0000-7d5a-8000-0000000000a0';
 
 INSERT INTO pending_facts
-    (id, kb_id, subject_id, object_id, phrase, proposed_predicate,
+    (id, kb_id, subject_id, predicate_id, object_id, phrase, proposed_predicate,
      confidence, chunk_id, time_words, quote_start, quote_end, created_at)
 VALUES ('0190d3e0-0000-7d5a-8000-0000000000a1', '0190d3e0-0000-7d5a-8000-000000000001',
-     '0190d3e0-0000-7d5a-8000-000000000020', '0190d3e0-0000-7d5a-8000-000000000023',
+     '0190d3e0-0000-7d5a-8000-000000000020', '0190d3e0-0000-7d5a-8000-000000000013',
+     '0190d3e0-0000-7d5a-8000-000000000023',
      '共建', '共建', 0.7, '0190d3e0-0000-7d5a-8000-000000000054',
      '[{"text": "首期"}]'::jsonb, 0, 0, '2026-11-08T09:20:01+08:00');
 UPDATE pending_facts p
@@ -696,13 +721,23 @@ UPDATE pending_facts p
   FROM chunks c
  WHERE c.id = '0190d3e0-0000-7d5a-8000-000000000054'
    AND p.id = '0190d3e0-0000-7d5a-8000-0000000000a1';
+UPDATE pending_facts p
+   SET time_words = jsonb_build_array(jsonb_build_object(
+           'text', '首期',
+           'char_start', strpos(c.text, '首期') - 1,
+           'char_end',   strpos(c.text, '首期') - 1 + char_length('首期'),
+           'role', 'when'))
+  FROM chunks c
+ WHERE c.id = '0190d3e0-0000-7d5a-8000-000000000054'
+   AND p.id = '0190d3e0-0000-7d5a-8000-0000000000a1';
 
 INSERT INTO pending_facts
-    (id, kb_id, subject_id, object_id, phrase, proposed_predicate,
+    (id, kb_id, subject_id, predicate_id, object_id, phrase, proposed_predicate,
      valid_from, valid_from_precision, confidence, chunk_id, time_words,
      quote_start, quote_end, created_at)
 VALUES ('0190d3e0-0000-7d5a-8000-0000000000a2', '0190d3e0-0000-7d5a-8000-000000000001',
-     '0190d3e0-0000-7d5a-8000-000000000021', '0190d3e0-0000-7d5a-8000-00000000002e',
+     '0190d3e0-0000-7d5a-8000-000000000021', '0190d3e0-0000-7d5a-8000-000000000014',
+     '0190d3e0-0000-7d5a-8000-00000000002e',
      '扩产', '扩产', '2026-03-01T00:00:00+00:00', 'month', 0.64,
      '0190d3e0-0000-7d5a-8000-000000000052', '[{"text": "2026年3月前"}]'::jsonb,
      0, 0, '2026-11-08T09:20:02+08:00');
@@ -710,6 +745,15 @@ UPDATE pending_facts p
    SET quote_start = strpos(c.text, '蓝海能源计划于2026年3月前在成都扩产电芯产线') - 1,
        quote_end   = strpos(c.text, '蓝海能源计划于2026年3月前在成都扩产电芯产线') - 1
                  + char_length('蓝海能源计划于2026年3月前在成都扩产电芯产线')
+  FROM chunks c
+ WHERE c.id = '0190d3e0-0000-7d5a-8000-000000000052'
+   AND p.id = '0190d3e0-0000-7d5a-8000-0000000000a2';
+UPDATE pending_facts p
+   SET time_words = jsonb_build_array(jsonb_build_object(
+           'text', '2026年3月前',
+           'char_start', strpos(c.text, '2026年3月前') - 1,
+           'char_end',   strpos(c.text, '2026年3月前') - 1 + char_length('2026年3月前'),
+           'role', 'when'))
   FROM chunks c
  WHERE c.id = '0190d3e0-0000-7d5a-8000-000000000052'
    AND p.id = '0190d3e0-0000-7d5a-8000-0000000000a2';
@@ -945,40 +989,53 @@ INSERT INTO personal_tokens
      'utp_pat_de160a01', 'read', NULL, NULL,
      '2026-11-15T07:45:00+08:00', '2026-11-08T12:00:00+08:00');
 
+-- detail 形状对齐真实写路径（收尾冲刺缺口 1）——DecisionRow 是消费面：
+--   fact.*    → ReviewWriteController.factSnapshot：subject/predicate/object/confidence
+--               （predicate 取 relation_types.label；why 是 0026 的裁决理由句）
+--   fact.time_corrected → 同上四要素 + valid_to；note 保留（GraphService
+--               time_corrected_targets 读 detail->>'note'）
+--   review.*  → decide()：left/right/score/why（target_kind='review'，target=审核对 id）
+--   mapping.decided / inference.materialized → 各自真实 detail 键（不在裁决史 LIKE 集，
+--               仅对齐写路径形状）
 INSERT INTO audit_events
     (id, kb_id, actor_id, action, target_kind, target_id, detail, created_at) VALUES
     ('0190d3e0-0000-7d5a-8000-000000001000', '0190d3e0-0000-7d5a-8000-000000000001',
      (SELECT utopia_uuid FROM sys_user WHERE user_id = 1), 'fact.confirm', 'fact',
-     '0190d3e0-0000-7d5a-8000-000000000071', '{"note": "公告与工商档案互证"}'::jsonb,
+     '0190d3e0-0000-7d5a-8000-000000000071',
+     '{"subject": "林晚清", "predicate": "任职于", "object": "星辰智造", "confidence": 0.92, "why": "公告与工商档案互证"}'::jsonb,
      '2026-11-09T10:00:00+08:00'),
     ('0190d3e0-0000-7d5a-8000-000000001001', '0190d3e0-0000-7d5a-8000-000000000001',
      (SELECT utopia_uuid FROM sys_user WHERE user_id = 1), 'fact.confirm', 'fact',
-     '0190d3e0-0000-7d5a-8000-000000000078', '{"note": "双方官网新闻稿互证"}'::jsonb,
+     '0190d3e0-0000-7d5a-8000-000000000078',
+     '{"subject": "星辰智造", "predicate": "合作", "object": "蓝海能源", "confidence": 0.92, "why": "双方官网新闻稿互证"}'::jsonb,
      '2026-11-10T11:00:00+08:00'),
     ('0190d3e0-0000-7d5a-8000-000000001002', '0190d3e0-0000-7d5a-8000-000000000001',
      (SELECT utopia_uuid FROM sys_user WHERE user_id = 1), 'fact.time_corrected', 'fact',
      '0190d3e0-0000-7d5a-8000-000000000073',
-     '{"note": "以离职公告日 2024-06-30 为准（day）"}'::jsonb,
+     '{"subject": "沈亦舟", "predicate": "任职于", "object": "星辰智造", "confidence": 0.90, "valid_to": "2024-06-30", "note": "以离职公告日 2024-06-30 为准（day）"}'::jsonb,
      '2026-11-11T09:30:00+08:00'),
     ('0190d3e0-0000-7d5a-8000-000000001003', '0190d3e0-0000-7d5a-8000-000000000001',
      (SELECT utopia_uuid FROM sys_user WHERE user_id = 1), 'fact.reject', 'fact',
-     '0190d3e0-0000-7d5a-8000-000000000086', '{"note": "联席 CEO 传闻暂不采信，保留低置信度待证"}'::jsonb,
+     '0190d3e0-0000-7d5a-8000-000000000086',
+     '{"subject": "顾清源", "predicate": "出任CEO", "object": "星辰智造", "confidence": 0.62, "why": "联席 CEO 传闻暂不采信，保留低置信度待证"}'::jsonb,
      '2026-11-13T14:00:00+08:00'),
     ('0190d3e0-0000-7d5a-8000-000000001004', '0190d3e0-0000-7d5a-8000-000000000001',
-     (SELECT utopia_uuid FROM sys_user WHERE user_id = 1), 'review.merge', 'merge',
-     '0190d3e0-0000-7d5a-8000-0000000000b3', '{"reason": "同一主体注册改名"}'::jsonb,
+     (SELECT utopia_uuid FROM sys_user WHERE user_id = 1), 'review.merge', 'review',
+     '0190d3e0-0000-7d5a-8000-0000000000b2',
+     '{"left": "星辰智能装备", "right": "星辰智造", "score": 0.93, "why": "同一主体的注册改名：统一社会信用代码一致，公告与工商档案互证，并入现行名。"}'::jsonb,
      '2026-11-10T15:00:00+08:00'),
     ('0190d3e0-0000-7d5a-8000-000000001005', '0190d3e0-0000-7d5a-8000-000000000001',
-     (SELECT utopia_uuid FROM sys_user WHERE user_id = 1), 'mapping.confirmed', 'mapping',
-     '0190d3e0-0000-7d5a-8000-0000000000d0', '{"unit": "万台"}'::jsonb,
+     (SELECT utopia_uuid FROM sys_user WHERE user_id = 1), 'mapping.decided', 'concept_mapping',
+     '0190d3e0-0000-7d5a-8000-0000000000d0', '{"status": "confirmed"}'::jsonb,
      '2026-11-12T11:00:00+08:00'),
     ('0190d3e0-0000-7d5a-8000-000000001006', '0190d3e0-0000-7d5a-8000-000000000001',
-     (SELECT utopia_uuid FROM sys_user WHERE user_id = 1), 'mapping.confirmed', 'mapping',
-     '0190d3e0-0000-7d5a-8000-0000000000d1', '{"unit": "亿元"}'::jsonb,
+     (SELECT utopia_uuid FROM sys_user WHERE user_id = 1), 'mapping.decided', 'concept_mapping',
+     '0190d3e0-0000-7d5a-8000-0000000000d1', '{"status": "confirmed"}'::jsonb,
      '2026-11-12T11:00:01+08:00'),
     ('0190d3e0-0000-7d5a-8000-000000001007', '0190d3e0-0000-7d5a-8000-000000000001',
-     NULL, 'inference.materialized', 'kb',
-     '0190d3e0-0000-7d5a-8000-000000000001', '{"derived": 3, "rules": 4}'::jsonb,
+     NULL, 'inference.materialized', 'knowledge_base',
+     '0190d3e0-0000-7d5a-8000-000000000001',
+     '{"rules": 4, "edges": 3, "derived": 3, "inserted": 3, "invalidated": 0, "capped": 0}'::jsonb,
      '2026-11-08T09:16:10+08:00')
 ON CONFLICT (id) DO NOTHING;
 
@@ -1005,6 +1062,41 @@ BEGIN
          OR p.quote_end > char_length(c.text));
   IF bad > 0 THEN
     RAISE EXCEPTION 'seed-demo: % 条待审偏移越界，整个事务回滚', bad;
+  END IF;
+  -- 待审时间词：text 必须是分块原文子串，char_start/char_end 与实算偏移一致
+  --（confirmOpen 逐条校验 text+char_start——缺了确认 422 time_word_shape）
+  SELECT count(*) INTO bad FROM pending_facts p
+   JOIN chunks c ON c.id = p.chunk_id
+   CROSS JOIN LATERAL jsonb_array_elements(p.time_words) tw
+  WHERE p.kb_id = '0190d3e0-0000-7d5a-8000-000000000001'
+    AND (strpos(c.text, tw->>'text') = 0
+         OR (tw->>'char_start')::int IS NULL
+         OR (tw->>'char_start')::int <> strpos(c.text, tw->>'text') - 1
+         OR (tw->>'char_end')::int <> strpos(c.text, tw->>'text') - 1
+                                 + char_length(tw->>'text')
+         OR tw->>'role' IS NULL);
+  IF bad > 0 THEN
+    RAISE EXCEPTION 'seed-demo: % 条待审时间词偏移不实，整个事务回滚', bad;
+  END IF;
+  -- 待审行的谓语必须落在 relation_types（缺口 3：谓语 join 不上渲染面成问号）
+  SELECT count(*) INTO bad FROM pending_facts p
+   LEFT JOIN relation_types r ON r.id = p.predicate_id AND r.kb_id = p.kb_id
+  WHERE p.kb_id = '0190d3e0-0000-7d5a-8000-000000000001'
+    AND p.predicate_id IS NOT NULL AND r.id IS NULL;
+  IF bad > 0 THEN
+    RAISE EXCEPTION 'seed-demo: % 条待审谓语未落 relation_types，整个事务回滚', bad;
+  END IF;
+  -- 演示审计行（尾号 1000..1007）的 detail 必须是 DecisionRow 消费面的完整快照：
+  -- fact.* 四要素齐；review.* 有 left/right/score（只查本脚本固定行，不约束
+  -- 应用后续追加的行——聊天抽出的开放陈述确认时 predicate 本就可以是 null）
+  SELECT count(*) INTO bad FROM audit_events
+  WHERE id::text LIKE '0190d3e0-0000-7d5a-8000-00000000100%'
+    AND ((action LIKE 'fact.%' AND (NOT (detail ? 'subject') OR NOT (detail ? 'predicate')
+                                    OR NOT (detail ? 'object') OR NOT (detail ? 'confidence')))
+      OR (action LIKE 'review.%' AND (NOT (detail ? 'left') OR NOT (detail ? 'right')
+                                      OR NOT (detail ? 'score'))));
+  IF bad > 0 THEN
+    RAISE EXCEPTION 'seed-demo: % 条演示审计快照不完整，整个事务回滚', bad;
   END IF;
 END $$;
 

@@ -1,0 +1,34 @@
+== 1. 打开 http://localhost:80/ 并登录 admin/admin123 ==
+   ✓ 登录后离开登录页（http://localhost/kb/0190d3e0-0000-7d5a-8000-0000000000f2/graph）
+== 2. 待审核队列：谓语落库（无警示 chip）==
+   ✓ 待审行谓语 label「任职于」在（0a0 works_at）
+   ✓ 待审行谓语 label「扩产」在（0a2 expands_at）
+   ✓ 「本体里没有这个关系」警示 chip = 0（实测 0）
+   截图 t4-01-review-pending-predicate.png
+== 3. API 确认一条待审（共建 0a1）→ 断言 200 非 422 ==
+   ✓ confirm HTTP 200（实测 200）
+   ✓ confirm 回报 fact_id（01a1f49a-b5f3-7000-9e78-d5d15241e772）
+== 3b. UI 确认一条待审（扩产 0a2）==
+   ✓ 确认后无 422 报错文本
+   ✓ 扩举行已出队（确认 200 落库）
+   截图 t4-02-confirm-done.png
+== 4. 裁决史：无 undefined / 谓语非问号 / 置信度徽章在 ==
+   ✓ 裁决史无 undefined 字面
+   ✓ 裁决史无「— ? →」问号谓语
+   ✓ nod_confirmed 行「星辰智造 — 共建 → 天枢半导体」
+   ✓ nod_confirmed 行「蓝海能源 — 扩产 → 成都」（UI 确认）
+   ✓ fact.confirm 行宾语在（合作 → 蓝海能源）
+   ✓ 置信度徽章 70% 在（共建 0.7）
+   ✓ 置信度徽章 92% 在（fact.confirm 0.92）
+   ✓ 置信度徽章行 ≥5（实测 6）
+   ✓ history API 200（实测 200）
+   ✓ history API 数据层四要素全齐（残缺 0 条/7 条）
+   截图 t4-03-decisions-complete.png
+== 5. 本体页：relation_types 共建/扩产 落库 ==
+   ✓ 本体关系表含 共建/扩产
+   截图 t4-04-ontology-relations.png
+== 6. 图谱总览全链仍在 ==
+   ✓ 图谱画布在（canvas=8）
+   截图 t4-05-graph-after-confirm.png
+   ✓ console 零 error（实测 0）
+== 全链走查 ALL PASS ==
