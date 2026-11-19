@@ -345,7 +345,7 @@
   color: var(--color-ink-2);
   font-size: var(--text-aux);
 }
-.pill:hover { background: #e2e8f0; }
+.pill:hover { background: var(--color-neutral-soft); }
 .pill.is-on { color: var(--color-ink); }
 .pill.is-static { cursor: default; }
 .pill.is-static:hover {

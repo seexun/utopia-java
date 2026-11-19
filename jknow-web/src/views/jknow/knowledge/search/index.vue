@@ -325,8 +325,10 @@ function srcCat(documentId: string): string {
   font-variant-numeric: tabular-nums;
 }
 
-/* 引文：四行截断；命中词 mark 形态 = 主色 soft 底 + 主色深档字
-   （全站 badge-soft 同语言）；语义命中无字面命中时整段原样 */
+/* 引文：四行截断；命中词 mark 形态 = 主色 glow 底 + 主色深档字
+   （reskin-b3 双候选择优：白卡上可感知的强调底，仍是 badge-soft 同语言的
+   软底系——与 graph 浮搜建议 mark 同一形态，两消费点同改勿单边漂移）；
+   语义命中无字面命中时整段原样 */
 .result-quote {
   display: -webkit-box;
   overflow: hidden;
@@ -341,7 +343,7 @@ function srcCat(documentId: string): string {
     padding: 0 2px;
     font-weight: 600;
     color: var(--color-primary-text);
-    background: var(--color-primary-soft);
+    background: var(--color-primary-glow);
     border-radius: 4px;
   }
 }

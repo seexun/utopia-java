@@ -654,275 +654,275 @@ const composerSendDisabled = computed(
       <PageHeader :title="S.nav.ask" :subtitle="kb?.name ?? ''" />
 
       <div class="flex min-h-0 flex-1 gap-4">
-      <!-- 会话列表卡（reskin-b3 三卡之一）：anivia 卡容器（theme.scss .card），
-         选中态由 URow 的 bg-primary-soft 提供（零动） -->
-      <aside class="card chat-rail flex w-64 shrink-0 flex-col">
-        <!-- 搜索在最上面，与图谱页的搜索框、本体页的过滤框同一副身材、同一个
-           角落。**标题重是常态**（同一个问题问两次就重了），而正文里那句话才是人
-           记得住的——所以服务端两处都搜 -->
-        <div class="pb-2">
-          <el-input
-            v-model="convSearch"
-            :placeholder="S.ask.searchConversations"
-            clearable
-            @keydown.escape="convSearch = ''"
-          >
-            <template #prefix>
-              <SearchIcon width="12" height="12" />
-            </template>
-          </el-input>
-        </div>
-        <!-- 新建会话：本页唯一主行动（批次模板语言：el-button primary 实底） -->
-        <div class="pb-2">
-          <el-button type="primary" class="w-full" @click="newChat">
-            <SquarePenIcon width="14" height="14" class="mr-1" />
-            {{ S.ask.newChat }}
-          </el-button>
-        </div>
-        <!-- 「最近」是这一组的名字，不是一条会话：同一副行的身材、同一档字色，
-            右端的三角说明这一组收得起来（朝右=收着，朝下=开着） -->
-        <div>
-          <URow density="nav" @click="recentOpen = !recentOpen">
-            {{ S.ask.recent }}
-            <template #trailing>
-              <ChevronRightIcon
-                width="12"
-                height="12"
-                :class="cn('turn', recentOpen && 'rotate-90')"
-              />
-            </template>
-          </URow>
-        </div>
-        <div
-          v-if="recentOpen"
-          class="flex flex-col gap-0.5 flex-1 overflow-y-auto overscroll-contain pb-3"
-        >
-          <div v-for="c in conversationRows" :key="c.id" class="group relative">
-            <!-- 单行标题；删除键悬停浮现（弹确认，不直接删） -->
+        <!-- 会话列表卡（reskin-b3 三卡之一）：anivia 卡容器（theme.scss .card），
+           选中态由 URow 的 bg-primary-soft 提供（零动） -->
+        <aside class="card chat-rail flex w-64 shrink-0 flex-col">
+          <!-- 搜索在最上面，与图谱页的搜索框、本体页的过滤框同一副身材、同一个
+             角落。**标题重是常态**（同一个问题问两次就重了），而正文里那句话才是人
+             记得住的——所以服务端两处都搜 -->
+          <div class="pb-2">
             <el-input
-              v-if="renamingId === c.id"
-              :ref="setRenameRef"
-              v-model="renameDraft"
-              size="small"
-              class="w-full"
-              @keydown.enter.prevent="submitRename(c)"
-              @keydown.escape="renamingId = null"
-              @blur="renamingId = null"
-            />
-            <URow
-              v-else
-              density="nav"
-              class="pr-8"
-              :active="c.id === activeId"
-              @click="openConversation(c.id)"
+              v-model="convSearch"
+              :placeholder="S.ask.searchConversations"
+              clearable
+              @keydown.escape="convSearch = ''"
             >
-              <template #icon>
-                <UConvMark
-                  :state="
-                    liveIds.has(c.id)
-                      ? 'live'
-                      : unreadIds.has(c.id)
-                        ? 'unread'
-                        : 'rest'
-                  "
+              <template #prefix>
+                <SearchIcon width="12" height="12" />
+              </template>
+            </el-input>
+          </div>
+          <!-- 新建会话：本页唯一主行动（批次模板语言：el-button primary 实底） -->
+          <div class="pb-2">
+            <el-button type="primary" class="w-full" @click="newChat">
+              <SquarePenIcon width="14" height="14" class="mr-1" />
+              {{ S.ask.newChat }}
+            </el-button>
+          </div>
+          <!-- 「最近」是这一组的名字，不是一条会话：同一副行的身材、同一档字色，
+              右端的三角说明这一组收得起来（朝右=收着，朝下=开着） -->
+          <div>
+            <URow density="nav" @click="recentOpen = !recentOpen">
+              {{ S.ask.recent }}
+              <template #trailing>
+                <ChevronRightIcon
+                  width="12"
+                  height="12"
+                  :class="cn('turn', recentOpen && 'rotate-90')"
                 />
               </template>
-              <span
-                :class="[
-                  'block truncate pr-6 text-body',
-                  c.id === activeId ? 'text-ink' : 'text-ink-2'
-                ]"
-              >
-                {{ c.title || S.ask.untitled }}
-              </span>
             </URow>
-            <!-- 三点菜单：**一个入口装下所有动作**（从前右边直接是删除，而删除是
-               这里最不该一步到位的那个）。走 el-dropdown：弹层样式与全站统一 -->
-            <el-dropdown
-              v-if="renamingId !== c.id"
-              trigger="click"
-              class="absolute right-1 top-1/2 -translate-y-1/2"
-              :class="REVEAL"
-              @command="(cmd: string) => onRowCommand(cmd, c)"
-            >
-              <UIconButton :label="S.ask.moreActions" @click.stop />
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="rename">{{
-                    S.ask.rename
-                  }}</el-dropdown-item>
-                  <el-dropdown-item command="copy">{{
-                    S.ask.copyTitle
-                  }}</el-dropdown-item>
-                  <el-dropdown-item command="delete" class="text-danger!">
-                    {{ S.ask.deleteConversation }}
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
           </div>
           <div
-            v-if="convs.isError.value"
-            role="alert"
-            class="px-3 py-2 text-sub text-ink-2"
+            v-if="recentOpen"
+            class="flex flex-col gap-0.5 flex-1 overflow-y-auto overscroll-contain pb-3"
           >
-            <p>{{ S.ask.conversationsLoadFailed }}</p>
-            <el-button
-              size="small"
-              link
-              @click="
-                convs.isFetchNextPageError.value
-                  ? convs.fetchNextPage()
-                  : convs.refetch()
-              "
-            >
-              {{ S.ask.retryConversations }}
-            </el-button>
-          </div>
-          <!-- 加载更早：有下一页且整条查询没挂时才给（旧仓 !isFetchNextPageError——
-             那是「取下一页失败才收」，isError 是「任意页失败都收」；首屏就挂时
-             翻页无从谈起，重试走上面的 retryConversations） -->
-          <div
-            v-if="convs.hasNextPage.value && !convs.isError.value"
-            class="px-2 pt-1"
-          >
-            <el-button
-              size="small"
-              link
-              :disabled="convs.isFetching.value"
-              @click="convs.fetchNextPage()"
-            >
-              {{ S.ask.loadEarlierConversations }}
-            </el-button>
-          </div>
-          <!-- 这句话与上面每一条会话的标题同一条竖线（38 = 卡内距 12 + 行内距
-             12 + 图标格 14），而不是自己另起一列 -->
-          <p
-            v-if="convs.isSuccess.value && conversationRows.length === 0"
-            class="py-2 pl-[38px] pr-3 text-sub text-ink-2"
-          >
-            {{ S.ask.noConversations }}
-          </p>
-        </div>
-      </aside>
-
-      <!-- 对话区（reskin-b3 三卡之二/之三：消息流的消息卡 + Composer 输入卡）：
-         新对话首屏 = 问候（+下一步提示），composer 随问候落位；
-         有消息后上区变滚动区、composer 停靠底部。
-         **composer 只挂一份、常驻不卸载**：EP 的 textarea autosize 在 nextTick 里
-         回读 DOM，卸载撞上那个回调会读 null 抛未处理异常——旧仓 React 无此约束，
-         所以旧仓可以同一块 JSX 挂两处随分支换，这里必须一实体两态（新对话/
-         装载中的 focus 也因此拿得到同一实例） -->
-      <div class="min-w-0 flex flex-1 flex-col">
-        <div
-          v-if="
-            idleHistoryKey === loadedKey &&
-            idleHistoryKey === viewKey(kbId, currentId) &&
-            !streaming
-          "
-          role="status"
-          class="px-4 pt-3 flex flex-wrap items-center gap-2 text-body text-ink-2"
-        >
-          <span>{{ S.ask.noActiveAnswer }}</span>
-          <el-button
-            v-if="retryAt === shown.length - 1"
-            size="small"
-            @click="retry"
-          >
-            {{ S.ask.retryQuestion }}
-          </el-button>
-        </div>
-        <!-- 优先级与旧仓一致：历史读挂了 > 正在装 > 问候首屏 > 对话滚动区 -->
-        <div
-          v-if="historyError"
-          role="alert"
-          class="card chat-error-card flex-1"
-        >
-          <p class="text-danger">{{ S.ask.historyLoadFailed }}</p>
-          <p class="text-ink-2">{{ historyError }}</p>
-          <el-button
-            class="mt-2"
-            @click="currentId && loadConversation(currentId)"
-          >
-            {{ S.ask.retryHistory }}
-          </el-button>
-        </div>
-        <div
-          v-else-if="loadingHistory && !liveHere"
-          role="status"
-          class="flex-1 p-6 text-body text-ink-2"
-        >
-          {{ S.ask.loadingHistory }}
-        </div>
-        <!-- 锚定上三分之一而非垂直居中：居中在高窗口下会显得下坠。
-           22vh + 顶部 chrome(~100px) ≈ 问候落在 37% 高度（旧仓注释原话） -->
-        <div v-else-if="shown.length === 0" class="px-4 pt-[22vh]">
-          <div class="w-full max-w-3xl mx-auto">
-            <h1 class="chat-greeting text-center text-stat text-ink mb-8">
-              {{ S.ask.greeting }}
-            </h1>
-            <div v-if="modelStep" class="mb-6 grid place-items-center">
-              <div class="max-w-xs text-center text-body text-ink-2">
-                {{ modelStep.line }}
-                <RouterLink
-                  v-if="modelStep.action"
-                  class="link-inline mt-3 block"
-                  :to="{
-                    path: modelStep.action.to,
-                    query: modelStep.action.search as never
-                  }"
+            <div v-for="c in conversationRows" :key="c.id" class="group relative">
+              <!-- 单行标题；删除键悬停浮现（弹确认，不直接删） -->
+              <el-input
+                v-if="renamingId === c.id"
+                :ref="setRenameRef"
+                v-model="renameDraft"
+                size="small"
+                class="w-full"
+                @keydown.enter.prevent="submitRename(c)"
+                @keydown.escape="renamingId = null"
+                @blur="renamingId = null"
+              />
+              <URow
+                v-else
+                density="nav"
+                class="pr-8"
+                :active="c.id === activeId"
+                @click="openConversation(c.id)"
+              >
+                <template #icon>
+                  <UConvMark
+                    :state="
+                      liveIds.has(c.id)
+                        ? 'live'
+                        : unreadIds.has(c.id)
+                          ? 'unread'
+                          : 'rest'
+                    "
+                  />
+                </template>
+                <span
+                  :class="[
+                    'block truncate pr-6 text-body',
+                    c.id === activeId ? 'text-ink' : 'text-ink-2'
+                  ]"
                 >
-                  {{ modelStep.action.label }}
-                </RouterLink>
+                  {{ c.title || S.ask.untitled }}
+                </span>
+              </URow>
+              <!-- 三点菜单：**一个入口装下所有动作**（从前右边直接是删除，而删除是
+                 这里最不该一步到位的那个）。走 el-dropdown：弹层样式与全站统一 -->
+              <el-dropdown
+                v-if="renamingId !== c.id"
+                trigger="click"
+                class="absolute right-1 top-1/2 -translate-y-1/2"
+                :class="REVEAL"
+                @command="(cmd: string) => onRowCommand(cmd, c)"
+              >
+                <UIconButton :label="S.ask.moreActions" @click.stop />
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="rename">{{
+                      S.ask.rename
+                    }}</el-dropdown-item>
+                    <el-dropdown-item command="copy">{{
+                      S.ask.copyTitle
+                    }}</el-dropdown-item>
+                    <el-dropdown-item command="delete" class="text-danger!">
+                      {{ S.ask.deleteConversation }}
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </div>
+            <div
+              v-if="convs.isError.value"
+              role="alert"
+              class="px-3 py-2 text-sub text-ink-2"
+            >
+              <p>{{ S.ask.conversationsLoadFailed }}</p>
+              <el-button
+                size="small"
+                link
+                @click="
+                  convs.isFetchNextPageError.value
+                    ? convs.fetchNextPage()
+                    : convs.refetch()
+                "
+              >
+                {{ S.ask.retryConversations }}
+              </el-button>
+            </div>
+            <!-- 加载更早：有下一页且整条查询没挂时才给（旧仓 !isFetchNextPageError——
+               那是「取下一页失败才收」，isError 是「任意页失败都收」；首屏就挂时
+               翻页无从谈起，重试走上面的 retryConversations） -->
+            <div
+              v-if="convs.hasNextPage.value && !convs.isError.value"
+              class="px-2 pt-1"
+            >
+              <el-button
+                size="small"
+                link
+                :disabled="convs.isFetching.value"
+                @click="convs.fetchNextPage()"
+              >
+                {{ S.ask.loadEarlierConversations }}
+              </el-button>
+            </div>
+            <!-- 这句话与上面每一条会话的标题同一条竖线（38 = 卡内距 12 + 行内距
+               12 + 图标格 14），而不是自己另起一列 -->
+            <p
+              v-if="convs.isSuccess.value && conversationRows.length === 0"
+              class="py-2 pl-[38px] pr-3 text-sub text-ink-2"
+            >
+              {{ S.ask.noConversations }}
+            </p>
+          </div>
+        </aside>
+
+        <!-- 对话区（reskin-b3 三卡之二/之三：消息流的消息卡 + Composer 输入卡）：
+           新对话首屏 = 问候（+下一步提示），composer 随问候落位；
+           有消息后上区变滚动区、composer 停靠底部。
+           **composer 只挂一份、常驻不卸载**：EP 的 textarea autosize 在 nextTick 里
+           回读 DOM，卸载撞上那个回调会读 null 抛未处理异常——旧仓 React 无此约束，
+           所以旧仓可以同一块 JSX 挂两处随分支换，这里必须一实体两态（新对话/
+           装载中的 focus 也因此拿得到同一实例） -->
+        <div class="min-w-0 flex flex-1 flex-col">
+          <div
+            v-if="
+              idleHistoryKey === loadedKey &&
+              idleHistoryKey === viewKey(kbId, currentId) &&
+              !streaming
+            "
+            role="status"
+            class="px-4 pt-3 flex flex-wrap items-center gap-2 text-body text-ink-2"
+          >
+            <span>{{ S.ask.noActiveAnswer }}</span>
+            <el-button
+              v-if="retryAt === shown.length - 1"
+              size="small"
+              @click="retry"
+            >
+              {{ S.ask.retryQuestion }}
+            </el-button>
+          </div>
+          <!-- 优先级与旧仓一致：历史读挂了 > 正在装 > 问候首屏 > 对话滚动区 -->
+          <div
+            v-if="historyError"
+            role="alert"
+            class="card chat-error-card flex-1"
+          >
+            <p class="text-danger">{{ S.ask.historyLoadFailed }}</p>
+            <p class="text-ink-2">{{ historyError }}</p>
+            <el-button
+              class="mt-2"
+              @click="currentId && loadConversation(currentId)"
+            >
+              {{ S.ask.retryHistory }}
+            </el-button>
+          </div>
+          <div
+            v-else-if="loadingHistory && !liveHere"
+            role="status"
+            class="flex-1 p-6 text-body text-ink-2"
+          >
+            {{ S.ask.loadingHistory }}
+          </div>
+          <!-- 锚定上三分之一而非垂直居中：居中在高窗口下会显得下坠。
+             22vh + 顶部 chrome(~100px) ≈ 问候落在 37% 高度（旧仓注释原话） -->
+          <div v-else-if="shown.length === 0" class="px-4 pt-[22vh]">
+            <div class="w-full max-w-3xl mx-auto">
+              <h1 class="chat-greeting text-center text-stat text-ink mb-8">
+                {{ S.ask.greeting }}
+              </h1>
+              <div v-if="modelStep" class="mb-6 grid place-items-center">
+                <div class="max-w-xs text-center text-body text-ink-2">
+                  {{ modelStep.line }}
+                  <RouterLink
+                    v-if="modelStep.action"
+                    class="link-inline mt-3 block"
+                    :to="{
+                      path: modelStep.action.to,
+                      query: modelStep.action.search as never
+                    }"
+                  >
+                    {{ modelStep.action.label }}
+                  </RouterLink>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-        <div
-          v-else
-          class="flex-1 overflow-y-auto overscroll-contain chat-fade px-4 pt-6 pb-12"
-          @scroll="
-            e => {
-              following = followsBottom(e.currentTarget as HTMLElement);
-            }
-          "
-        >
-          <div class="max-w-3xl mx-auto space-y-4">
-            <UTurn
-              v-for="(t, i) in shown"
-              :key="i"
-              :turn="t"
-              :live="streaming && i === shown.length - 1"
-              :kb-id="kbId"
-              :show-retry="
-                !streaming &&
-                i === shown.length - 1 &&
-                t.role === 'assistant' &&
-                retryAt >= 0
-              "
-              @retry="retry"
-            />
-            <div ref="bottomRef" />
+          <div
+            v-else
+            class="flex-1 overflow-y-auto overscroll-contain chat-fade px-4 pt-6 pb-12"
+            @scroll="
+              e => {
+                following = followsBottom(e.currentTarget as HTMLElement);
+              }
+            "
+          >
+            <div class="max-w-3xl mx-auto space-y-4">
+              <UTurn
+                v-for="(t, i) in shown"
+                :key="i"
+                :turn="t"
+                :live="streaming && i === shown.length - 1"
+                :kb-id="kbId"
+                :show-retry="
+                  !streaming &&
+                  i === shown.length - 1 &&
+                  t.role === 'assistant' &&
+                  retryAt >= 0
+                "
+                @retry="retry"
+              />
+              <div ref="bottomRef" />
+            </div>
+          </div>
+          <div class="px-4 pt-3 pb-1">
+            <div class="max-w-3xl mx-auto">
+              <ChatComposer
+                ref="composerEl"
+                v-model="input"
+                :streaming="streaming"
+                :stopping="liveHere?.stopping"
+                :stop-error="liveHere?.stopError"
+                :send-disabled="composerSendDisabled"
+                :kb="kb"
+                @send="send"
+                @stop="liveAnswer.stop(kbId, currentId)"
+                @rescope="onComposerRescope"
+              />
+            </div>
           </div>
         </div>
-        <div class="px-4 pt-3 pb-1">
-          <div class="max-w-3xl mx-auto">
-            <ChatComposer
-              ref="composerEl"
-              v-model="input"
-              :streaming="streaming"
-              :stopping="liveHere?.stopping"
-              :stop-error="liveHere?.stopError"
-              :send-disabled="composerSendDisabled"
-              :kb="kb"
-              @send="send"
-              @stop="liveAnswer.stop(kbId, currentId)"
-              @rescope="onComposerRescope"
-            />
-          </div>
         </div>
-      </div>
-      </div>
 
       <DangerConfirm
         v-if="pendingDelete"

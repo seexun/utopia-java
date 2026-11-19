@@ -14,7 +14,6 @@ import {
 import { RouterLink } from "vue-router";
 import ChevronLeft from "~icons/lucide/chevron-left";
 import ChevronRight from "~icons/lucide/chevron-right";
-import CircleAlert from "~icons/lucide/circle-alert";
 import ArrowUpRight from "~icons/lucide/arrow-up-right";
 import { S } from "@/i18n";
 
@@ -46,7 +45,7 @@ export function chipLike(tone: ChipTone = "neutral", className?: string): string
   return cn("badge-soft", BADGE_TONE[tone], className);
 }
 
-/* ---------- Chip / Status / StatusCell ---------- */
+/* ---------- Chip / Status ---------- */
 
 export const UChip = defineComponent({
   name: "UChip",
@@ -103,42 +102,6 @@ export const UStatus = defineComponent({
         {slots.default?.()}
       </span>
     );
-  }
-});
-
-export const StatusCell = defineComponent({
-  name: "StatusCell",
-  props: {
-    danger: { type: Boolean, default: false },
-    title: { type: String, default: undefined },
-    onClick: { type: Function as PropType<() => void>, default: undefined }
-  },
-  setup(props, { slots }) {
-    return () => {
-      const cls = cn(
-        "badge-soft",
-        props.danger ? "badge-soft-danger" : "badge-soft-info",
-        props.onClick && "cursor-pointer"
-      );
-      const body = (
-        <>
-          {props.danger && <CircleAlert class="shrink-0" />}
-          {slots.default?.()}
-        </>
-      );
-      if (!props.onClick) {
-        return (
-          <span class={cls} title={props.title}>
-            {body}
-          </span>
-        );
-      }
-      return (
-        <button type="button" title={props.title} onClick={() => props.onClick?.()} class={cls}>
-          {body}
-        </button>
-      );
-    };
   }
 });
 

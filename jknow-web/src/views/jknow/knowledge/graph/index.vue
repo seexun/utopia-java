@@ -272,6 +272,31 @@ const searchHits = computed(() =>
   inSubgraph.value ? subgraphHits.value : (candidates.data.value?.entities ?? [])
 );
 
+/** 实体名按命中词切段（纯展示，reskin-b3 mark 形态统一）：hit 段渲染成
+    <mark>——与检索结果卡 .result-quote mark 同一形态（主色 glow 底+主色深档
+    字），两消费点同改勿单边漂移。只读 searchQ 做展示切分，不碰上面的过滤 */
+function nameSegments(name: string): { text: string; hit: boolean }[] {
+  const q = searchQ.value.trim();
+  if (!q) return [{ text: name, hit: false }];
+  const esc = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  let re: RegExp;
+  try {
+    re = new RegExp(`(${esc})`, "gi");
+  } catch {
+    return [{ text: name, hit: false }];
+  }
+  const segs: { text: string; hit: boolean }[] = [];
+  let last = 0;
+  for (const m of name.matchAll(re)) {
+    const i = m.index ?? 0;
+    if (i > last) segs.push({ text: name.slice(last, i), hit: false });
+    segs.push({ text: m[0], hit: true });
+    last = i + m[0].length;
+  }
+  if (last < name.length) segs.push({ text: name.slice(last), hit: false });
+  return segs;
+}
+
 /* ---------- 图例（类型显隐） ---------- */
 
 const hiddenTypes = ref(new Set<string>());
@@ -1273,10 +1298,11 @@ const statsText = computed(() => {
               "
             />
           </div>
-          <!-- 搜索建议框 -->
+          <!-- 搜索建议框（reskin-b3：max-height 防极短视口溢出 + 实体名命中词
+               <mark> 高亮——形态与检索结果卡统一，见 scoped .graph-suggest） -->
           <div
             v-if="searchQ && searchHits.length > 0"
-            class="absolute mt-1 w-full overflow-hidden rounded-card border border-line bg-card shadow-pop"
+            class="graph-suggest absolute mt-1 w-full overflow-hidden rounded-card border border-line bg-card shadow-pop"
           >
             <URow
               v-for="c in searchHits"
@@ -1297,7 +1323,15 @@ const statsText = computed(() => {
                   class="h-2.5 w-2.5 shrink-0 rounded-full"
                   :style="{ background: c.color }"
                 />
-                <span class="truncate">{{ c.name }}</span>
+                <span class="truncate">
+                  <template
+                    v-for="(seg, i) in nameSegments(c.name)"
+                    :key="i"
+                  >
+                    <mark v-if="seg.hit">{{ seg.text }}</mark>
+                    <template v-else>{{ seg.text }}</template>
+                  </template>
+                </span>
                 <span
                   v-if="c.disambiguator && c.disambiguator !== c.type_label"
                   class="min-w-0 max-w-[40%] truncate text-sub text-ink-2"
@@ -1759,5 +1793,20 @@ const statsText = computed(() => {
 /* 顶部「全图」返回钮：与搜索卡同一浮层海拔（原硬编码 rgb() 阴影令牌化） */
 .graph-shadow {
   box-shadow: var(--shadow-pop);
+}
+
+/* 搜索建议框（reskin-b3 清扫）：极短视口下建议列表不再顶出屏外（16rem 内滚，
+   x 向仍由模板的 overflow-hidden 收口圆角）；命中词 <mark> 与检索结果卡
+   .result-quote mark 同一形态——主色 glow 底 + 主色深档字（两消费点同改） */
+.graph-suggest {
+  max-height: 16rem;
+  overflow-y: auto;
+}
+.graph-suggest mark {
+  padding: 0 2px;
+  font-weight: 600;
+  color: var(--color-primary-text);
+  background: var(--color-primary-glow);
+  border-radius: 4px;
 }
 </style>
