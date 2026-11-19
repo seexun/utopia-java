@@ -167,7 +167,7 @@ class MigrationTests {
         assertEquals(16, fPerms.size(), "V0105 补回工作空间载体 2 行后菜单内 knowledge:* F 行应为 16");
         assertEquals(16, fPerms.stream().distinct().count(), "16 行 F perms 应无重复（list/edit 成对）");
         assertTrue(fPerms.stream().allMatch(KNOWLEDGE_F_PERMS_V0100::contains),
-                "剩余 14 行 F perms 应逐项取自 V0100 原 16 项集合（F 权限值一字不动）");
+                "剩余 16 行 F perms 应逐项取自 V0100 原 16 项集合（F 权限值一字不动）");
         // —— V0101 用户重绑断言 ——
         assertEquals(1, queryInt(
                 "select count(*) from information_schema.columns"

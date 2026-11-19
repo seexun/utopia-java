@@ -18,7 +18,7 @@
 // onRecover，消费方零动。
 
 import { createParser } from "eventsource-parser";
-import { getToken } from "@/utils/auth";
+import { bearerHeaders } from "./api";
 
 /** 页面藏起来多久之后让出连接。短暂切走再回来不断流，也就不用补刷 */
 export const HIDDEN_RELEASE_MS = 30_000;
@@ -52,10 +52,10 @@ export function subscribeEvents(
     const current = new AbortController();
     controller = current;
     try {
-      const token = getToken();
+      // Bearer 头与 api.ts 全站 fetch 直连同源（bearerHeaders 未登录不带——同旧内联三元）
       const res = await fetch(url, {
         credentials: "include",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: bearerHeaders(),
         signal: current.signal,
       });
       if (current.signal.aborted) return;
