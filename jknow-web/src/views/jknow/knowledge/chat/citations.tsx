@@ -50,6 +50,27 @@ export function charterTitle(s: Source): string {
     : s.filename;
 }
 
+/* ---------- 引用徽章的 cat 色点（reskin-b3，纯展示辅助） ---------- */
+
+/** 来源的 cat 色档变量名：--cat-1..6 按 document_id 稳定轮转（charter 无
+ *  document_id 时退 slug/文件名）——同一文档的分块同色，与检索结果卡的
+ *  srcCat 同一套纪律；色值只引 --cat-N 令牌，零硬编码 */
+function citeCatVar(s: Source): string {
+  let h = 0;
+  for (const ch of s.document_id ?? s.slug ?? s.filename)
+    h = (h * 31 + (ch.codePointAt(0) ?? 0)) >>> 0;
+  return `--cat-${(h % 6) + 1}`;
+}
+
+/** 落款行/角标 chip 里的色点（inline 语境用 inline-block） */
+const citeDot = (s: Source) => (
+  <span
+    class="mr-1 inline-block size-2 shrink-0 align-middle rounded-full"
+    style={{ background: `var(${citeCatVar(s)})` }}
+    aria-hidden
+  />
+);
+
 /* ---------- 引用预览浮窗 ---------- */
 
 const CITE_POPPER = "shell-pop chat-cite-pop";
@@ -251,7 +272,9 @@ export const USourceList = defineComponent({
   setup(props) {
     const openedN = ref<number | null>(null);
     return () => (
-      <div class="mt-2 divide-y divide-line rounded-card border border-line bg-card">
+      /* reskin-b3：落款是助手白卡里的软底内嵌面板（bg-fill，行悬停回白）；
+         [n] 升 badge-soft-primary 徽章、行首 cat 色点标来源身份（citeCatVar） */
+      <div class="mt-2 divide-y divide-line overflow-hidden rounded-card border border-line bg-fill">
         {props.sources.map(s => (
           <ElPopover
             key={s.n}
@@ -264,12 +287,15 @@ export const USourceList = defineComponent({
               reference: () => (
                 <button
                   type="button"
-                  class="block w-full px-3 py-2 text-left text-sub text-ink-2 transition-colors hover:bg-fill"
+                  class="block w-full px-3 py-2 text-left text-sub text-ink-2 transition-colors hover:bg-card"
                   onClick={() => (openedN.value = s.n)}
                 >
                   {s.kind === "charter" ? (
                     <span class="flex items-center gap-2">
-                      <span class="tabular-nums text-primary">[{s.n}]</span>
+                      {citeDot(s)}
+                      <span class="badge-soft badge-soft-primary px-1.5! text-aux! tabular-nums">
+                        [{s.n}]
+                      </span>
                       <BookOpenIcon
                         width={11}
                         height={11}
@@ -279,7 +305,10 @@ export const USourceList = defineComponent({
                     </span>
                   ) : (
                     <span class="sle block">
-                      <span class="tabular-nums text-primary">[{s.n}]</span>{" "}
+                      {citeDot(s)}
+                      <span class="badge-soft badge-soft-primary px-1.5! text-aux! tabular-nums">
+                        [{s.n}]
+                      </span>{" "}
                       {s.filename} · {sourceLead(s).slice(0, 60)}…
                     </span>
                   )}

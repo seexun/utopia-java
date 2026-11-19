@@ -162,15 +162,14 @@ function scopeButtonClass() {
           <rect x="6" y="6" width="12" height="12" rx="2" />
         </svg>
       </UIconButton>
-      <!-- 发送键（M-5 台账，有意的微差）：旧仓 IconButton 分 primary/secondary
-           两档皮（有输入变实底蓝键）；本仓 UIconButton 是中性幽灵档，这里用
-           「有输入时字色升到 primary」近似两档意图。要完全复刻需给 kit 加
-           variant 档，观感差异记在 ASSET-LEDGER（w3）——后续统一再提档 -->
+      <!-- 发送键：reskin-b3 升主行动形态（批次模板语言）——有输入变实底主色键
+           （.chat-send-live，scoped 层覆盖 UIconButton 的中性幽灵档；旧仓
+           primary/secondary 两档皮的最终到位），无输入保持幽灵档 -->
       <UIconButton
         v-else
         :label="S.ask.send"
         :disabled="sendDisabled"
-        :class="cn('shrink-0', modelValue.trim() ? 'text-primary' : '')"
+        :class="cn('shrink-0', modelValue.trim() ? 'chat-send-live' : '')"
         @click="emit('send')"
       >
         <ArrowUpIcon width="15" height="15" style="stroke-width: 2.4" />
@@ -180,6 +179,8 @@ function scopeButtonClass() {
 </template>
 
 <style scoped>
+/* 重造层（reskin-b3）：只引令牌（--color-*），禁硬编码色值 */
+
 /* el-input 的 textarea 去掉 EP 的默认皮：composer 卡自己就是框 */
 .composer-input :deep(.el-textarea__inner) {
   box-shadow: none;
@@ -193,6 +194,21 @@ function scopeButtonClass() {
   box-shadow: none;
 }
 .composer-input :deep(.el-textarea__inner::placeholder) {
+  color: var(--color-ink-3);
+}
+
+/* 发送键主行动形态（有输入时实底主色；scoped 无层规则压过 UIconButton 的
+   @layer utilities 幽灵档）。不可用时退 soft 底淡色（EP 主键 disabled 同语言） */
+.chat-send-live {
+  background: var(--color-primary);
+  color: var(--color-on-accent);
+}
+.chat-send-live:hover {
+  background: var(--color-primary-hover);
+  color: var(--color-on-accent);
+}
+.chat-send-live:disabled {
+  background: var(--color-primary-soft);
   color: var(--color-ink-3);
 }
 </style>

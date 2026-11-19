@@ -72,7 +72,9 @@ const StepRow = defineComponent({
             )}
           </div>
           {sqlOpen.value && step.sql && (
-            <pre class="mt-1 rounded-card bg-fill px-3 py-2 font-mono text-sub text-ink-2 whitespace-pre-wrap wrap-break-word">
+            /* reskin-b3：SQL 原文从 fill 凹底改白底描边井——轨迹段已是 bg-fill
+               软卡，同一档底色会糊在一起 */
+            <pre class="mt-1 rounded-card border border-line bg-card px-3 py-2 font-mono text-sub text-ink-2 whitespace-pre-wrap wrap-break-word">
               {step.sql}
             </pre>
           )}

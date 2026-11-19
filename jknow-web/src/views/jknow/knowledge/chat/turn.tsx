@@ -31,7 +31,8 @@ export const UTurn = defineComponent({
           <div class="flex justify-end">
             {/* **对话按 title 那一档读**（16/24，不是正文的 14/22）。这一页是这个
                 产品里唯一一块拿来"读"的长文本，其余都是表格、清单、面板里的字段，
-                14px 在那些地方是对的，成段读就偏小了（旧仓注释原话） */}
+                14px 在那些地方是对的，成段读就偏小了（旧仓注释原话）。
+                reskin-b3：气泡底改 primary-soft（.bubble-user），角色对比交给底色 */}
             <div class="bubble-user max-w-[85%] rounded-card px-4 py-2 text-title whitespace-pre-wrap text-ink">
               {turn.content}
             </div>
@@ -72,17 +73,21 @@ const AssistantTurn = defineComponent({
       const lastStep = turn.steps?.[turn.steps.length - 1];
       const cited = citedSources(turn);
       return (
-        <div class="max-w-[95%]">
-          {/* agent 回复无气泡：正文直接落在画布上（用户消息保留气泡以区分角色） */}
+        /* reskin-b3：助手消息白卡（radius-card/shadow-card，批次卡语言）——
+           正文与轨迹、引用、动作全住进这张卡；用户消息反向用 primary-soft
+           气泡区分角色。DOM 结构零动（仅容器类样式） */
+        <div class="max-w-[95%] rounded-card border border-line bg-card px-4 py-3 shadow-card">
+          {/* agent 回复正文直接落在（白）卡上；用户消息保留气泡以区分角色 */}
           <div class="py-1 text-base/relaxed text-ink ">
             {/* **轨迹按发生的顺序穿在正文里。** 模型是边说边查的：说一句、调一次、
                 再说一句。把调用整块提到最前面，读起来就成了「先查七次再一口气
-                说完」——那不是它做的事（旧仓注释原话） */}
+                说完」——那不是它做的事（旧仓注释原话）。
+                reskin-b3：轨迹段收成软底折叠卡（bg-fill），不再是左侧细线 */}
             {segments(turn).map((seg, i) =>
               seg.kind === "steps" ? (
                 <div
                   key={i}
-                  class="my-3 space-y-1 border-l border-line-strong pl-3"
+                  class="my-3 space-y-1 rounded-card bg-fill px-3 py-2"
                 >
                   {seg.steps.map((s, j) => (
                     <StepRow key={j} step={s} kbId={props.kbId} />

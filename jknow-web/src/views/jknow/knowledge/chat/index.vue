@@ -52,6 +52,7 @@ import { useKbContext } from "@/composables/useKbContext";
 import { useSyncExternal } from "@/composables/useSyncExternal";
 import { DangerConfirm } from "@/components/knowledge/dialog";
 import { UIconButton, URow, cn, REVEAL } from "@/components/knowledge/kit";
+import PageHeader from "@/components/PageHeader/index.vue";
 import { UTurn } from "./turn";
 import { UConvMark } from "./convMark";
 import ChatComposer from "./ChatComposer.vue";
@@ -624,14 +625,14 @@ const composerSendDisabled = computed(
       class="utopia-page-scope grid h-full place-items-center px-6"
     >
       <div class="max-w-sm text-center">
-        <h2 class="text-xl" style="color: #0f172a">
+        <h2 class="text-xl text-ink">
           {{
             scope.noAccess.value.status === 404
               ? S.kbScope.missingTitle
               : S.kbScope.deniedTitle
           }}
         </h2>
-        <p class="mt-2 text-body/relaxed" style="color: #475569">
+        <p class="mt-2 text-body/relaxed text-ink-2">
           {{
             scope.noAccess.value.status === 404
               ? S.kbScope.missingBody
@@ -647,13 +648,19 @@ const composerSendDisabled = computed(
         </el-button>
       </div>
     </div>
-    <div v-else class="utopia-page-scope h-full flex">
-      <!-- 会话栏 -->
-      <aside class="w-64 shrink-0 bg-card border-r border-line flex flex-col">
+    <div v-else class="utopia-page-scope flex h-full flex-col p-6">
+      <!-- 页头（reskin-b3 六要素之一）：标题=对话、副题=库名；本页唯一主行动是
+           左栏的「新对话」，页头不放 extra（检索/图谱页同口径） -->
+      <PageHeader :title="S.nav.ask" :subtitle="kb?.name ?? ''" />
+
+      <div class="flex min-h-0 flex-1 gap-4">
+      <!-- 会话列表卡（reskin-b3 三卡之一）：anivia 卡容器（theme.scss .card），
+         选中态由 URow 的 bg-primary-soft 提供（零动） -->
+      <aside class="card chat-rail flex w-64 shrink-0 flex-col">
         <!-- 搜索在最上面，与图谱页的搜索框、本体页的过滤框同一副身材、同一个
            角落。**标题重是常态**（同一个问题问两次就重了），而正文里那句话才是人
            记得住的——所以服务端两处都搜 -->
-        <div class="px-2 pt-3 pb-1">
+        <div class="pb-2">
           <el-input
             v-model="convSearch"
             :placeholder="S.ask.searchConversations"
@@ -665,17 +672,16 @@ const composerSendDisabled = computed(
             </template>
           </el-input>
         </div>
-        <div class="px-2 pb-1">
-          <URow density="nav" @click="newChat">
-            <template #icon>
-              <SquarePenIcon width="14" height="14" />
-            </template>
+        <!-- 新建会话：本页唯一主行动（批次模板语言：el-button primary 实底） -->
+        <div class="pb-2">
+          <el-button type="primary" class="w-full" @click="newChat">
+            <SquarePenIcon width="14" height="14" class="mr-1" />
             {{ S.ask.newChat }}
-          </URow>
+          </el-button>
         </div>
         <!-- 「最近」是这一组的名字，不是一条会话：同一副行的身材、同一档字色，
             右端的三角说明这一组收得起来（朝右=收着，朝下=开着） -->
-        <div class="px-2">
+        <div>
           <URow density="nav" @click="recentOpen = !recentOpen">
             {{ S.ask.recent }}
             <template #trailing>
@@ -689,7 +695,7 @@ const composerSendDisabled = computed(
         </div>
         <div
           v-if="recentOpen"
-          class="flex flex-col gap-0.5 flex-1 overflow-y-auto overscroll-contain px-2 pb-3"
+          class="flex flex-col gap-0.5 flex-1 overflow-y-auto overscroll-contain pb-3"
         >
           <div v-for="c in conversationRows" :key="c.id" class="group relative">
             <!-- 单行标题；删除键悬停浮现（弹确认，不直接删） -->
@@ -789,24 +795,25 @@ const composerSendDisabled = computed(
               {{ S.ask.loadEarlierConversations }}
             </el-button>
           </div>
-          <!-- 这句话与上面每一条会话的标题同一条竖线（34 = 栏 px 8 + 行内距 12 +
-             图标格 14），而不是自己另起一列 -->
+          <!-- 这句话与上面每一条会话的标题同一条竖线（38 = 卡内距 12 + 行内距
+             12 + 图标格 14），而不是自己另起一列 -->
           <p
             v-if="convs.isSuccess.value && conversationRows.length === 0"
-            class="py-2 pl-8.5 pr-3 text-sub text-ink-2"
+            class="py-2 pl-[38px] pr-3 text-sub text-ink-2"
           >
             {{ S.ask.noConversations }}
           </p>
         </div>
       </aside>
 
-      <!-- 对话区：新对话首屏 = 问候（+下一步提示），composer 随问候落位；
+      <!-- 对话区（reskin-b3 三卡之二/之三：消息流的消息卡 + Composer 输入卡）：
+         新对话首屏 = 问候（+下一步提示），composer 随问候落位；
          有消息后上区变滚动区、composer 停靠底部。
          **composer 只挂一份、常驻不卸载**：EP 的 textarea autosize 在 nextTick 里
          回读 DOM，卸载撞上那个回调会读 null 抛未处理异常——旧仓 React 无此约束，
          所以旧仓可以同一块 JSX 挂两处随分支换，这里必须一实体两态（新对话/
          装载中的 focus 也因此拿得到同一实例） -->
-      <div class="flex-1 min-w-0 flex flex-col">
+      <div class="min-w-0 flex flex-1 flex-col">
         <div
           v-if="
             idleHistoryKey === loadedKey &&
@@ -814,7 +821,7 @@ const composerSendDisabled = computed(
             !streaming
           "
           role="status"
-          class="px-4 pt-4 flex flex-wrap items-center gap-2 text-body text-ink-2"
+          class="px-4 pt-3 flex flex-wrap items-center gap-2 text-body text-ink-2"
         >
           <span>{{ S.ask.noActiveAnswer }}</span>
           <el-button
@@ -826,8 +833,12 @@ const composerSendDisabled = computed(
           </el-button>
         </div>
         <!-- 优先级与旧仓一致：历史读挂了 > 正在装 > 问候首屏 > 对话滚动区 -->
-        <div v-if="historyError" role="alert" class="flex-1 p-6 text-body">
-          <p>{{ S.ask.historyLoadFailed }}</p>
+        <div
+          v-if="historyError"
+          role="alert"
+          class="card chat-error-card flex-1"
+        >
+          <p class="text-danger">{{ S.ask.historyLoadFailed }}</p>
           <p class="text-ink-2">{{ historyError }}</p>
           <el-button
             class="mt-2"
@@ -894,7 +905,7 @@ const composerSendDisabled = computed(
             <div ref="bottomRef" />
           </div>
         </div>
-        <div class="px-4 pb-4 pt-2">
+        <div class="px-4 pt-3 pb-1">
           <div class="max-w-3xl mx-auto">
             <ChatComposer
               ref="composerEl"
@@ -910,6 +921,7 @@ const composerSendDisabled = computed(
             />
           </div>
         </div>
+      </div>
       </div>
 
       <DangerConfirm
@@ -929,3 +941,26 @@ const composerSendDisabled = computed(
     </div>
   </div>
 </template>
+
+<style scoped>
+/* 重造层（reskin-b3）：只引令牌（--color-* / --radius-* / --shadow-*），
+   禁硬编码色值；卡容器形态来自全局 .card（theme.scss），徽章形态来自全局
+   .badge-soft。script 逻辑零动——本块只管三卡的容器身材 */
+
+/* 会话列表卡：256px 窄栏不吃 .card 默认 20px 内距，收到 12px；
+   列表滚动条随之落在卡内缘 */
+.chat-rail {
+  padding: 12px;
+}
+
+/* 历史读挂错误态卡（对齐检索页 state-card is-error 的口径：卡面 + 首行危险色） */
+.chat-error-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  justify-content: center;
+  max-width: 48rem;
+  margin: 0 auto;
+  width: 100%;
+}
+</style>

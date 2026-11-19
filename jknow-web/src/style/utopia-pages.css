@@ -605,22 +605,28 @@
   mask-image: linear-gradient(to bottom, #000 calc(100% - 2.5rem), transparent);
 }
 
-/* 用户说的那句话：比一块面板更该被看见 */
+/* 用户说的那句话：比一块面板更该被看见（reskin-b3：底色改 primary-soft，
+   与右对齐一起承担角色对比——助手是白卡，用户是主色 soft 气泡） */
 .bubble-user {
-  background: var(--color-card); /* 旧垫片气泡面值 = #ffffff */
+  background: var(--color-primary-soft);
 }
 
-/* Composer 卡：新对话首屏居中 / 进场后停靠底部共用的一块（旧 @layer components） */
+/* Composer 卡：新对话首屏居中 / 进场后停靠底部共用的一块（旧 @layer components）。
+   reskin-b3：边框 rgba 字面量令牌化（--color-border）；focus 光晕对齐全站
+   输入控件语言（theme.scss .is-focus → --color-primary-glow） */
 .composer {
   border-radius: var(--radius-card); /* 旧 --radius-panel = 12px */
-  border: 1px solid rgba(15, 23, 42, 0.12);
+  border: 1px solid var(--color-border);
   background: var(--color-card); /* 旧垫片面值（浮起的面 raise）= #ffffff */
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  transition: border-color 120ms; /* 旧快速时长档 */
+  transition:
+    border-color 120ms, /* 旧快速时长档 */
+    box-shadow 120ms;
 }
 .composer:focus-within {
-  border-color: var(--color-line-strong); /* 旧垫片深线色 #cbd5e1 */
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-glow);
 }
 
 /* 问候是这一屏的主角。旧仓内联 var(--font-brand)（= var(--font-sans) 别名，
