@@ -1,6 +1,8 @@
 /* 本体读成三张表（对照旧仓 pages/ontologyTables.tsx）：类（层级序 + 缩进）/
    关系（签名 + 公理芯片）/ 属性（挂在哪个类上）。排序把层级拍平；不列 key。
-   新建行/属性编辑入口属任务 6。 */
+   新建行/属性编辑入口属任务 6。
+   reskin-b3：root 自带内距归零（表格视图主区卡 .card 提供内距），
+   表体 .table-box 全局配方原样。 */
 import { computed, defineComponent, ref, type PropType, type VNode } from "vue";
 import type { EntityTypeView, RelationTypeView } from "@/api/knowledge/types";
 import { S } from "@/i18n";
@@ -425,7 +427,7 @@ export const OntologyTables = defineComponent({
         );
       }
       return (
-        <div class="h-full overflow-y-auto overscroll-contain px-8 py-6">
+        <div class="h-full overflow-y-auto overscroll-contain">
           {props.loading ? (
             <div class="text-sub text-ink-2">{S.nav.loading}</div>
           ) : (
