@@ -1,4 +1,5 @@
-<!-- 法务页（对照旧仓 Legal.tsx）：/privacy、/terms，登录页页脚可达的公共页面。
+<!-- 法务页（对照旧仓 Legal.tsx）：/terms、/privacy 双址正式接线（constantRoutes，polish-b I1），
+     经 /terms、/privacy 直达；登录页页脚现仅版权行无链接区，未挂页脚链。
      自部署语境：运营方是部署它的组织，这里的文本是随软件附带的缺省政策，
      口径务求诚实（存了什么、什么情况下数据会离开服务器、删除的真实语义）。
      （旧仓注释原话。）文本真源在 i18n 词典（S.legal.privacy / S.legal.terms）。

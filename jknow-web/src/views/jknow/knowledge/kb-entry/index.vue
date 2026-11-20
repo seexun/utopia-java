@@ -102,10 +102,10 @@ const workspaceReady = computed(
          的 noAccess 落地页同一副骨架） -->
     <div v-else-if="guided" class="grid h-full place-items-center px-6">
       <div class="max-w-sm text-center">
-        <h2 class="text-xl" style="color: #0f172a">
+        <h2 class="text-xl text-ink">
           {{ S.kbEntry.guideTitle }}
         </h2>
-        <p class="mt-2 text-sm leading-relaxed" style="color: #475569">
+        <p class="mt-2 text-sm leading-relaxed text-ink-2">
           {{ S.kbEntry.guideBody }}
         </p>
         <el-button class="mt-4" size="default" @click="reload">
@@ -115,7 +115,7 @@ const workspaceReady = computed(
     </div>
     <!-- 等待页：壳在、内容空（与 KbRedirect 同观感——一行「加载中」） -->
     <div v-else class="grid h-full place-items-center px-6">
-      <p class="text-sm" style="color: #94a3b8">{{ S.nav.loading }}</p>
+      <p class="text-sm text-ink-3">{{ S.nav.loading }}</p>
     </div>
   </div>
 </template>

@@ -175,6 +175,20 @@ export const constantRoutes = [
     component: () => import("@/views/jknow/knowledge/docs/index.vue"),
     hidden: true
   },
+  // 法务页正式接线（polish-b I1 收口，孤儿视图除名）：legal 组件按
+  // route.path 切换词条（/terms=使用条款，/privacy=隐私政策），故 /privacy
+  // 是同组件独立记录而非 redirect——redirect 到 /terms 会让隐私词条永不渲染。
+  // hidden 不进菜单；登录态直达（permission.ts 白名单未开，页脚无链接区未挂链）。
+  {
+    path: "/terms",
+    component: () => import("@/views/jknow/knowledge/legal/index.vue"),
+    hidden: true
+  },
+  {
+    path: "/privacy",
+    component: () => import("@/views/jknow/knowledge/legal/index.vue"),
+    hidden: true
+  },
   // 账户层（源仓 router/modules/remaining.ts 的 AccountShell 族，T5 收口）：
   // kb 页顶栏 user-menu（个人资料/我的库/部署管理）与「新建知识库」深链
   // （/account/kbs?create=true）的链接目标。kb/account 若依壳内联
