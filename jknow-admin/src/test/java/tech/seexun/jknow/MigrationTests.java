@@ -30,14 +30,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * V0104 系统组后移（T2 走查发现三组与系统组 order 同为 1/2/3、PG 稳定排序按 menu_id 决胜致侧栏交错；
  * 系统管理/监控/工具 order+3→4/5/6，行数零变动）与
  * V0105 普通角色知识菜单授权+演示访客绑定（补回工作空间 perms 载体 F 2111/2112 挂 2200 下、
- * 区间 27 行整体授 role 2、9999→2；用户本体由 seed-demo 造）为本工程新写。
+ * 区间 27 行整体授 role 2、9999→2；用户本体由 seed-demo 造）与
+ * V0106 演示访客只读角色（role 3 demo 只授知识区间 27 行、系统菜单零授予、
+ * 9999 解绑 2 改绑 3、sys_role_menu 孤儿行通用清——V0103 删菜单未清关联遗留 (2,4)）
+ * 为本工程新写。
  */
 @Testcontainers(disabledWithoutDocker = true)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class MigrationTests {
 
-    /** V0000 + 99（源拷） + V0100 + V0101 + V0102 + V0103 + V0104 + V0105 */
-    private static final int MIGRATION_COUNT = 106;
+    /** V0000 + 99（源拷） + V0100 + V0101 + V0102 + V0103 + V0104 + V0105 + V0106 */
+    private static final int MIGRATION_COUNT = 107;
 
     /** V0105 后 2100-2299 区间行数：3 M（2200/2210/2220）+ 8 C（2120 保留 + 2202/2203/2211/2212/2213/2214/2221）
      *  + 16 F（V0103 退役的工作空间 2111/2112 由 V0105 补回为 perms 载体行挂 2200 下——
@@ -89,7 +92,7 @@ class MigrationTests {
     @Order(1)
     void replayFullChainCreatesAllTables() throws SQLException {
         var result = flyway().migrate();
-        assertEquals(MIGRATION_COUNT, result.migrationsExecuted, "应执行 V0000-V0105 共 106 个迁移");
+        assertEquals(MIGRATION_COUNT, result.migrationsExecuted, "应执行 V0000-V0106 共 107 个迁移");
         assertEquals(TABLE_COUNT, queryInt(
                 "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'"
                         + " AND table_name <> 'flyway_schema_history'"),
@@ -181,27 +184,56 @@ class MigrationTests {
         // —— V0105 授权断言：role 2 补齐知识区间全量 + 演示访客绑定 ——
         assertEquals(KNOWLEDGE_MENU_COUNT, queryInt(
                 "select count(*) from sys_role_menu where role_id = 2 and menu_id between 2100 and 2299"),
-                "role 2 应持有知识区间全量 27 行授权（3 分组 M + 8 C + 16 F——非 admin 侧栏三分组可见的前提）");
+                "role 2 应持有知识区间全量 27 行授权（3 分组 M + 8 C + 16 F——非 admin 侧栏三分组可见的前提；"
+                        + "V0106 孤儿清/改绑均不动 role 2 此 27 行——V0105 不回退）");
         assertEquals(0, queryInt(
                 "select count(*) from sys_menu m where m.menu_id between 2100 and 2299"
                         + " and not exists (select 1 from sys_role_menu rm"
                         + " where rm.role_id = 2 and rm.menu_id = m.menu_id)"),
                 "知识区间不应存在 role 2 未授权的菜单（逐行双向钉死，防部分授权）");
         assertEquals(0, queryInt(
-                "select count(*) from sys_role_menu where role_id <> 2 and menu_id between 2100 and 2299"),
-                "知识区间不应授权给 role 2 以外的角色（admin 走超级管理员直通，不需关联行）");
+                "select count(*) from sys_role_menu where role_id not in (2, 3) and menu_id between 2100 and 2299"),
+                "知识区间不应授权给 role 2/role 3 以外的角色（admin 走超级管理员直通，不需关联行；"
+                        + "V0106 起 role 3 同持区间——demo 只读角色与 role 2 同口径）");
         assertEquals(2, queryInt(
                 "select count(*) from sys_menu where menu_id in (2111, 2112)"
                         + " and menu_type = 'F' and parent_id = 2200 and visible = '0' and status = '0'"),
                 "V0105 补回的工作空间 perms 载体行 2111/2112 应为 F 型挂 2200 下、显示且正常"
                         + "（F 不进侧栏导航，仅向权限集合贡献 knowledge:workspace:list/edit）");
-        assertEquals(112, queryInt(
+        assertEquals(111, queryInt(
                 "select count(*) from sys_role_menu where role_id = 2"),
-                "role 2 关联总数应为 112（V0000 基线 85 系统菜单 + V0105 知识区间 27，无交集无重复）");
+                "role 2 关联总数应为 111（V0000 基线 85 系统菜单 + V0105 知识区间 27 = 112，"
+                        + "V0106 孤儿行通用清去 V0103 删菜单遗留的 (2,4) 若依官网关联 = 111）");
+        // —— V0106 演示访客只读角色断言群（安全核心：demo 侧栏只见三分组）——
+        assertEquals("demo", queryInt2Str(
+                "select role_key from sys_role where role_id = 3"),
+                "role 3 应存在且 role_key=demo（演示访客只读角色）");
         assertEquals(1, queryInt(
-                "select count(*) from sys_user_role where user_id = 9999 and role_id = 2"),
-                "sys_user_role 应存在 9999→2 绑定（演示访客 demo——用户本体由 seed-demo.sql §0.5 造，"
+                "select count(*) from sys_role where role_id = 3 and status = '0' and del_flag = '0'"),
+                "role 3 应为正常启用状态（status='0'、del_flag='0'）");
+        assertEquals(KNOWLEDGE_MENU_COUNT, queryInt(
+                "select count(*) from sys_role_menu where role_id = 3 and menu_id between 2100 and 2299"),
+                "role 3 应持有知识区间全量 27 行授权（与 V0105 的 role 2 同口径——三分组 M + 8 C + 16 F，"
+                        + "图谱/检索/对话全链鉴权面放行）");
+        assertEquals(0, queryInt(
+                "select count(*) from sys_menu m where m.menu_id between 2100 and 2299"
+                        + " and not exists (select 1 from sys_role_menu rm"
+                        + " where rm.role_id = 3 and rm.menu_id = m.menu_id)"),
+                "知识区间不应存在 role 3 未授权的菜单（逐行双向钉死，防部分授权断链）");
+        assertEquals(0, queryInt(
+                "select count(*) from sys_role_menu where role_id = 3 and menu_id < 2100"),
+                "role 3 系统菜单授权必须为 0（安全核心断言——demo 登录侧栏不得见系统管理/监控/工具）");
+        assertEquals(1, queryInt(
+                "select count(*) from sys_user_role where user_id = 9999 and role_id = 3"),
+                "sys_user_role 应存在 9999→3 绑定（V0106 改绑演示访客 demo——用户本体由 seed-demo.sql §0.5 造，"
                         + "sys_user_role 无外键故空库重放先行建绑定）");
+        assertEquals(1, queryInt(
+                "select count(*) from sys_user_role where user_id = 9999"),
+                "9999 应只绑 role 3 一个角色（V0105 的 2 绑定已解——绑 2 会带出 85 行系统菜单）");
+        assertEquals(0, queryInt(
+                "select count(*) from sys_role_menu rm"
+                        + " where not exists (select 1 from sys_menu m where m.menu_id = rm.menu_id)"),
+                "全表 sys_role_menu 不应存在孤儿行（menu_id 指向已删菜单——V0106 通用清后归零）");
     }
 
     @Test
