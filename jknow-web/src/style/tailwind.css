@@ -128,6 +128,7 @@
    ============================================================ */
 html.dark {
   --color-card: #212121;
+  /* 别名镜像豁免（亮定义同引用，随 neutral-soft 翻暗）——本块唯一嵌套 var */
   --color-fill: var(--color-neutral-soft);
   --color-line-strong: #525252;
 }

@@ -147,8 +147,9 @@ html.dark {
   --color-warning-soft: rgb(245 158 11 / 22%);
   --color-danger-soft: rgb(239 68 68 / 22%);
   /* soft 徽章的同系字（走查实证：亮值 #1d4ed8 压暗洗底仅 ~1.3:1 不可读）——
-     暗档取本文件既有 el light-3 静态档原值复用（非新色），对各自洗底
-     （叠 #212121 卡面）对比度 4.8~6.2:1，守住 theme.scss 徽章 ≥4.5:1 契约 */
+     暗档 3 值（success/warning/danger）复用本文件既有 el light-3 档原值；
+     primary-text 因 light-3 #6692f1 对 soft 洗底 4.2:1 不达 4.5:1 契约，
+     调亮为新值 #93b4f5 实测 6.23:1（叠 #212121 卡面合成），守住 theme.scss 徽章 ≥4.5:1 契约 */
   --color-primary-text: #93b4f5;
   --color-success-text: #58cea7;
   --color-warning-text: #f8bb54;
