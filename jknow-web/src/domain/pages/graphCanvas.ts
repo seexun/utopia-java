@@ -145,6 +145,15 @@ export function sigmaOptions(o: CanvasOptions) {
        可以忽略 */
     zIndex: true,
     allowInvalidContainer: true,
+    /* **fit 边距**。sigma 相机的 reset/fit 是 ratio 1——整张图贴边填满视口
+       （视口矩阵里最小边全幅、correctionRatio 保证 contain），落在包围盒边缘
+       的节点正好压在卡缘上被裁半，图谱页底部还要再叠一层时间岛。sigma 没有
+       带 padding 的 fitView，但 settings 里有这枚 `stagePadding`：视口矩阵
+       按 `min(w,h) − 2×padding` 取景，fit 时四边各留这些像素的呼吸边——
+       坐标换算（graphToViewport 等）与世界网格走同一矩阵，自动对齐。
+       只在 fit（ratio 1）附近最显；缩放不受影响（minCameraRatio 语义未变）。
+       40px：底缘节点完整离开卡缘，盖在时间岛后面的只是浮层叠加不是裁切 */
+    stagePadding: 40,
     defaultNodeType: NODE_TYPE_SHELL,
     nodeProgramClasses: NODE_PROGRAMS,
     nodeHoverProgramClasses: NODE_HOVER_PROGRAMS,

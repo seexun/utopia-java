@@ -317,7 +317,7 @@ onUnmounted(() => {
 </script>
 
 <style lang='scss'>
-$lighterBlue: #409EFF;
+$lighterBlue: var(--color-primary);
 
 .container {
   position: relative;

@@ -139,7 +139,7 @@ const docDate = computed(() =>
         <template v-else-if="doc">
           <!-- 页头（重造要素一）：标题=文档名、副题=库名；extra=回文库。
                原 h1 行的元信息（块数/大小/文档日期/上传日）落在页头下 -->
-          <PageHeader class-name="mb-1" :title="doc.filename" :subtitle="kbName">
+          <PageHeader class="mb-1" :title="doc.filename" :subtitle="kbName">
             <template #extra>
               <RouterLink
                 :to="`/kb/${kbId}/library`"

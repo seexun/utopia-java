@@ -348,6 +348,7 @@ function resetAudit(fn: () => void) {
                   >{{ S.kbset.saved }}</span
                 >
                 <el-button
+                  type="primary"
                   size="small"
                   :disabled="!name.trim() || !identityDirty || saving"
                   @click="
@@ -400,6 +401,7 @@ function resetAudit(fn: () => void) {
                   >{{ S.kbset.saved }}</span
                 >
                 <el-button
+                  type="primary"
                   size="small"
                   :disabled="!visibilityDirty || saving"
                   @click="save('visibility', { visibility })"
@@ -461,6 +463,7 @@ function resetAudit(fn: () => void) {
                   >{{ S.kbset.saved }}</span
                 >
                 <el-button
+                  type="primary"
                   size="small"
                   :disabled="!automationDirty || saving"
                   @click="
@@ -554,6 +557,7 @@ function resetAudit(fn: () => void) {
                   >{{ S.kbset.saved }}</span
                 >
                 <el-button
+                  type="primary"
                   size="small"
                   :disabled="!langDirty || saving"
                   @click="save('lang', { ontology_lang: ontoLang })"

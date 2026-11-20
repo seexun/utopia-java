@@ -176,7 +176,7 @@ const clamp = (v: number) => Math.max(1, Math.min(256, v || 1));
           :key="`${m.base_url}|${m.model}`"
           class="flex items-center gap-2 py-3 text-sub first:pt-1.5 last:pb-1.5"
         >
-          <span class="badge-soft badge-soft shrink-0 px-2">{{ m.kind }}</span>
+          <span class="badge-soft shrink-0 px-2">{{ m.kind }}</span>
           <span class="truncate font-mono text-ink-2">{{ m.model }}</span>
           <span class="hidden truncate text-ink-2 sm:inline">{{ m.base_url }}</span>
           <div class="ml-auto flex shrink-0 items-center gap-3">

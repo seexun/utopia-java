@@ -19,11 +19,19 @@ defineProps({
 </script>
 
 <style scoped lang="scss">
+/* 默认下距单独住 components 层（层序 base < components < utilities，见
+   style/tailwind.css 首行）：本文件未分层规则恒压 utilities，写在这里调用方
+   的 mb-* 永远不生效；住进层里，紧凑页头（doc-viewer 的 mb-1）就能压过 */
+@layer components {
+  .page-header {
+    margin-bottom: 20px;
+  }
+}
+
 .page-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 20px;
 
   .page-title {
     margin: 0;
