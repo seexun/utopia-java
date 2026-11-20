@@ -30,18 +30,22 @@
   --el-color-danger: #ef4444;
   --el-color-error: #ef4444;
 
-  /* 中性（旧 ink/border/bg） */
-  --el-text-color-primary: #0f172a; /* ink */
-  --el-text-color-regular: #475569; /* ink-2 */
-  --el-text-color-secondary: #94a3b8; /* ink-3 */
-  --el-text-color-placeholder: #94a3b8;
-  --el-border-color: #e5eaf1; /* line */
-  --el-border-color-light: #e5eaf1;
-  --el-border-color-lighter: #e5eaf1;
-  --el-fill-color-light: #f1f5f9; /* neutral-soft */
-  --el-fill-color-lighter: #f6f8fb; /* bg-page */
-  --el-bg-color: #ffffff; /* card */
-  --el-bg-color-page: #f6f8fb;
+  /* 中性（旧 ink/border/bg）——T4 暗态令牌层：改引 --color-* 令牌（亮值与
+     原字面量逐一同值 → 亮态零改动；html.dark 下随令牌翻暗。本块挂在
+     .knowledge-page 上直接声明会压过 element-plus dark/css-vars 的 html.dark
+     继承值——子树里 .card（--el-bg-color）/el-table（fill/border）若不走
+     令牌就整体滞留亮值，成暗态刺眼白块，见任务 4 走查） */
+  --el-text-color-primary: var(--color-ink);
+  --el-text-color-regular: var(--color-ink-2);
+  --el-text-color-secondary: var(--color-ink-3);
+  --el-text-color-placeholder: var(--color-ink-3);
+  --el-border-color: var(--color-border);
+  --el-border-color-light: var(--color-border);
+  --el-border-color-lighter: var(--color-border);
+  --el-fill-color-light: var(--color-neutral-soft);
+  --el-fill-color-lighter: var(--color-bg);
+  --el-bg-color: var(--color-card);
+  --el-bg-color-page: var(--color-bg);
 
   /* 圆角（旧 radius-ctl 8 / radius-card 12） */
   --el-border-radius-base: 8px;
@@ -61,9 +65,10 @@
    .knowledge-page——否则若依登录页/系统管理页的正文底色与字体被整体改写。 */
 .knowledge-page {
   /* 页底（旧 bg-page）：中间灰的基调，登录页与内容区共用。
-     字体栈与 --el-font-family 同源（中文 = 本地思源黑体，见上方说明） */
-  background-color: #f6f8fb;
-  color: #0f172a;
+     字体栈与 --el-font-family 同源（中文 = 本地思源黑体，见上方说明）。
+     T4 暗态令牌层：底/墨改引令牌（亮值与原字面同值，html.dark 随档翻暗）。 */
+  background-color: var(--color-bg);
+  color: var(--color-ink);
   font-family:
     "Plus Jakarta Sans", "Noto Sans SC Variable", "PingFang SC",
     "Microsoft YaHei", "HarmonyOS Sans SC", sans-serif;

@@ -110,3 +110,24 @@
 @utility bg-page {
   background-color: var(--color-bg);
 }
+
+/* ============================================================
+   暗态覆盖档（规格 §5，与 tokens.scss 尾部 html.dark 同批）：
+   本文件 @theme 独有的三个面令牌在这里翻暗——tokens.scss 的 html.dark
+   块管不到它们（同名双源，两处都要覆盖）。亮态值不动，仅 html.dark 生效。
+   - --color-card：亮 #ffffff → #212121（比页底 #1a1a1a 亮一档、比
+     neutral-soft #262626 暗一档——保住亮档「卡比底亮、fill 比卡沉」的层序
+     反演；bg-card / .pop / .stat-card / 画布 node-shell 全走它，是「自定义
+     面翻暗无刺眼白块」的关键一件）。
+   - --color-fill：亮 var(--color-neutral-soft) → 暗档同引用（tokens.scss
+     html.dark 已把 neutral-soft 翻成 #262626，这里显式同批声明，防单源漂移）。
+   - --color-line-strong：亮 #cbd5e1（border 与 ink-3 之间）→ #525252
+     （暗档 border #3a3a3a 与 ink-3 #6b6b6b 之间——现亮值按档位推暗一档）。
+   不进 @theme/@layer：裸规则压过 @layer theme 的 :root 注册，html.dark
+   特异性同层取胜。
+   ============================================================ */
+html.dark {
+  --color-card: #212121;
+  --color-fill: var(--color-neutral-soft);
+  --color-line-strong: #525252;
+}
