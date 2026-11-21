@@ -35,7 +35,7 @@ describe("subscribeEvents 竞态窗口", () => {
 
   it("卸载后迟到帧不作数：dispose 后 reader 吐帧不触达 handlers", async () => {
     const onEvent = vi.fn();
-    const dispose = subscribeEvents("/sse", { tick: onEvent });
+    const dispose = subscribeEvents("/sse", { tick: onEvent }, () => {});
     await settle();
     expect(streams.length).toBe(1);
     dispose();
@@ -45,7 +45,7 @@ describe("subscribeEvents 竞态窗口", () => {
   });
 
   it("重连窗口 close：流断排程 retry 期间 dispose，不再重建连接", async () => {
-    const dispose = subscribeEvents("/sse", {});
+    const dispose = subscribeEvents("/sse", {}, () => {});
     await settle();
     streams[0].drop();               // 服务端断流 → 排程 retry
     await settle();
@@ -73,7 +73,7 @@ describe("subscribeEvents 竞态窗口", () => {
   });
 
   it("open 重入闸：controller 占位期间 visible 抖动不开第二条连接", async () => {
-    subscribeEvents("/sse", {});
+    subscribeEvents("/sse", {}, () => {});
     await settle();
     vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
     document.dispatchEvent(new Event("visibilitychange"));
