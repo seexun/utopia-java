@@ -560,7 +560,8 @@ body.sidebar-light-mode {
     .el-menu-item.is-active {
       background-color: var(--color-primary-soft) !important;
       color: var(--color-primary) !important;
-      font-weight: 600;
+      // 字重对齐 light 展开块 is-active 的 700（终审必修项：折叠/展开形态字重一致）
+      font-weight: 700;
     }
   }
 }
