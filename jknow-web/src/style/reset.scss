@@ -185,7 +185,7 @@
 
   input::placeholder,
   textarea::placeholder {
-    color: #9ca3af;
+    color: var(--color-ink-3);
     opacity: 1;
   }
 

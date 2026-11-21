@@ -7,7 +7,8 @@
    3) 尾部追加：has-logo calc（jknow Logo 54px）与 theme-dark/theme-light 容器块
       （jknow 壳 --current-color 换色跟随；fallback 已对齐 #2563eb）。
    舍弃的 jknow 侧改动（让位 gvdata 观感）：菜单 44px 行高、svg-icon 10px 边距、
-   hideSidebar 54px、box-shadow 0-0-8px——详见任务报告合并点清单。 */
+   hideSidebar 54px、box-shadow 0-0-8px——详见任务报告合并点清单。
+   更正：T2（ui-calib）起一级恢复 44px 分档。 */
 @use './variables.module.scss' as *;
 
 #app {

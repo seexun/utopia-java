@@ -22,7 +22,8 @@ const props = defineProps({
 })
 
 const loading = ref<boolean>(true)
-const height = ref<string>(document.documentElement.clientHeight - 94.5 + 'px')
+/* 124 = 顶栏 54 + 标签栏 38（§B 尺寸校准）+ .app-main 上下 padding 16×2 */
+const height = ref<string>(document.documentElement.clientHeight - 124 + 'px')
 const iframeRef = ref<HTMLIFrameElement | null>(null)
 
 onMounted(() => {
