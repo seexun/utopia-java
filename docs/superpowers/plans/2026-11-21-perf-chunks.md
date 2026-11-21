@@ -115,7 +115,19 @@ sed -i "s|const baseUrl = 'http://localhost:8080'|const baseUrl = 'http://localh
 
 ---
 
-### 任务 3：产物对比+network 验证+回归汇总（分支终审前置）
+### 任务 3：Quill 桶化+产物对比+network 验证+回归汇总（分支终审前置）
+
+> 计划修正（用户拍板 B）：T2 实证 hljs 假设证伪（本体早已在 vendor-md 桶，主 entry 无变化）；主 entry 796K 真实大头为 Quill（main.ts:118 Editor 全局注册，消费方仅首页+审查页）。本任务增补 Quill 桶化达成"主 entry 显著缩"的本批目标（规格 §2 意图的修正实现路径）。
+
+- [ ] **步骤 0：Quill 桶化（增补）**
+
+vite.config.ts manualChunks 增一行桶（与 vendor-md 同构）：
+
+```ts
+'vendor-quill': ['quill', '@vueup/vue-quill']
+```
+
+（quill@2.0.2 与 @vueup/vue-quill@1.2.0 均为 package.json 直接依赖——无幽灵依赖问题。）`pnpm build:prod` 后断言：主 entry 最大 index-*.js 显著缩（~200KB 级，Quill ~590KB 移出）；`ls dist/static/js/ | grep vendor-quill` 存在。走查：首页+审查页（用 Editor 的页面）富文本编辑器渲染正常（DOM 断言 .ql-editor 存在）——截图 `t3-00-quill-pages.png`。
 
 - [ ] **步骤 1：network 首屏验证**
 
