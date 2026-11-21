@@ -344,7 +344,7 @@ $lighterBlue: var(--color-primary);
         left: 12px;
         top: 6px;
         line-height: 30px;
-        color: #00afff;
+        color: var(--color-primary);
         font-weight: 600;
         font-size: 17px;
         white-space: nowrap;
@@ -414,11 +414,11 @@ $lighterBlue: var(--color-primary);
                 }
 
                 &:hover {
-                  border: 1px dashed #787be8;
-                  color: #787be8;
+                  border: 1px dashed var(--color-primary);
+                  color: var(--color-primary);
 
                   .svg-icon {
-                    color: #787be8;
+                    color: var(--color-primary);
                   }
                 }
               }
@@ -451,7 +451,7 @@ $lighterBlue: var(--color-primary);
       justify-content: flex-end;
 
       u .delete-btn {
-        color: #F56C6C;
+        color: var(--color-danger);
       }
     }
 
@@ -538,7 +538,7 @@ $lighterBlue: var(--color-primary);
             cursor: move;
 
             &.unfocus-bordered:not(.activeFromItem)>div:first-child {
-              border: 1px dashed #ccc;
+              border: 1px dashed var(--color-border);
             }
 
             .el-form-item {
@@ -550,7 +550,7 @@ $lighterBlue: var(--color-primary);
             position: relative;
             cursor: move;
             box-sizing: border-box;
-            border: 1px dashed #ccc;
+            border: 1px dashed var(--color-border);
             border-radius: 3px;
             padding: 0 2px;
             margin-bottom: 15px;
@@ -583,7 +583,7 @@ $lighterBlue: var(--color-primary);
               top: 0;
               left: 0;
               font-size: 12px;
-              color: #bbb;
+              color: var(--color-ink-3);
               display: inline-block;
               padding: 0 6px;
             }
@@ -623,7 +623,7 @@ $lighterBlue: var(--color-primary);
               right: 56px;
               border-color: $lighterBlue;
               color: $lighterBlue;
-              background: #fff;
+              background: var(--color-card);
 
               &:hover {
                 background: $lighterBlue;
@@ -633,12 +633,12 @@ $lighterBlue: var(--color-primary);
 
             &>.drawing-item-delete {
               right: 24px;
-              border-color: #F56C6C;
-              color: #F56C6C;
-              background: #fff;
+              border-color: var(--color-danger);
+              color: var(--color-danger);
+              background: var(--color-card);
 
               &:hover {
-                background: #F56C6C;
+                background: var(--color-danger);
                 color: #fff;
               }
             }
@@ -651,7 +651,7 @@ $lighterBlue: var(--color-primary);
             right: 0;
             text-align: center;
             font-size: 18px;
-            color: #ccb1ea;
+            color: var(--color-ink-3);
             letter-spacing: 4px;
           }
 

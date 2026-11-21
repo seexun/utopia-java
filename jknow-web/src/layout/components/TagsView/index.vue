@@ -376,18 +376,18 @@ $tags-bar-height: 38px;
 .tags-view-container {
   height: $tags-bar-height;
   width: 100%;
-  background: var(--tags-bg, #fff);
-  border-bottom: 1px solid var(--tags-item-border, #d8dce5);
+  background: var(--tags-bg, var(--color-card));
+  border-bottom: 1px solid var(--tags-item-border, var(--color-border));
   display: flex;
   align-items: center;
   overflow: hidden;
 
   $btn-width: 28px;
-  $btn-color: #71717a;
-  $btn-hover-bg: #f0f2f5;
-  $btn-hover-color: #303133;
-  $btn-disabled-color: #c0c4cc;
-  $divider: 1px solid var(--tags-item-border, #d8dce5);
+  $btn-color: var(--color-ink-2);
+  $btn-hover-bg: var(--color-neutral-soft);
+  $btn-hover-color: var(--color-ink);
+  $btn-disabled-color: var(--color-ink-3);
+  $divider: 1px solid var(--tags-item-border, var(--color-border));
 
   .tags-nav-btn {
     flex-shrink: 0;
@@ -428,9 +428,9 @@ $tags-bar-height: 38px;
       cursor: pointer;
       height: 30px;
       line-height: 30px;
-      border: 1px solid var(--tags-item-border, #d8dce5);
-      color: var(--tags-item-text, #495060);
-      background: var(--tags-item-bg, #fff);
+      border: 1px solid var(--tags-item-border, var(--color-border));
+      color: var(--tags-item-text, var(--color-ink));
+      background: var(--tags-item-bg, var(--color-card));
       padding: 0 8px;
       font-size: 12px;
       margin-left: 5px;
@@ -445,9 +445,9 @@ $tags-bar-height: 38px;
   }
 
   &:not(.tags-view-container--chrome) .tags-view-wrapper .tags-view-item.active {
-    background-color: #42b983;
+    background-color: var(--color-success);
     color: #fff;
-    border-color: #42b983;
+    border-color: var(--color-success);
 
     &::before {
       content: '';
@@ -496,7 +496,7 @@ $tags-bar-height: 38px;
 
   .contextmenu {
     margin: 0;
-    background: var(--el-bg-color-overlay, #fff);
+    background: var(--el-bg-color-overlay, var(--color-card));
     z-index: 3000;
     position: fixed;
     list-style-type: none;
@@ -504,9 +504,9 @@ $tags-bar-height: 38px;
     border-radius: 4px;
     font-size: 12px;
     font-weight: 400;
-    color: var(--tags-item-text, #333);
+    color: var(--tags-item-text, var(--color-ink));
     box-shadow: 2px 2px 3px 0 rgba(0, 0, 0, .3);
-    border: 1px solid var(--el-border-color-light, #e4e7ed);
+    border: 1px solid var(--el-border-color-light, var(--color-border));
 
     li {
       margin: 0;
@@ -514,16 +514,16 @@ $tags-bar-height: 38px;
       cursor: pointer;
 
       &:hover {
-        background: var(--tags-item-hover, #eee);
+        background: var(--tags-item-hover, var(--color-neutral-soft));
       }
     }
   }
 
   &.tags-view-container--chrome {
-    --chrome-strip-bg: #ffffff;
-    --chrome-strip-border: var(--el-border-color-lighter, #e4e7ed);
+    --chrome-strip-bg: var(--color-card);
+    --chrome-strip-border: var(--el-border-color-lighter, var(--color-border));
     --chrome-tab-active-bg: var(--el-color-primary-light-9);
-    --chrome-tab-text: var(--el-text-color-regular, #606266);
+    --chrome-tab-text: var(--el-text-color-regular, var(--color-ink-2));
     --chrome-tab-text-active: var(--el-color-primary);
     --chrome-wing-r: 10px;
 
@@ -601,14 +601,14 @@ $tags-bar-height: 38px;
         }
 
         &:not(.active) + .tags-view-item:not(.active) {
-          border-left: 1px solid var(--el-border-color-lighter, #e4e7ed);
+          border-left: 1px solid var(--el-border-color-lighter, var(--color-border));
           padding-left: 11px;
         }
 
         &:hover:not(.active) {
-          background: var(--el-fill-color-light, #f5f7fa) !important;
+          background: var(--el-fill-color-light, var(--color-bg)) !important;
           border-radius: 6px 6px 0 0;
-          color: var(--el-text-color-primary, #303133);
+          color: var(--el-text-color-primary, var(--color-ink));
         }
 
         &.active {
@@ -661,7 +661,7 @@ $tags-bar-height: 38px;
       }
       
       &:hover {
-        background-color: var(--tags-close-hover, #b4bccc);
+        background-color: var(--tags-close-hover, var(--color-ink-3));
         
         .el-icon-close {
           color: #fff;

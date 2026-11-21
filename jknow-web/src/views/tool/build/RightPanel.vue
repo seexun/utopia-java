@@ -847,7 +847,7 @@ function tagChange(tagIcon: string): void {
 
   & .close-btn {
     cursor: pointer;
-    color: #f56c6c;
+    color: var(--color-danger);
   }
 
   & .el-input+.el-input {
@@ -867,7 +867,7 @@ function tagChange(tagIcon: string): void {
   line-height: 32px;
   font-size: 22px;
   padding: 0 4px;
-  color: #777;
+  color: var(--color-ink-2);
 }
 
 .option-drag {
@@ -908,7 +908,7 @@ function tagChange(tagIcon: string): void {
 }
 
 .node-icon {
-  color: #bebfc3;
+  color: var(--color-ink-3);
 }
 
 .custom-tree-node {

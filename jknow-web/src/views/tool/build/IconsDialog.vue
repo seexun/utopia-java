@@ -73,12 +73,12 @@ watch(key, (val: string) => {
     justify-content: center;
 
     &:hover {
-      background: #f2f2f2;
+      background: var(--color-neutral-soft);
     }
 
     &.active-item {
-      background: #e1f3fb;
-      color: #7a6df0
+      background: var(--color-primary-soft);
+      color: var(--color-primary-text)
     }
 
     i {

@@ -31,13 +31,13 @@ const title = computed(() => (route.meta?.title as string) ?? "");
 
 .panel {
   text-align: center;
-  color: #9ca3af;
+  color: var(--color-ink-3);
 }
 
 .title {
   font-size: 16px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--color-ink-2);
   margin: 0 0 8px;
 }
 

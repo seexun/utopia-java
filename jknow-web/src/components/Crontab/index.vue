@@ -264,14 +264,14 @@ onMounted(() => {
     overflow: hidden;
     line-height: 34px;
     padding-top: 6px;
-    background: #f2f2f2;
+    background: var(--color-neutral-soft);
 }
 .popup-result {
     box-sizing: border-box;
     line-height: 24px;
     margin: 25px auto;
     padding: 15px 10px 10px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--color-border);
     position: relative;
 }
 .popup-result .title {
@@ -283,7 +283,7 @@ onMounted(() => {
     margin-left: -70px;
     text-align: center;
     line-height: 30px;
-    background: #fff;
+    background: var(--color-card);
 }
 .popup-result table {
     text-align: center;
@@ -303,7 +303,7 @@ onMounted(() => {
     height: 30px;
     white-space: nowrap;
     overflow: hidden;
-    border: 1px solid #e8e8e8;
+    border: 1px solid var(--color-border);
 }
 .popup-result-scroll {
     font-size: 12px;

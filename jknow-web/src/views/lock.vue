@@ -178,7 +178,7 @@ onBeforeUnmount(() => {
 .lock-container {
   position: fixed;
   inset: 0;
-  background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+  background: linear-gradient(135deg, #0f0c29, #302b63, #24243e); /* dark-only */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -320,7 +320,7 @@ onBeforeUnmount(() => {
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: var(--gradient-brand);
   border: none;
   color: #fff;
   font-size: 18px;
@@ -348,7 +348,7 @@ onBeforeUnmount(() => {
 
 .error-msg {
   margin-top: 14px;
-  color: #ff7675;
+  color: var(--color-danger);
   font-size: 13px;
   text-align: center;
   animation: fadeIn 0.3s ease;

@@ -263,7 +263,7 @@ defineExpose({
       height: 100%;
       padding-top: 15px;
       padding-left: 24px;
-      color: #1890ff;
+      color: var(--color-primary);
       font-weight: 700;
       font-size: 14px;
     }
@@ -300,7 +300,7 @@ defineExpose({
     width: 56px;
     height: 48px;
     border-radius: 4px;
-    background: #f0f2f5;
+    background: var(--color-neutral-soft);
     border: 2px solid transparent;
   }
 
@@ -308,11 +308,11 @@ defineExpose({
     b:first-child {
       display: block;
       height: 30%;
-      background: #fff;
+      background: var(--color-card);
     }
     b:last-child {
       width: 30%;
-      background: #1b2a47;
+      background: #1b2a47; /* dark-only */
       position: absolute;
       height: 100%;
       top: 0;
@@ -324,11 +324,11 @@ defineExpose({
       border-radius: 4px 4px 0 0;
       display: block;
       height: 30%;
-      background: #1b2a47;
+      background: #1b2a47; /* dark-only */
     }
     b:last-child {
       width: 30%;
-      background: #1b2a47;
+      background: #1b2a47; /* dark-only */
       position: absolute;
       height: 70%;
       border-radius: 0 0 0 4px;
@@ -338,7 +338,7 @@ defineExpose({
     b:first-child {
       display: block;
       height: 30%;
-      background: #1b2a47;
+      background: #1b2a47; /* dark-only */
       border-radius: 4px 4px 0 0;
     }
   }

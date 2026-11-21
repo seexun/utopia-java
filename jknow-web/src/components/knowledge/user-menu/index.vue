@@ -64,7 +64,7 @@ function onLang(next: Lang) {
         :style="{ width: '24px', height: '24px', fontSize: '9px' }"
         >{{ initials }}</span
       >
-      <span class="text-sm" style="color: #6b7280">{{ user.display_name }}</span>
+      <span class="text-sm" style="color: var(--color-ink-2)">{{ user.display_name }}</span>
     </div>
     <template #dropdown>
       <el-dropdown-menu>
@@ -81,11 +81,11 @@ function onLang(next: Lang) {
               <span
                 v-if="user.is_admin"
                 class="rounded px-1.5 py-0.5 text-xs"
-                style="background: #f1f5f9; color: #6b7280"
+                style="background: var(--color-neutral-soft); color: var(--color-ink-2)"
                 >{{ S.account.adminChip }}</span
               >
             </div>
-            <div class="truncate text-xs" style="color: #9ca3af">{{ user.email }}</div>
+            <div class="truncate text-xs" style="color: var(--color-ink-3)">{{ user.email }}</div>
           </div>
         </li>
         <el-dropdown-item @click="go('/account')">
@@ -136,7 +136,7 @@ function onLang(next: Lang) {
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  border-bottom: 1px solid #e5eaf0;
+  border-bottom: 1px solid var(--color-border);
   cursor: default;
 }
 
@@ -148,8 +148,8 @@ function onLang(next: Lang) {
   padding: 8px 16px;
   font-size: 14px;
   white-space: nowrap;
-  border-top: 1px solid #e5eaf0;
-  border-bottom: 1px solid #e5eaf0;
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
   cursor: default;
 }
 </style>

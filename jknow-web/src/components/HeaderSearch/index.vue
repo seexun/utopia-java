@@ -271,7 +271,7 @@ watch(searchPool, (list: SearchItem[]) => {
 .result-count {
   padding: 6px 16px 0;
   font-size: 12px;
-  color: #aaa;
+  color: var(--color-ink-3);
 
   strong {
     color: red;
@@ -321,7 +321,7 @@ watch(searchPool, (list: SearchItem[]) => {
       }
 
       .menu-path {
-        color: #ccc;
+        color: var(--color-ink-3);
         font-size: 10px;
       }
     }
@@ -340,23 +340,23 @@ watch(searchPool, (list: SearchItem[]) => {
 
     .empty-icon {
       font-size: 42px;
-      color: #e0e0e0;
+      color: var(--color-ink-3);
       margin-bottom: 14px;
     }
 
     .empty-text {
       font-size: 14px;
-      color: #999;
+      color: var(--color-ink-3);
       margin: 0 0 6px;
 
       strong {
-        color: #666;
+        color: var(--color-ink-2);
       }
     }
 
     .empty-tip {
       font-size: 12px;
-      color: #bbb;
+      color: var(--color-ink-3);
       margin: 0;
     }
   }
@@ -367,8 +367,8 @@ watch(searchPool, (list: SearchItem[]) => {
   align-items: center;
   gap: 28px;
   padding: 10px 20px;
-  border-top: 1px solid #f0f0f0;
-  color: #999;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-ink-3);
   font-size: 12px;
 
   .shortcut-item {
@@ -384,14 +384,14 @@ watch(searchPool, (list: SearchItem[]) => {
     min-width: 20px;
     height: 20px;
     padding: 0 5px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--color-border);
     border-radius: 4px;
-    background: #f7f7f7;
-    color: #555;
+    background: var(--color-neutral-soft);
+    color: var(--color-ink-2);
     font-size: 11px;
     font-family: inherit;
     line-height: 1;
-    box-shadow: 0 1px 0 #ccc;
+    box-shadow: 0 1px 0 var(--color-border);
   }
 }
 </style>

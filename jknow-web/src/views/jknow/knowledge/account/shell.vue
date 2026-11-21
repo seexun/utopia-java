@@ -107,8 +107,8 @@ function goAdminTab(key: string) {
   display: flex;
   gap: 4px;
   padding: 0 16px;
-  border-bottom: 1px solid var(--el-border-color-light, #e5eaf0);
-  background: var(--el-bg-color, #fff);
+  border-bottom: 1px solid var(--el-border-color-light, var(--color-border));
+  background: var(--el-bg-color, var(--color-card));
 }
 
 .account-tab {
@@ -119,7 +119,7 @@ function goAdminTab(key: string) {
   padding: 0 14px;
   font-size: 14px;
   font-weight: 500;
-  color: var(--el-text-color-regular, #6b7280);
+  color: var(--el-text-color-regular, var(--color-ink-2));
   border-bottom: 2px solid transparent;
   transition:
     color 120ms,
@@ -127,13 +127,13 @@ function goAdminTab(key: string) {
 }
 
 .account-tab:hover {
-  color: var(--el-text-color-primary, #1f2937);
+  color: var(--el-text-color-primary, var(--color-ink));
 }
 
 .account-tab.is-active {
   font-weight: 600;
-  color: var(--el-color-primary, #1677ff);
-  border-bottom-color: var(--el-color-primary, #1677ff);
+  color: var(--el-color-primary, var(--color-primary));
+  border-bottom-color: var(--el-color-primary, var(--color-primary));
 }
 
 /* 管理页子页签行：贴主页签之下、内容区之上（缩进子项的横排化） */
@@ -142,8 +142,8 @@ function goAdminTab(key: string) {
   flex-wrap: wrap;
   gap: 8px;
   padding: 10px 20px;
-  border-bottom: 1px solid var(--el-border-color-lighter, #eef2f6);
-  background: var(--el-bg-color, #fff);
+  border-bottom: 1px solid var(--el-border-color-lighter, var(--color-border));
+  background: var(--el-bg-color, var(--color-card));
 }
 
 .subtab {
@@ -151,7 +151,7 @@ function goAdminTab(key: string) {
   padding: 0 14px;
   font-size: 13px;
   font-weight: 500;
-  color: var(--el-text-color-regular, #6b7280);
+  color: var(--el-text-color-regular, var(--color-ink-2));
   background: transparent;
   border: 0;
   border-radius: 8px;
@@ -162,12 +162,12 @@ function goAdminTab(key: string) {
 }
 
 .subtab:hover {
-  color: var(--el-text-color-primary, #1f2937);
-  background: var(--el-fill-color-light, #f1f5f9);
+  color: var(--el-text-color-primary, var(--color-ink));
+  background: var(--el-fill-color-light, var(--color-neutral-soft));
 }
 
 .subtab.is-active {
-  color: var(--el-color-primary, #1677ff);
-  background: var(--el-color-primary-light-9, #e6f4ff);
+  color: var(--el-color-primary, var(--color-primary));
+  background: var(--el-color-primary-light-9, var(--color-primary-soft));
 }
 </style>

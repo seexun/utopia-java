@@ -553,8 +553,8 @@ onBeforeUnmount(() => {
 .tree-sidebar {
   flex-shrink: 0;
   width: 220px;
-  background: #fff;
-  border-right: 1px solid #e8eaed;
+  background: var(--color-card);
+  border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -610,14 +610,14 @@ onBeforeUnmount(() => {
   justify-content: center;
   width: 15px;
   height: 20px;
-  background: #fff;
+  background: var(--color-card);
   border-radius: 0 4px 4px 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   transition: all 0.2s ease;
   
   .tree-sidebar.collapsed & {
     right: 0;
-    background: #f7f8fa;
+    background: var(--color-neutral-soft);
     border-radius: 0 4px 4px 0;
   }
   
@@ -628,7 +628,7 @@ onBeforeUnmount(() => {
 
 .collapse-button {
   font-size: 20px;
-  color: #909399;
+  color: var(--color-ink-3);
   cursor: pointer;
   padding: 4px;
   border-radius: 4px;
@@ -636,7 +636,7 @@ onBeforeUnmount(() => {
   
   &:hover {
     color: var(--color-primary);
-    background: #ecf5ff;
+    background: var(--color-primary-soft);
   }
 }
 
@@ -646,14 +646,14 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   padding: 0 10px;
   height: 40px;
-  border-bottom: 1px solid #e8eaed;
-  background: #f7f8fa;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-neutral-soft);
   flex-shrink: 0;
 
   .tree-title {
     font-size: 13px;
     font-weight: 600;
-    color: #303133;
+    color: var(--color-ink);
     white-space: nowrap;
     overflow: hidden;
     display: flex;
@@ -676,7 +676,7 @@ onBeforeUnmount(() => {
 
 .tree-action-icon {
   font-size: 20px;
-  color: #909399;
+  color: var(--color-ink-3);
   cursor: pointer;
   padding: 4px;
   border-radius: 4px;
@@ -684,7 +684,7 @@ onBeforeUnmount(() => {
 
   &:hover {
     color: var(--color-primary);
-    background: #ecf5ff;
+    background: var(--color-primary-soft);
   }
 }
 
@@ -707,11 +707,11 @@ onBeforeUnmount(() => {
   }
 
   &::-webkit-scrollbar-thumb {
-    background: #dcdfe6;
+    background: var(--color-border);
     border-radius: 4px;
     
     &:hover {
-      background: #c0c4cc;
+      background: var(--color-ink-3);
     }
   }
 
@@ -721,12 +721,12 @@ onBeforeUnmount(() => {
     margin-bottom: 1px;
 
     &:hover {
-      background: #f0f7ff;
+      background: var(--color-primary-soft);
     }
   }
 
   :deep(.el-tree-node.is-current > .el-tree-node__content) {
-    background: #e6f0fd;
+    background: var(--color-primary-soft);
     color: var(--color-primary);
     font-weight: 600;
 
@@ -745,7 +745,7 @@ onBeforeUnmount(() => {
 
   .node-icon {
     font-size: 14px;
-    color: #f5a623;
+    color: var(--color-warning);
     flex-shrink: 0;
   }
 

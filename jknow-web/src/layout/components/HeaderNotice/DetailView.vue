@@ -139,21 +139,21 @@ defineExpose({
 }
 
 .type-notify {
-  background: var(--notice-tag-notify-bg, #fff8e6);
-  color: var(--notice-tag-notify-color, #b7791f);
-  border-left: 3px solid #d97706;
+  background: var(--notice-tag-notify-bg, var(--color-warning-soft));
+  color: var(--notice-tag-notify-color, var(--color-warning-text));
+  border-left: 3px solid var(--color-warning);
 }
 
 .type-announce {
-  background: var(--notice-tag-announce-bg, #e8f5e9);
-  color: var(--notice-tag-announce-color, #276749);
-  border-left: 3px solid #38a169;
+  background: var(--notice-tag-announce-bg, var(--color-success-soft));
+  color: var(--notice-tag-announce-color, var(--color-success-text));
+  border-left: 3px solid var(--color-success);
 }
 
 .notice-title {
   font-size: 22px;
   font-weight: 700;
-  color: var(--notice-title-color, #1a202c);
+  color: var(--notice-title-color, var(--color-ink));
   line-height: 1.45;
   margin: 0 0 16px;
   letter-spacing: -0.2px;
@@ -165,8 +165,8 @@ defineExpose({
   flex-wrap: wrap;
   gap: 16px;
   padding: 12px 0;
-  border-top: 1px solid var(--notice-border-color, #e9ecef);
-  border-bottom: 1px solid var(--notice-border-color, #e9ecef);
+  border-top: 1px solid var(--notice-border-color, var(--color-border));
+  border-bottom: 1px solid var(--notice-border-color, var(--color-border));
   margin-bottom: 28px;
 }
 
@@ -175,12 +175,12 @@ defineExpose({
   align-items: center;
   gap: 5px;
   font-size: 12px;
-  color: var(--notice-meta-color, #718096);
+  color: var(--notice-meta-color, var(--color-ink-2));
 }
 
 .meta-item .el-icon {
   font-size: 12px;
-  color: var(--notice-meta-icon-color, #a0aec0);
+  color: var(--notice-meta-icon-color, var(--color-ink-3));
 }
 
 .status-dot {
@@ -191,8 +191,8 @@ defineExpose({
   margin-right: 4px;
 }
 
-.status-ok  { background: #38a169; }
-.status-off { background: #e53e3e; }
+.status-ok  { background: var(--color-success); }
+.status-off { background: var(--color-danger); }
 
 .notice-divider {
   display: flex;
@@ -206,18 +206,18 @@ defineExpose({
   content: '';
   flex: 1;
   height: 1px;
-  background: var(--notice-divider-gradient, linear-gradient(to right, transparent, #dee2e6, transparent));
+  background: var(--notice-divider-gradient, linear-gradient(to right, transparent, var(--color-border), transparent));
 }
 
 .notice-divider-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--notice-divider-dot-color, #cbd5e0);
+  background: var(--notice-divider-dot-color, var(--color-border));
 }
 
 .notice-body {
-  background: var(--notice-body-bg, #fff);
+  background: var(--notice-body-bg, var(--color-card));
   border-radius: 6px;
   padding: 28px 32px;
   box-shadow: var(--notice-body-shadow, 0 1px 4px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.04));
@@ -227,7 +227,7 @@ defineExpose({
 .notice-content {
   font-size: 14px;
   line-height: 1.85;
-  color: var(--notice-content-color, #2d3748);
+  color: var(--notice-content-color, var(--color-ink));
   word-break: break-word;
 }
 
@@ -237,7 +237,7 @@ defineExpose({
 .notice-content :deep(h2),
 .notice-content :deep(h3) {
   font-weight: 700;
-  color: var(--notice-title-color, #1a202c);
+  color: var(--notice-title-color, var(--color-ink));
   margin: 1.4em 0 0.6em;
 }
 
@@ -246,10 +246,10 @@ defineExpose({
 .notice-content :deep(h3) { font-size: 14px; }
 
 .notice-content :deep(a) {
-  color: #3182ce;
+  color: var(--color-primary);
   text-decoration: underline;
 }
-.notice-content :deep(a:hover) { color: #2b6cb0; }
+.notice-content :deep(a:hover) { color: var(--color-primary-hover); }
 
 .notice-content :deep(img) {
   max-width: 100%;
@@ -265,11 +265,11 @@ defineExpose({
 .notice-content :deep(li) { margin-bottom: 4px; }
 
 .notice-content :deep(blockquote) {
-  border-left: 3px solid var(--notice-blockquote-border, #cbd5e0);
+  border-left: 3px solid var(--notice-blockquote-border, var(--color-border));
   margin: 1em 0;
   padding: 6px 16px;
-  color: var(--notice-meta-color, #718096);
-  background: var(--notice-blockquote-bg, #f7fafc);
+  color: var(--notice-meta-color, var(--color-ink-2));
+  background: var(--notice-blockquote-bg, var(--color-neutral-soft));
 }
 
 .notice-content :deep(table) {
@@ -280,18 +280,18 @@ defineExpose({
 }
 .notice-content :deep(table th),
 .notice-content :deep(table td) {
-  border: 1px solid var(--notice-table-border, #e2e8f0);
+  border: 1px solid var(--notice-table-border, var(--color-border));
   padding: 7px 12px;
 }
 .notice-content :deep(table th) {
-  background: var(--notice-table-header-bg, #f7fafc);
+  background: var(--notice-table-header-bg, var(--color-neutral-soft));
   font-weight: 600;
 }
 
 .notice-empty {
   text-align: center;
   padding: 40px 0;
-  color: var(--notice-meta-icon-color, #a0aec0);
+  color: var(--notice-meta-icon-color, var(--color-ink-3));
   font-size: 13px;
 }
 .notice-empty .el-icon {
@@ -313,14 +313,14 @@ defineExpose({
   .el-drawer__header {
     margin-bottom: 0;
     padding: 16px 20px;
-    border-bottom: 1px solid var(--notice-border-color, #ebeef5);
+    border-bottom: 1px solid var(--notice-border-color, var(--color-border));
     font-size: 16px;
     font-weight: 600;
-    color: var(--notice-title-color, #303133);
+    color: var(--notice-title-color, var(--color-ink));
   }
 
   .el-drawer__body {
-    background: var(--notice-drawer-body-bg, #f5f6f8);
+    background: var(--notice-drawer-body-bg, var(--color-bg));
     padding: 0;
   }
 }

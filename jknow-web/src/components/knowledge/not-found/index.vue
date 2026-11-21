@@ -48,7 +48,7 @@ function goHome() {
   justify-content: center;
   min-height: 100vh;
   padding: 0 16px;
-  background: #f5f7fa;
+  background: var(--color-bg);
 }
 
 .punishment-bg {
@@ -68,7 +68,7 @@ function goHome() {
   max-width: 420px;
   margin: 16px auto 0;
   font-size: 14px;
-  color: #6b7280;
+  color: var(--color-ink-2);
 }
 
 .punishment-actions {
@@ -81,7 +81,7 @@ function goHome() {
 
 .punishment-link {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--color-ink-2);
   text-decoration: underline;
   text-underline-offset: 3px;
 }

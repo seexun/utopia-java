@@ -55,6 +55,6 @@ watch(
        **根必须是带内容盒的真实元素**：主区 Transition(mode=out-in) 的离场
        要靠 transitionend/时长超时收尾，空 div 会把离场卡在半途。 -->
   <div class="grid h-full place-items-center px-6">
-    <p class="text-sm" style="color: #9ca3af">{{ S.nav.loading }}</p>
+    <p class="text-sm" style="color: var(--color-ink-3)">{{ S.nav.loading }}</p>
   </div>
 </template>
