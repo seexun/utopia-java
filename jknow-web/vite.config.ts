@@ -75,7 +75,7 @@ export default defineConfig(({ mode, command }) => {
               'rehype-highlight',
               'unified'
             ],
-            'vendor-utils': ['axios', 'dayjs', '@vueuse/core', 'echarts', 'qs']
+            'vendor-utils': ['axios', 'dayjs', '@vueuse/core', 'qs']
           }
         }
       }

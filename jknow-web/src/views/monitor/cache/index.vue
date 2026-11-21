@@ -45,7 +45,7 @@
 
       <el-col :span="12" class="card-box">
         <el-card>
-          <template #header><PieChart style="width: 1em; height: 1em; vertical-align: middle;" /> <span style="vertical-align: middle;">命令统计</span></template>
+          <template #header><PieChartIcon style="width: 1em; height: 1em; vertical-align: middle;" /> <span style="vertical-align: middle;">命令统计</span></template>
           <div class="el-table el-table--enable-row-hover el-table--medium">
             <div ref="commandstats" style="height: 420px" />
           </div>
@@ -66,7 +66,16 @@
 
 <script setup lang="ts" name="Cache">
 import { getCache } from '@/api/monitor/cache'
-import * as echarts from 'echarts'
+// PieChart 图标显式别名引入：echarts/charts 的 PieChart 在 setup 作用域会
+// 遮蔽 svgicon.ts 全量注册的同名 element-plus 图标（编译实证 $setup["PieChart"]
+// 直连非 _resolveComponent），模板改用别名保住图标渲染
+import { PieChart as PieChartIcon } from '@element-plus/icons-vue'
+import * as echarts from 'echarts/core'
+import { GaugeChart, PieChart } from 'echarts/charts'
+import { TooltipComponent } from 'echarts/components'
+import { CanvasRenderer } from 'echarts/renderers'
+
+echarts.use([GaugeChart, PieChart, TooltipComponent, CanvasRenderer])
 
 const cache = ref([])
 const commandstats = ref(null)
@@ -79,7 +88,7 @@ function getList(): void {
     proxy.$modal.closeLoading()
     cache.value = response.data!
 
-    const commandstatsIntance = echarts.init(commandstats.value!, "macarons")
+    const commandstatsIntance = echarts.init(commandstats.value!)
     commandstatsIntance.setOption({
       tooltip: {
         trigger: "item",
@@ -98,7 +107,7 @@ function getList(): void {
         }
       ]
     })
-    const usedmemoryInstance = echarts.init(usedmemory.value!, "macarons")
+    const usedmemoryInstance = echarts.init(usedmemory.value!)
     usedmemoryInstance.setOption({
       tooltip: {
         formatter: "{b} <br/>{a} : " + cache.value!.info.used_memory_human
