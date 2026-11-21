@@ -156,25 +156,30 @@ getCode()
 </script>
 
 <style lang='scss' scoped>
+/* SaaS Light 对齐（镜像 login.vue 家族——register 不可达但启用即合规）：
+   旧版为照片背景+硬编码灰标题；改令牌底色+主色 soft 氛围光，暗档由 html.dark 令牌翻转自动成立 */
 .register {
   display: flex;
   justify-content: center;
   align-items: center;
   height: 100%;
-  background-image: url("../assets/images/login-background.jpg");
-  background-size: cover;
+  background:
+    radial-gradient(1100px 560px at 78% -8%, var(--color-primary-soft), transparent 62%),
+    var(--color-bg);
 }
 .title {
   margin: 0px auto 30px auto;
   text-align: center;
-  color: #707070;
+  color: var(--color-ink);
 }
-
 .register-form {
-  border-radius: 6px;
-  background: #ffffff;
+  border-radius: var(--radius-card);
+  background: var(--el-bg-color);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-card);
   width: 400px;
   padding: 25px 25px 5px 25px;
+  z-index: 1;
   .el-input {
     height: 40px;
     input {
@@ -190,7 +195,7 @@ getCode()
 .register-tip {
   font-size: 13px;
   text-align: center;
-  color: #bfbfbf;
+  color: var(--color-ink-3);
 }
 .register-code {
   width: 33%;
@@ -208,7 +213,7 @@ getCode()
   bottom: 0;
   width: 100%;
   text-align: center;
-  color: #fff;
+  color: var(--color-ink-3);
   font-family: Arial;
   font-size: 12px;
   letter-spacing: 1px;
@@ -216,5 +221,9 @@ getCode()
 .register-code-img {
   height: 40px;
   padding-left: 12px;
+}
+
+html.dark .register-form {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
 }
 </style>
