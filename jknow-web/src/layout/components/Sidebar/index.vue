@@ -30,6 +30,7 @@
 </template>
 
 <script setup lang="ts">
+import { onUnmounted, watch } from 'vue'
 import Logo from './Logo.vue'
 import SidebarItem from './SidebarItem.vue'
 import KbSwitcher from '@/components/knowledge/kb-switcher/index.vue'
@@ -48,6 +49,13 @@ const showLogo = computed(() => settingsStore.sidebarLogo)
 const sideTheme = computed(() => settingsStore.sideTheme)
 const theme = computed(() => settingsStore.theme)
 const isCollapse = computed(() => !appStore.sidebar.opened)
+
+// 折叠弹层 teleport 到 body，逃出 .sidebar-light 作用域——body 类桥接（ui-ledger-cleanup §4）
+function syncSidebarLightMode(light: boolean): void {
+  document.body.classList.toggle('sidebar-light-mode', light)
+}
+watch(sideTheme, v => syncSidebarLightMode(v === 'theme-light'), { immediate: true })
+onUnmounted(() => syncSidebarLightMode(false))
 
 // 获取菜单背景色
 const getMenuBackground = computed(() => {

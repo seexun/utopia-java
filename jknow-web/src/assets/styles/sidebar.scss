@@ -418,6 +418,25 @@
     box-shadow: 2px 0 8px rgba(0, 0, 0, 0.4);
     border-right: none;
 
+    // 分档（与 theme-light 同构）：一级 44px / 二级及以下 40px
+    .el-menu-item,
+    .el-sub-menu__title {
+      height: 44px;
+      line-height: 44px;
+      margin: 2px 8px;
+      border-radius: var(--radius-ctl);
+    }
+    .nest-menu .el-menu-item,
+    .nest-menu .el-sub-menu__title {
+      height: 40px;
+      line-height: 40px;
+    }
+    // 二级菜单项宽度不撑破带 margin 的圆角容器（与 light 同款）
+    .nest-menu .el-sub-menu > .el-sub-menu__title,
+    .el-sub-menu .el-menu-item {
+      min-width: 0 !important;
+    }
+
     .el-menu-item.is-active {
       position: relative;
 
@@ -425,6 +444,8 @@
         content: '';
         position: absolute;
         inset: 0;
+        // 选中遮罩随分档圆角走（分档加 margin+圆角后避免方角压圆角，对齐 theme-light 同款）
+        border-radius: inherit;
         background-color: var(--current-color-dark-bg, rgba(37, 99, 235, 0.2));
         pointer-events: none;
         z-index: 1;
@@ -444,6 +465,8 @@
         content: '';
         position: absolute;
         inset: 0;
+        // hover 遮罩同样随分档圆角（避免方角压圆角）
+        border-radius: inherit;
         background-color: transparent;
         pointer-events: none;
         z-index: 1;
@@ -508,6 +531,36 @@
       &:hover {
         background-color: var(--color-primary-soft, #f0f5ff);
       }
+    }
+  }
+}
+
+/* ===== 折叠弹层（teleport 到 body 逃出上方作用域——body.sidebar-light-mode 桥接；ui-ledger-cleanup §4）===== */
+body.sidebar-light-mode {
+  .el-menu--vertical {
+    // 弹层容器卡化
+    .el-menu--popup {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-card);
+      overflow: hidden;
+      min-width: 176px;
+    }
+    .el-menu-item,
+    .el-sub-menu__title {
+      height: 40px;
+      line-height: 40px;
+      border-radius: var(--radius-ctl);
+      transition: background-color var(--transition-base), color var(--transition-base);
+      &:hover {
+        background-color: var(--color-neutral-soft) !important;
+        color: var(--color-ink) !important;
+      }
+    }
+    .el-menu-item.is-active {
+      background-color: var(--color-primary-soft) !important;
+      color: var(--color-primary) !important;
+      font-weight: 600;
     }
   }
 }
