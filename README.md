@@ -123,7 +123,7 @@ cd jknow-web && pnpm test && pnpm typecheck && pnpm build:prod   # test 418 pass
 
 清卷重建（全新环境从零到闭环）：`docker compose -f docker-compose.dev.yml down -v && docker compose -f docker-compose.dev.yml up -d` → 起后端（Flyway 107 自动建）→ seed → 上述全部闸门照跑（P3 已演练，见 p3-report）。
 
-注：**全仓 `mvn -q test` 的共享库热身态**——两处只读测试前提依赖共享库里「至少一个组织」与「空 General 库」各一行（源仓注册流遗产，jknow 无建行路径；累积开发库天然满足）。清卷后的空库先执行一次热身（p3-report §五-1 有三行 INSERT 全文可直接照抄），否则 3 例因前提缺失报错（非代码回归）。
+注：全仓 `mvn -q test` 的测试前提**已自足**（test-infra 批起三测试 fixture 自建 org 根行/General 库链），清卷空库起后端建 schema 后可直接 `mvn test`，无热身 SQL 前置（历史注记：手工热身 SQL 三行见 [p3-report §五-1](docs/superpowers/plans/p3-report.md)）。
 
 ## 迁移四阶段索引
 

@@ -29,6 +29,12 @@ class GraphApiTests extends ApiTestBase {
 
     @BeforeAll
     void fixture() {
+        // 源仓注册流遗产自足化：清卷空库无 organizations 根行，测试自建（p3-report §五-1 固定 uuid）
+        jdbc.update("""
+                INSERT INTO organizations (id, name, created_at)
+                VALUES ('0190d3e0-0000-7d5a-8000-0000000000f0', '默认组织', '2026-10-01T00:00:00Z')
+                ON CONFLICT (id) DO NOTHING
+                """);
         orgId = jdbc.queryForObject(
                 "SELECT id FROM organizations ORDER BY created_at LIMIT 1", UUID.class);
         adminId = Uuids.nowV7();

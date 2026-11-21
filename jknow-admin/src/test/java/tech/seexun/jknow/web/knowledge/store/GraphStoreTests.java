@@ -137,6 +137,10 @@ class GraphStoreTests extends StoreTestBase {
     @Test
     void emptyKbOverviewAndSearchAreZero() {
         // 空库面：General（首用户库空起步，#580）
+        // emptyKbOverview 前提自足：General 库三行链（org→workspace→kb），清卷空库直跑
+        jdbc.update("INSERT INTO organizations (id, name, created_at) VALUES ('0190d3e0-0000-7d5a-8000-0000000000f0', '默认组织', '2026-10-01T00:00:00Z') ON CONFLICT (id) DO NOTHING");
+        jdbc.update("INSERT INTO workspaces (id, org_id, name, created_at) VALUES ('0190d3e0-0000-7d5a-8000-0000000000f1', '0190d3e0-0000-7d5a-8000-0000000000f0', '默认工作区', '2026-10-02T00:00:00Z') ON CONFLICT (id) DO NOTHING");
+        jdbc.update("INSERT INTO knowledge_bases (id, workspace_id, name, visibility, created_at) VALUES ('0190d3e0-0000-7d5a-8000-0000000000f2', '0190d3e0-0000-7d5a-8000-0000000000f1', 'General', 'restricted', '2026-10-02T00:00:01Z') ON CONFLICT (id) DO NOTHING");
         UUID emptyKb = jdbc.queryForObject(
                 "SELECT id FROM knowledge_bases WHERE name = 'General'", UUID.class);
         GraphService.Overview o = graph.overview(emptyKb, 150, null, null);
