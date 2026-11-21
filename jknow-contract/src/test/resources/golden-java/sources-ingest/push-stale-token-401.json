@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "sources-ingest",
+    "step" : "push-stale-token-401",
+    "method" : "POST",
+    "path" : "/api/v1/sources/${api_id}/ingest",
+    "target" : "java",
+    "expectedStatus" : 401,
+    "status" : 401
+  },
+  "normalized" : {
+    "error" : "Not signed in or invalid credentials"
+  }
+}

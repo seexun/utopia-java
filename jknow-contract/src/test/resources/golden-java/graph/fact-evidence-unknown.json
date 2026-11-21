@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "graph",
+    "step" : "fact-evidence-unknown",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/facts/00000000-0000-0000-0000-000000000000/evidence",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "evidence" : [ ]
+  }
+}

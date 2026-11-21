@@ -1,0 +1,29 @@
+{
+  "meta" : {
+    "scenario" : "sources-ingest",
+    "step" : "api-create",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/sources",
+    "target" : "java",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "ingest_token" : "<masked>",
+    "source" : {
+      "config" : { },
+      "created_at" : "<ts>",
+      "icon" : null,
+      "id" : "<uuid>",
+      "kb_id" : "<uuid>",
+      "kind" : "api",
+      "last_sync_added" : 0,
+      "last_sync_at" : null,
+      "last_sync_error" : null,
+      "last_sync_status" : "never",
+      "name" : "src-contract-api",
+      "sync_cron" : null,
+      "sync_interval_minutes" : null
+    }
+  }
+}

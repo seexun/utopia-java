@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "ontology",
+    "step" : "regressions-list-route-absent",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/ontology/regressions",
+    "target" : "both",
+    "expectedStatus" : 404,
+    "status" : 404
+  },
+  "normalized" : {
+    "error" : "Not found"
+  }
+}

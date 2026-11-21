@@ -1,0 +1,12 @@
+{
+  "meta" : {
+    "scenario" : "search",
+    "step" : "search-missing-q-422",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/search",
+    "target" : "both",
+    "expectedStatus" : 422,
+    "status" : 422
+  },
+  "normalized" : "Failed to deserialize the JSON body into the target type: missing field `q` at line 1 column 2"
+}

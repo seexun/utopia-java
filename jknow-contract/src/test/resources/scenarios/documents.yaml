@@ -1,0 +1,154 @@
+# 域：documents——上传（multipart）/列表筛选/详情/版本/内容/抽取排队/重试/删除-恢复-真删全生命周期 + 库内 jobs 面。
+# 幂等：自建专属库 kb-contract-docs（每轮新建，重录不依赖历史）；同内容重复上传走 skipped 分支（确定性）。
+# M2 任务 3：文档域写步转 target:java（D9 消除——上传也写 document_versions 版本 1 + 同事务入队，
+# Java 与参照实例共享同一库与 data_dir：读步两侧看到的台账/原文一致，doc-content 由 M1 的 500
+# 现状转 200——d9-upload-no-version-ledger 挂账随之核销，见 WAIVERS.md）；工作区/库/jobs 域
+# 写步仍归 rust（各自里程碑）；取最小合法文档（59 字节文本）；抽取走 /extract 的排队回执断言。
+name: documents
+desc: 上传(D9消除)/筛选/版本/内容200/抽取排队/墓碑-恢复-真删 + 库内 jobs（自建 kb-contract-docs）
+setup:
+  register: { email: contract-docs@test.local, password: ContractDocs!2026, display_name: Contract Docs }
+vars:
+  note: 'Alice works at Acme Corp since 2020. Bob joined Beta Ltd in 2021.'
+steps:
+  - id: ws-create
+    call: 'POST /api/v1/workspaces { "name": "ws-contract-docs" }'
+    capture: { ws_id: body.id }
+    expect: { status: 200 }
+    target: rust
+  - id: kb-create
+    call: 'POST /api/v1/workspaces/${ws_id}/kbs { "name": "kb-contract-docs", "description": "documents scenario" }'
+    capture: { kb_id: body.id }
+    expect: { status: 200 }
+    target: rust
+  - id: upload
+    call: POST /api/v1/kbs/${kb_id}/documents
+    upload: { filename: note.txt, content: '${note}', mime: text/plain }
+    capture: { doc_id: body.created.0.id }
+    expect: { status: 200 }
+    target: java
+  # M5 任务 6：job 静默等（缺省轮 Rust worker 800ms 内分好块，java 轮 Java worker+ES
+  # 索引慢过固定窗——wait 步对两侧同口径，chunk_count 才可比）
+  - id: wait-processing
+    wait: { kb_id: '${kb_id}' }
+  - id: docs-list
+    call: GET /api/v1/kbs/${kb_id}/documents?limit=10&offset=0
+    pause_ms: 800
+    expect: { status: 200 }
+  - id: upload-duplicate
+    call: POST /api/v1/kbs/${kb_id}/documents
+    upload: { filename: note.txt, content: '${note}', mime: text/plain }
+    expect: { status: 200 }
+    target: java
+  - id: upload-empty-file
+    call: POST /api/v1/kbs/${kb_id}/documents
+    upload: { filename: empty.txt, content: '', mime: text/plain }
+    expect: { status: 200 }
+    target: java
+  - id: docs-list-filter-name
+    call: GET /api/v1/kbs/${kb_id}/documents?q=note&limit=5&offset=0
+    expect: { status: 200 }
+  - id: docs-list-filter-graph
+    call: GET /api/v1/kbs/${kb_id}/documents?graph=none&limit=5&offset=0
+    expect: { status: 200 }
+  - id: docs-list-deleted-view
+    call: GET /api/v1/kbs/${kb_id}/documents?state=deleted&limit=5&offset=0
+    expect: { status: 200 }
+  - id: doc-detail
+    call: GET /api/v1/documents/${doc_id}
+    expect: { status: 200 }
+  - id: doc-versions
+    call: GET /api/v1/documents/${doc_id}/versions
+    expect: { status: 200 }
+  - id: doc-content
+    call: GET /api/v1/documents/${doc_id}/content
+    expect: { status: 200 }
+  - id: doc-extractions
+    call: GET /api/v1/documents/${doc_id}/extractions
+    expect: { status: 200 }
+  - id: doc-extract
+    call: POST /api/v1/documents/${doc_id}/extract
+    capture: { job_id: body.job_id }
+    expect: { status: 200 }
+    target: java
+  - id: doc-reprocess
+    call: POST /api/v1/documents/${doc_id}/reprocess
+    expect: { status: 200 }
+    target: java
+  - id: retry-failed
+    call: POST /api/v1/kbs/${kb_id}/documents/retry-failed
+    pause_ms: 1500
+    expect: { status: 200 }
+    target: java
+  - id: extraction-drops
+    call: GET /api/v1/kbs/${kb_id}/extraction-drops
+    expect: { status: 200 }
+  # ---- 库内 jobs 面（用无文档的第二个库拿确定性的 0 计数）----
+  - id: kb-jobs-create
+    call: 'POST /api/v1/workspaces/${ws_id}/kbs { "name": "kb-contract-docs-jobs" }'
+    capture: { kb2_id: body.id }
+    expect: { status: 200 }
+    target: rust
+  - id: jobs-failed-empty-kb
+    call: GET /api/v1/kbs/${kb2_id}/jobs/failed
+    expect: { status: 200 }
+  - id: jobs-requeue-kb
+    call: 'POST /api/v1/kbs/${kb2_id}/jobs/requeue {}'
+    expect: { status: 200 }
+    target: rust
+  - id: jobs-requeue-all-forbidden
+    call: 'POST /api/v1/jobs/requeue {}'
+    expect: { status: 403 }
+    target: rust
+  - id: jobs-nonexistent-404
+    call: GET /api/v1/kbs/${kb2_id}/jobs/999999
+    expect: { status: 404 }
+  # ---- 删除（墓碑）→恢复→再删→真删→幂等拒绝 ----
+  - id: doc-delete
+    call: DELETE /api/v1/documents/${doc_id}
+    expect: { status: 200 }
+    target: java
+  - id: docs-deleted-view-after-delete
+    call: GET /api/v1/kbs/${kb_id}/documents?state=deleted&limit=5&offset=0
+    expect: { status: 200 }
+  - id: doc-restore
+    call: POST /api/v1/documents/${doc_id}/restore
+    expect: { status: 200 }
+    target: java
+  - id: doc-restore-conflict
+    call: POST /api/v1/documents/${doc_id}/restore
+    expect: { status: 409 }
+    target: java
+  - id: doc-delete-again
+    call: DELETE /api/v1/documents/${doc_id}
+    expect: { status: 200 }
+    target: java
+  - id: doc-purge
+    call: POST /api/v1/documents/${doc_id}/purge
+    expect: { status: 200 }
+    target: java
+  - id: doc-purge-conflict
+    call: POST /api/v1/documents/${doc_id}/purge
+    expect: { status: 409 }
+    target: java
+  - id: doc-restore-purged-409
+    call: POST /api/v1/documents/${doc_id}/restore
+    expect: { status: 409 }
+    target: java
+  # ---- 404 族 ----
+  - id: doc-detail-zero-404
+    call: GET /api/v1/documents/00000000-0000-0000-0000-000000000000
+    expect: { status: 404 }
+  - id: docs-list-zero-kb-404
+    call: GET /api/v1/kbs/00000000-0000-0000-0000-000000000000/documents?limit=5&offset=0
+    expect: { status: 404 }
+  - id: upload-zero-kb-404
+    call: POST /api/v1/kbs/00000000-0000-0000-0000-000000000000/documents
+    upload: { filename: note.txt, content: '${note}', mime: text/plain }
+    expect: { status: 404 }
+    target: java
+  # ---- 收尾：删工作区级联清库 ----
+  - id: ws-delete
+    call: DELETE /api/v1/workspaces/${ws_id}
+    expect: { status: 200 }
+    target: rust

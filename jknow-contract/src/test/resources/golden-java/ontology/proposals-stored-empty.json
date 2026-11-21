@@ -1,0 +1,17 @@
+{
+  "meta" : {
+    "scenario" : "ontology",
+    "step" : "proposals-stored-empty",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/ontology/proposals",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "attribute_types" : [ ],
+    "entity_types" : [ ],
+    "map_to" : [ ],
+    "relation_types" : [ ]
+  }
+}

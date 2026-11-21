@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "sources-ingest",
+    "step" : "folder-re-extract",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/sources/${folder_id}/re-extract",
+    "target" : "java",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "queued" : 0
+  }
+}

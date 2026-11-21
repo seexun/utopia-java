@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "sources-ingest",
+    "step" : "statements-push-unknown-key",
+    "method" : "POST",
+    "path" : "/api/v1/sources/${stmt_id}/statements",
+    "target" : "java",
+    "expectedStatus" : 422,
+    "status" : 422
+  },
+  "normalized" : {
+    "error" : "unknown key \"bogus\": the contract has no slot for it (allowed: external_id, doc_time, deleted, e, s, n)"
+  }
+}

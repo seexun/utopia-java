@@ -1,0 +1,18 @@
+{
+  "meta" : {
+    "scenario" : "workspace-kb",
+    "step" : "viewer-read-ok",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/readiness",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "documents" : 0,
+    "entities" : 0,
+    "failed" : 0,
+    "has_chat_model" : false,
+    "processing" : 0
+  }
+}

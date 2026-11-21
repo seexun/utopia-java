@@ -1,0 +1,168 @@
+# 域：review——审核中心全 12 队列 × 分页/类型筛 + batch/history/summary + 逐项裁决端点的 404/422 形状
+# + 一致性检查 + R1 推理（纯计算，无模型调用，同步返回）。
+# 幂等：自建专属库 kb-contract-review（空库——队列计数全零是确定形状）；裁决端点用不存在 id 打出 404/422 分支。
+# M1 双打定向（任务 4 起）：setup 块引擎整体视为 rust；写路径步 target: rust。
+# M4 任务 2 定向修订：**治理写步转 target: java**（ReviewWriteController 19 POST 落地——逐项裁决族/
+# 事实三态/合并回滚/冲突裁决/batch/一致性/推理/对齐三件/勘误答）；
+# M4 任务 6 修订：ws-create/kb-create/ws-delete 三步随 WorkspaceKbWriteController 落地转 target:java。读步（12 队列/分页/类型筛/summary/history/
+# pending-for-chunk/unknown-queue 422）缺省 both 双打（M1 任务 4 起）。
+name: review
+desc: 12 队列×分页+summary/history/batch+逐项裁决 404/422+一致性+推理（自建 kb-contract-review）
+setup:
+  register: { email: contract-review@test.local, password: ContractReview!2026, display_name: Contract Review }
+steps:
+  - id: ws-create
+    call: 'POST /api/v1/workspaces { "name": "ws-contract-review" }'
+    target: java                # M4 任务 6 起建删走 Java（WorkspaceKbWriteController）
+    capture: { ws_id: body.id }
+    expect: { status: 200 }
+  - id: kb-create
+    call: 'POST /api/v1/workspaces/${ws_id}/kbs { "name": "kb-contract-review", "description": "review scenario" }'
+    target: java                # M4 任务 6 起建库走 Java（创建者入矩阵 admin）
+    capture: { kb_id: body.id }
+    expect: { status: 200 }
+  # ---- 全 12 队列（空库计数全零；任务 4 Java 侧实现，双打） ----
+  - id: queue-pending
+    call: GET /api/v1/kbs/${kb_id}/review?queue=pending&limit=5&offset=0&types=any
+    expect: { status: 200 }
+  - id: queue-duplicates
+    call: GET /api/v1/kbs/${kb_id}/review?queue=duplicates&limit=5&offset=0&types=any
+    expect: { status: 200 }
+  - id: queue-conflicts
+    call: GET /api/v1/kbs/${kb_id}/review?queue=conflicts&limit=5&offset=0&types=any
+    expect: { status: 200 }
+  - id: queue-unconfirmed
+    call: GET /api/v1/kbs/${kb_id}/review?queue=unconfirmed&limit=5&offset=0&types=any
+    expect: { status: 200 }
+  - id: queue-lowconf
+    call: GET /api/v1/kbs/${kb_id}/review?queue=lowconf&limit=5&offset=0&types=any
+    expect: { status: 200 }
+  - id: queue-mappings
+    call: GET /api/v1/kbs/${kb_id}/review?queue=mappings&limit=5&offset=0&types=any
+    expect: { status: 200 }
+  - id: queue-violations
+    call: GET /api/v1/kbs/${kb_id}/review?queue=violations&limit=5&offset=0&types=any
+    expect: { status: 200 }
+  - id: queue-defects
+    call: GET /api/v1/kbs/${kb_id}/review?queue=defects&limit=5&offset=0&types=any
+    expect: { status: 200 }
+  - id: queue-alignment
+    call: GET /api/v1/kbs/${kb_id}/review?queue=alignment&limit=5&offset=0&types=any
+    expect: { status: 200 }
+  - id: queue-errata
+    call: GET /api/v1/kbs/${kb_id}/review?queue=errata&limit=5&offset=0&types=any
+    expect: { status: 200 }
+  - id: queue-merges
+    call: GET /api/v1/kbs/${kb_id}/review?queue=merges&limit=5&offset=0&types=any
+    expect: { status: 200 }
+  - id: queue-agent
+    call: GET /api/v1/kbs/${kb_id}/review?queue=agent&limit=5&offset=0&types=any
+    expect: { status: 200 }
+  # ---- 分页与类型筛 ----
+  - id: queue-duplicates-page2
+    call: GET /api/v1/kbs/${kb_id}/review?queue=duplicates&limit=1&offset=1&types=any
+    expect: { status: 200 }
+  - id: queue-duplicates-type-conflict
+    call: GET /api/v1/kbs/${kb_id}/review?queue=duplicates&limit=5&offset=0&types=conflict
+    expect: { status: 200 }
+  - id: queue-unknown-422
+    call: GET /api/v1/kbs/${kb_id}/review?queue=no-such-queue&limit=5&offset=0&types=any
+    expect: { status: 422 }     # 任务 4 Java 侧实现（AppException invalid unknown_queue 同形）
+  # ---- 汇总/历史/批量 ----
+  - id: review-summary
+    call: GET /api/v1/kbs/${kb_id}/review/summary
+    expect: { status: 200 }
+  - id: review-history
+    call: GET /api/v1/kbs/${kb_id}/review/history?page=0&per=5
+    expect: { status: 200 }
+  - id: review-batch-empty-422
+    call: 'POST /api/v1/kbs/${kb_id}/review/batch { "ids": [], "action": "merge" }'
+    target: java                # M4 任务 2 起写步转 java（ReviewWriteController 批量裁决）——任务 2 收口时掉了 #，YAML 解析一直失败（M4 任务 6 重录时抓到补上）
+    expect: { status: 422 }
+  - id: review-batch-unknown-ids
+    call: 'POST /api/v1/kbs/${kb_id}/review/batch { "ids": ["00000000-0000-0000-0000-000000000000"], "action": "keep", "rationale": "contract: nothing to decide" }'
+    target: java                # 写路径端点（同上）
+    expect: { status: 200 }
+  # ---- 逐项裁决端点（不存在的 id：404；坏枚举：422）——全部写路径，定向 rust ----
+  - id: review-decide-unknown-404
+    call: 'POST /api/v1/kbs/${kb_id}/review/00000000-0000-0000-0000-000000000000 { "action": "merge" }'
+    target: java                # 写路径端点（人工裁决，M2）
+    expect: { status: 404 }
+  - id: review-pending-for-chunk
+    call: GET /api/v1/kbs/${kb_id}/review/pending?chunk_id=00000000-0000-0000-0000-000000000000
+    expect: { status: 200 }     # 任务 4 实现（VIEW_SELECT 同主体的 for_chunk 变体）
+  - id: review-pending-decide-unknown-404
+    call: 'POST /api/v1/kbs/${kb_id}/review/pending/00000000-0000-0000-0000-000000000000 { "action": "confirm" }'
+    target: java                # 写路径端点（确认/拒绝记忆事实，M2）
+    expect: { status: 404 }
+  - id: review-agent-unknown-404
+    call: 'POST /api/v1/kbs/${kb_id}/review/agent/00000000-0000-0000-0000-000000000000 { "action": "keep" }'
+    target: java                # 写路径端点（回答 agent 建议，M2）
+    expect: { status: 404 }
+  - id: alignment-phrase-unknown-404
+    call: 'POST /api/v1/kbs/${kb_id}/review/alignment/phrases/00000000-0000-0000-0000-000000000000 { "property": null, "direction": "forward", "marks": null }'
+    target: java                # 写路径端点（短语判定写回，M2）
+    expect: { status: 404 }
+  - id: alignment-kind-word-decide
+    call: 'POST /api/v1/kbs/${kb_id}/review/alignment/kind-words/contract-kind-word { "class": null }'
+    target: java                # 写路径端点（类别词判定写回；Rust 200 落 type_bindings）
+    expect: { status: 200 }
+  - id: alignment-rule-unknown-404
+    call: 'POST /api/v1/kbs/${kb_id}/review/alignment/rules/00000000-0000-0000-0000-000000000000 { "approve": true }'
+    target: java                # 写路径端点（规则表态，M2）
+    expect: { status: 404 }
+  - id: errata-unknown-404
+    call: 'POST /api/v1/kbs/${kb_id}/review/errata/00000000-0000-0000-0000-000000000000 { "approve": false }'
+    target: java                # 写路径端点（勘误批/否，M2）
+    expect: { status: 404 }
+  - id: review-mapping-unknown-404
+    call: 'POST /api/v1/kbs/${kb_id}/review/mappings/00000000-0000-0000-0000-000000000000 { "status": "confirmed" }'
+    target: java                # 写路径端点（映射表态，M2）
+    expect: { status: 404 }
+  - id: review-violation-bad-resolution-422
+    call: 'POST /api/v1/kbs/${kb_id}/review/violations/00000000-0000-0000-0000-000000000000 { "resolution": "reject", "close_at": null, "close_at_precision": null, "fact_id": null }'
+    target: java                # 写路径端点（违规裁决，M2）；坏枚举 422 于查库前
+    expect: { status: 422 }
+  - id: review-violation-unknown-404
+    call: 'POST /api/v1/kbs/${kb_id}/review/violations/00000000-0000-0000-0000-000000000000 { "resolution": "accepted", "close_at": null, "close_at_precision": null, "fact_id": null }'
+    target: java                # 写路径端点（同上）
+    expect: { status: 404 }
+  - id: review-defect-unknown-404
+    call: 'POST /api/v1/kbs/${kb_id}/review/defects/00000000-0000-0000-0000-000000000000 { "resolution": "fixed" }'
+    target: java                # 写路径端点（缺陷表态，M2）
+    expect: { status: 404 }
+  # ---- 事实三态与合并回滚、冲突裁决（不存在的对象 → 404）----
+  - id: fact-confirm-unknown-404
+    call: POST /api/v1/kbs/${kb_id}/facts/00000000-0000-0000-0000-000000000000/confirm
+    target: java                # 写路径端点（确认=改置信度，M2）
+    expect: { status: 404 }
+  - id: fact-reject-unknown-404
+    call: POST /api/v1/kbs/${kb_id}/facts/00000000-0000-0000-0000-000000000000/reject
+    target: java                # 写路径端点（作废，M2）
+    expect: { status: 404 }
+  - id: fact-close-unknown-404
+    call: 'POST /api/v1/kbs/${kb_id}/facts/00000000-0000-0000-0000-000000000000/close { "valid_to": "2026-01-01T00:00:00Z", "valid_to_precision": "day" }'
+    target: java                # 写路径端点（闭合=作废+改写，M2）
+    expect: { status: 404 }
+  - id: merge-revert-unknown-404
+    call: POST /api/v1/kbs/${kb_id}/merges/00000000-0000-0000-0000-000000000000/revert
+    target: java                # 写路径端点（合并回滚，M2）
+    expect: { status: 404 }
+  - id: conflict-resolve-unknown-404
+    call: 'POST /api/v1/kbs/${kb_id}/conflicts/00000000-0000-0000-0000-000000000000 { "action": "keep" }'
+    target: java                # 写路径端点（冲突裁决，M2）
+    expect: { status: 404 }
+  # ---- 一致性检查与 R1 推理（纯计算，同步，确定性零计数）----
+  - id: consistency-check
+    call: POST /api/v1/kbs/${kb_id}/consistency/check
+    target: java                # 计算型写路径（落 violations/defects 行，M2+）
+    expect: { status: 200 }
+  - id: inference-run
+    call: POST /api/v1/kbs/${kb_id}/inference/run
+    target: java                # 计算型写路径（物化派生事实，M2+）
+    expect: { status: 200 }
+  # ---- 收尾 ----
+  - id: ws-delete
+    call: DELETE /api/v1/workspaces/${ws_id}
+    target: java                # M4 任务 6 起建删走 Java（幂等闭环）
+    expect: { status: 200 }

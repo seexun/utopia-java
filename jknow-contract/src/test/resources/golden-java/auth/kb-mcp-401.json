@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "auth",
+    "step" : "kb-mcp-401",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/00000000-0000-0000-0000-000000000000/mcp",
+    "target" : "both",
+    "expectedStatus" : 401,
+    "status" : 401
+  },
+  "normalized" : {
+    "error" : "Not signed in or invalid credentials"
+  }
+}

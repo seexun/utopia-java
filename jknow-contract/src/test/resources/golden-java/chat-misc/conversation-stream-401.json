@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "chat-misc",
+    "step" : "conversation-stream-401",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/00000000-0000-0000-0000-000000000000/conversations/00000000-0000-0000-0000-000000000000/stream",
+    "target" : "both",
+    "expectedStatus" : 401,
+    "status" : 401
+  },
+  "normalized" : {
+    "error" : "Not signed in or invalid credentials"
+  }
+}

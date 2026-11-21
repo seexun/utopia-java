@@ -1,0 +1,15 @@
+{
+  "meta" : {
+    "scenario" : "review",
+    "step" : "review-batch-empty-422",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/review/batch",
+    "target" : "java",
+    "expectedStatus" : 422,
+    "status" : 422
+  },
+  "normalized" : {
+    "code" : "batch_size",
+    "error" : "between 1 and 500 ids per batch"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "mappings",
+    "step" : "ds-sync-schema-unknown-500",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/data-sources/00000000-0000-0000-0000-000000000000/sync-schema",
+    "target" : "java",
+    "expectedStatus" : 500,
+    "status" : 500
+  },
+  "normalized" : {
+    "error" : "Internal server error"
+  }
+}

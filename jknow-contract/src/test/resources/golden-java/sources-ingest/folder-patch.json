@@ -1,0 +1,28 @@
+{
+  "meta" : {
+    "scenario" : "sources-ingest",
+    "step" : "folder-patch",
+    "method" : "PATCH",
+    "path" : "/api/v1/kbs/${kb_id}/sources/${folder_id}",
+    "target" : "java",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "source" : {
+      "config" : { },
+      "created_at" : "<ts>",
+      "icon" : null,
+      "id" : "<uuid>",
+      "kb_id" : "<uuid>",
+      "kind" : "folder",
+      "last_sync_added" : 0,
+      "last_sync_at" : "<ts>",
+      "last_sync_error" : null,
+      "last_sync_status" : "ok",
+      "name" : "src-contract-folder-renamed",
+      "sync_cron" : null,
+      "sync_interval_minutes" : null
+    }
+  }
+}

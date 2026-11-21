@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "workspace-kb",
+    "step" : "kb-delete-second",
+    "method" : "DELETE",
+    "path" : "/api/v1/kbs/${kb2_id}",
+    "target" : "java",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "ok" : true
+  }
+}

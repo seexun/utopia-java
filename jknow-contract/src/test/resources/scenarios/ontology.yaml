@@ -1,0 +1,203 @@
+# 域：ontology——本体（实体类/关系类 CRUD、唯一性候选、类型消解三段、提案存取、本体代理排队、
+# OWL 导入预览/落库、回归用例）+ 能力问题 CRUD/报告 + 业务规则全生命周期 + 规则运行。
+# 幂等：自建专属库 kb-contract-onto，全部对象在剧本内自建自删；OWL 导入用 7 字节最小合法 turtle。
+# 现状注记：ontology/regressions 两端点在参照实例二进制上未装配（404 路由缺失），忠实记录，M5 升级参照后补录。
+# M1 双打定向（任务 4 起）：setup 块引擎整体视为 rust；CRUD/导入/类型消解/提案/问题/规则等一切写路径步
+# target: rust（写路径归 Rust 至 M2，m1-recon §5）。读步中任务 4 已实现两视图与实例列表（both 双打）；
+# 其余读族（uniqueness/proposals/questions/imports/rules 列表族）M4 任务 6 已实现——双打常规比对
+# （M4 任务 6 起九读步已实现并核销——见 WAIVERS.md 已核销节）；regressions 两步参照实例本就 404 路由缺失，Java 未配路由同形，both 直接双打。
+name: ontology
+desc: 本体 CRUD+类型消解+提案+OWL 导入+问题 CRUD+规则全周期（自建 kb-contract-onto）
+setup:
+  register: { email: contract-onto@test.local, password: ContractOnto!2026, display_name: Contract Onto }
+vars:
+  owl: |
+    @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+    <http://contract/x/Company> a rdfs:Class .
+steps:
+  - id: ws-create
+    call: 'POST /api/v1/workspaces { "name": "ws-contract-onto" }'
+    target: rust                # 写路径：建工作区
+    capture: { ws_id: body.id }
+    expect: { status: 200 }
+  - id: kb-create
+    call: 'POST /api/v1/workspaces/${ws_id}/kbs { "name": "kb-contract-onto", "description": "ontology scenario" }'
+    target: rust                # 写路径：建库
+    capture: { kb_id: body.id }
+    expect: { status: 200 }
+  # ---- 本体：实体类 ----
+  - id: ontology-empty
+    call: GET /api/v1/kbs/${kb_id}/ontology
+    expect: { status: 200 }     # 任务 4 实现（两视图：entity_types+relation_types 空数组形状）
+  - id: entity-type-create
+    call: 'POST /api/v1/kbs/${kb_id}/ontology/entity-types { "key": "company", "label": "Company" }'
+    target: rust                # 写路径：本体（写路径归 Rust 至 M2）
+    capture: { et_id: body.id }
+    expect: { status: 200 }
+  - id: entity-type-missing-key-422
+    call: 'POST /api/v1/kbs/${kb_id}/ontology/entity-types { "label": "NoKey" }'
+    target: rust                # 写路径端点的 422 校验分支
+    expect: { status: 422 }
+  - id: entity-type-patch
+    call: 'PATCH /api/v1/kbs/${kb_id}/ontology/entity-types/${et_id} { "label": "Firm", "description": "a company" }'
+    target: rust                # 写路径：改名/改描述
+    expect: { status: 200 }
+  - id: entity-type-instances
+    call: GET /api/v1/kbs/${kb_id}/ontology/entity-types/${et_id}/entities?page=0&per=10
+    expect: { status: 200 }     # 任务 4 实现（实例分页：per 缺省 12 钳 [1,100]）
+  - id: person-type-create
+    call: 'POST /api/v1/kbs/${kb_id}/ontology/entity-types { "key": "person", "label": "Person" }'
+    target: rust                # 写路径：本体
+    capture: { person_id: body.id }
+    expect: { status: 200 }
+  # ---- 本体：关系类 ----
+  - id: relation-type-create
+    call: 'POST /api/v1/kbs/${kb_id}/ontology/relation-types { "key": "employs", "label": "Employs", "kind": "relation" }'
+    target: rust                # 写路径：本体谓词
+    capture: { rt_id: body.id }
+    expect: { status: 200 }
+  - id: relation-type-patch
+    call: 'PATCH /api/v1/kbs/${kb_id}/ontology/relation-types/${rt_id} { "label": "Employs People" }'
+    target: rust                # 写路径
+    expect: { status: 200 }
+  - id: uniqueness-candidates
+    call: GET /api/v1/kbs/${kb_id}/ontology/uniqueness
+    expect: { status: 200 }     # M4 任务 6 实现双打核销（uniqueness_candidates 聚合接 HTTP）
+  - id: relation-type-reconcile-without-uniqueness-422
+    call: POST /api/v1/kbs/${kb_id}/ontology/relation-types/${rt_id}/reconcile
+    target: rust                # 写路径端点（按唯一性改写 functional，M2）
+    expect: { status: 422 }
+  - id: relation-type-delete
+    call: DELETE /api/v1/kbs/${kb_id}/ontology/relation-types/${rt_id}
+    target: rust                # 写路径：删除（含使用量保护）
+    expect: { status: 200 }
+  - id: relation-type-delete-again-409
+    call: DELETE /api/v1/kbs/${kb_id}/ontology/relation-types/${rt_id}
+    target: rust                # 写路径端点的 409 分支
+    expect: { status: 409 }
+  # ---- 类型消解三段 ----
+  - id: type-resolution-preview
+    call: POST /api/v1/kbs/${kb_id}/ontology/type-resolution/preview
+    target: rust                # 写路径（预览=排队任务，M2）
+    expect: { status: 200 }
+  - id: type-resolution-apply
+    call: POST /api/v1/kbs/${kb_id}/ontology/type-resolution
+    target: rust                # 写路径（应用批次，M2）
+    expect: { status: 200 }
+  - id: type-resolution-approve
+    call: 'POST /api/v1/kbs/${kb_id}/ontology/type-resolution/approve { "from_type_id": "${person_id}", "to_type_id": "${et_id}", "entity_ids": [] }'
+    target: rust                # 写路径（批准精化，M2）
+    expect: { status: 200 }
+  - id: type-resolution-undo-unknown-404
+    call: DELETE /api/v1/kbs/${kb_id}/ontology/type-resolution/00000000-0000-0000-0000-000000000000
+    target: rust                # 写路径端点（撤批次，M2）
+    expect: { status: 404 }
+  # ---- 提案（代理排队 + 存取 + 表态/采纳的错误分支）----
+  - id: proposals-stored-empty
+    call: GET /api/v1/kbs/${kb_id}/ontology/proposals
+    expect: { status: 200 }     # M4 任务 6 实现双打核销（ontology_proposals 读族接 HTTP）
+  - id: ontology-propose-queued
+    call: 'POST /api/v1/kbs/${kb_id}/ontology/propose {}'
+    target: rust                # 写路径（排队本体代理，M2）
+    expect: { status: 200 }
+  - id: proposals-decide-unknown-key-ok
+    call: 'POST /api/v1/kbs/${kb_id}/ontology/proposals { "section": "entity_types", "key": "no-such-proposal", "status": "rejected" }'
+    target: rust                # 写路径端点（表态，M2）
+    expect: { status: 200 }
+  - id: proposals-adopt-unknown-404
+    call: 'POST /api/v1/kbs/${kb_id}/ontology/proposals/adopt { "section": "entity_types", "key": "no-such-proposal" }'
+    target: rust                # 写路径端点（采纳，M2）
+    expect: { status: 404 }
+  # ---- 回归用例（参照实例未装配该路由，404 现状；Java 未配路由同形，双打）----
+  - id: regressions-list-route-absent
+    call: GET /api/v1/kbs/${kb_id}/ontology/regressions
+    expect: { status: 404 }
+  - id: regressions-create-route-absent
+    call: 'POST /api/v1/kbs/${kb_id}/ontology/regressions { "statement_id": "00000000-0000-0000-0000-000000000000", "relation_type_id": "00000000-0000-0000-0000-000000000000", "direction": "forward" }'
+    expect: { status: 404 }
+  # ---- 能力问题 ----
+  - id: question-create
+    call: 'POST /api/v1/kbs/${kb_id}/questions { "question": "Who works at Acme?" }'
+    target: rust                # 写路径（问题 CRUD，M2+）
+    capture: { q_id: body.id }
+    expect: { status: 200 }
+  - id: questions-list
+    call: GET /api/v1/kbs/${kb_id}/questions
+    expect: { status: 200 }     # M4 任务 6 实现双打核销（competency_questions 列表）
+  - id: question-patch
+    call: 'PATCH /api/v1/kbs/${kb_id}/questions/${q_id} { "status": "retired" }'
+    target: rust                # 写路径
+    expect: { status: 200 }
+  - id: question-report
+    call: GET /api/v1/kbs/${kb_id}/questions/report
+    expect: { status: 200 }     # M4 任务 6 实现双打核销（报告聚合：问题两数+uncovered+提案采纳率）
+  - id: questions-propose-queued
+    call: 'POST /api/v1/kbs/${kb_id}/questions/propose {}'
+    target: rust                # 写路径（排队提案）
+    expect: { status: 200 }
+  - id: question-delete
+    call: DELETE /api/v1/kbs/${kb_id}/questions/${q_id}
+    target: rust                # 写路径
+    expect: { status: 200 }
+  # ---- OWL 导入：预览与落库分开（同一份最小 turtle，计划确定性）----
+  - id: imports-list-empty
+    call: GET /api/v1/kbs/${kb_id}/ontology/imports
+    expect: { status: 200 }     # M4 任务 6 实现双打核销（ontology_imports 读族）
+  - id: import-preview
+    call: POST /api/v1/kbs/${kb_id}/ontology/imports/preview
+    target: java               # M5 任务 5 写步转 java（OwlProjector+ImportPlanner——预览与落库同一份 plan）
+    upload: { field: file, filename: contract-mini.ttl, content: '${owl}', mime: text/turtle }
+    expect: { status: 200 }
+  - id: import-apply
+    call: POST /api/v1/kbs/${kb_id}/ontology/imports
+    target: java               # M5 任务 5 写步转 java（blob 先存 sha256/批量落库/审计/enqueue embed_ontology）
+    upload: { field: file, filename: contract-mini.ttl, content: '${owl}', mime: text/turtle }
+    expect: { status: 200 }
+  - id: imports-list-after-apply
+    call: GET /api/v1/kbs/${kb_id}/ontology/imports
+    expect: { status: 200 }     # M4 任务 6 实现双打核销（同上）
+  # ---- 业务规则：属性谓词做条件，typing 结论，全生命周期 + 立即运行 ----
+  - id: attribute-type-create
+    call: 'POST /api/v1/kbs/${kb_id}/ontology/relation-types { "key": "headcount", "label": "Headcount", "kind": "attribute", "domains": ["${et_id}"], "datatype": "number" }'
+    target: rust                # 写路径：本体谓词（attribute）
+    capture: { attr_id: body.id }
+    expect: { status: 200 }
+  - id: rule-create-empty-conditions-422
+    call: 'POST /api/v1/kbs/${kb_id}/rules { "name": "r-contract-empty", "subject_type_id": "${et_id}", "conclusion": "typing", "conclude_type_id": "${et_id}", "conditions": [] }'
+    target: rust                # 写路径端点的 422 校验分支
+    expect: { status: 422 }
+  - id: rule-create
+    call: 'POST /api/v1/kbs/${kb_id}/rules { "name": "r-contract", "subject_type_id": "${et_id}", "conclusion": "typing", "conclude_type_id": "${et_id}", "conditions": [ { "predicate_id": "${attr_id}", "op": "present" } ] }'
+    target: rust                # 写路径（规则全周期，M2+）
+    capture: { rule_id: body.id }
+    expect: { status: 200 }
+  - id: rules-list
+    call: GET /api/v1/kbs/${kb_id}/rules
+    expect: { status: 200 }     # M4 任务 6 实现双打核销（attribute_rules 列表接 HTTP）
+  - id: rule-patch
+    call: 'PATCH /api/v1/kbs/${kb_id}/rules/${rule_id} { "name": "r-contract-renamed" }'
+    target: rust                # 写路径
+    expect: { status: 200 }
+  - id: rule-matches
+    call: GET /api/v1/kbs/${kb_id}/rules/${rule_id}/matches?page=0&per=10
+    expect: { status: 200 }     # M4 任务 6 实现双打核销（命中分页：per 钳 [1,100]）
+  - id: rule-versions
+    call: GET /api/v1/kbs/${kb_id}/rules/${rule_id}/versions
+    expect: { status: 200 }     # M4 任务 6 实现双打核销（规则定义史 0060）
+  - id: rules-run
+    call: POST /api/v1/kbs/${kb_id}/rules/run
+    target: rust                # 写路径（规则运行物化，M2+）
+    expect: { status: 200 }
+  - id: rule-delete
+    call: DELETE /api/v1/kbs/${kb_id}/rules/${rule_id}
+    target: rust                # 写路径
+    expect: { status: 200 }
+  - id: entity-type-delete
+    call: DELETE /api/v1/kbs/${kb_id}/ontology/entity-types/${et_id}
+    target: rust                # 写路径：删类（收尾）
+    expect: { status: 200 }
+  # ---- 收尾 ----
+  - id: ws-delete
+    call: DELETE /api/v1/workspaces/${ws_id}
+    target: rust                # 写路径：删工作区收口（幂等闭环）
+    expect: { status: 200 }

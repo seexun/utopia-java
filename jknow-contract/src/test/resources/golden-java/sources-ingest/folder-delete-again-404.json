@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "sources-ingest",
+    "step" : "folder-delete-again-404",
+    "method" : "DELETE",
+    "path" : "/api/v1/kbs/${kb_id}/sources/${folder_id}",
+    "target" : "java",
+    "expectedStatus" : 404,
+    "status" : 404
+  },
+  "normalized" : {
+    "error" : "Not found"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "meta" : {
+    "scenario" : "review",
+    "step" : "consistency-check",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/consistency/check",
+    "target" : "java",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "classes" : 0,
+    "cleared" : 0,
+    "cycles_capped" : 0,
+    "defects_found" : 0,
+    "defects_new" : 0,
+    "edges" : 0,
+    "found" : 0,
+    "inserted" : 0,
+    "predicates_with_axioms" : 0
+  }
+}

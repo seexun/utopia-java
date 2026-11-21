@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "sources-ingest",
+    "step" : "push-updated",
+    "method" : "POST",
+    "path" : "/api/v1/sources/${api_id}/ingest",
+    "target" : "java",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "action" : "updated"
+  }
+}

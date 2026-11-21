@@ -1,0 +1,33 @@
+{
+  "meta" : {
+    "scenario" : "workspace-kb",
+    "step" : "kb-patch",
+    "method" : "PATCH",
+    "path" : "/api/v1/kbs/${kb_id}",
+    "target" : "java",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "auto_extend_ontology" : true,
+    "auto_type_resolution" : true,
+    "created_at" : "<ts>",
+    "data_conventions" : null,
+    "data_description" : null,
+    "data_questions" : [ ],
+    "description" : "contract scenario kb patched",
+    "governance" : true,
+    "governance_since" : "<ts>",
+    "id" : "<uuid>",
+    "inference_interval_minutes" : 60,
+    "is_default" : true,
+    "kind" : "knowledge",
+    "last_inference_at" : null,
+    "materialize_inferences" : true,
+    "name" : "kb-contract-wskb",
+    "ontology_lang" : "en",
+    "updated_at" : "<ts>",
+    "visibility" : "open",
+    "workspace_id" : "<uuid>"
+  }
+}

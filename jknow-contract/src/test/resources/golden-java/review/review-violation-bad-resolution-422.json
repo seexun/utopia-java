@@ -1,0 +1,15 @@
+{
+  "meta" : {
+    "scenario" : "review",
+    "step" : "review-violation-bad-resolution-422",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/review/violations/00000000-0000-0000-0000-000000000000",
+    "target" : "java",
+    "expectedStatus" : 422,
+    "status" : 422
+  },
+  "normalized" : {
+    "code" : "bad_resolution",
+    "error" : "resolution 只能是 fact_retracted、fact_closed、axiom_relaxed 或 accepted"
+  }
+}

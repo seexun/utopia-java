@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "documents",
+    "step" : "jobs-nonexistent-404",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb2_id}/jobs/999999",
+    "target" : "both",
+    "expectedStatus" : 404,
+    "status" : 404
+  },
+  "normalized" : {
+    "error" : "Not found"
+  }
+}

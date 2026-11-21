@@ -1,0 +1,17 @@
+{
+  "meta" : {
+    "scenario" : "ontology",
+    "step" : "ontology-empty",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/ontology",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "dismissed_misses" : [ ],
+    "entity_types" : [ ],
+    "misses" : [ ],
+    "relation_types" : [ ]
+  }
+}

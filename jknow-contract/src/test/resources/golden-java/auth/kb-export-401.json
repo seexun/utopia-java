@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "auth",
+    "step" : "kb-export-401",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/00000000-0000-0000-0000-000000000000/export",
+    "target" : "both",
+    "expectedStatus" : 401,
+    "status" : 401
+  },
+  "normalized" : {
+    "error" : "Not signed in or invalid credentials"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "meta" : {
+    "scenario" : "ontology",
+    "step" : "entity-type-instances",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/ontology/entity-types/${et_id}/entities?page=0&per=10",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "entities" : [ ],
+    "total" : 0
+  }
+}

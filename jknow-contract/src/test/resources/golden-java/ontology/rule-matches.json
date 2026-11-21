@@ -1,0 +1,15 @@
+{
+  "meta" : {
+    "scenario" : "ontology",
+    "step" : "rule-matches",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/rules/${rule_id}/matches?page=0&per=10",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "matches" : [ ],
+    "total" : 0
+  }
+}

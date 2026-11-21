@@ -1,0 +1,188 @@
+# 域：workspace-kb——工作区/库全生命周期、成员（两级）、审计、readiness、导出、工作区设置。
+# 幂等：开头自建专属工作区 ws-contract-wskb 与库 kb-contract-wskb（名字带剧本名），结尾删除工作区收尾；
+# M4 任务 6：ws/kb 建改删九写步转 target:java（WorkspaceKbWriteController）；成员矩阵与 llm 设置写面未落，仍 rust。
+# M5 任务 5：install_packs 接真（422 ontology_packs_unsupported 降级退役）——kb-create-with-packs 建库带 w3c-org 包走真导入。
+# 每轮重建全新对象，不依赖上一轮。第二用户 contract-wskb-viewer 由 setup.ensure 保证存在。
+name: workspace-kb
+desc: 工作区/库 CRUD+成员矩阵+审计+readiness+export+设置（自建 ws-contract-wskb/kb-contract-wskb）
+setup:
+  register: { email: contract-wskb@test.local, password: ContractWskb!2026, display_name: Contract Wskb }
+  ensure:
+    - { email: contract-wskb-viewer@test.local, password: ContractWskbView!2026, display_name: Contract Wskb Viewer }
+vars:
+  viewer: contract-wskb-viewer@test.local
+  viewer_pw: ContractWskbView!2026
+  owner: contract-wskb@test.local
+  owner_pw: ContractWskb!2026
+steps:
+  - id: workspaces-list-before
+    call: GET /api/v1/workspaces
+    expect: { status: 200 }
+  - id: ws-create
+    call: 'POST /api/v1/workspaces { "name": "ws-contract-wskb" }'
+    capture: { ws_id: body.id }
+    expect: { status: 200 }
+    target: java               # M4 任务 6 写步转 java（WorkspaceKbWriteController 六端点落地）
+  - id: ws-get
+    call: GET /api/v1/workspaces/${ws_id}
+    expect: { status: 200 }
+  - id: ws-rename
+    call: 'PATCH /api/v1/workspaces/${ws_id} { "name": "ws-contract-wskb-renamed" }'
+    expect: { status: 200 }
+    target: java               # M4 任务 6 写步转 java（ws Admin rename）
+  - id: ws-kbs-empty
+    call: GET /api/v1/workspaces/${ws_id}/kbs
+    expect: { status: 200 }
+  - id: kb-create
+    call: 'POST /api/v1/workspaces/${ws_id}/kbs { "name": "kb-contract-wskb", "description": "contract scenario kb" }'
+    capture: { kb_id: body.id }
+    expect: { status: 200 }
+    target: java               # M4 任务 6 写步转 java（创建者自动入矩阵 admin；不带包——带包建库见下 kb-create-with-packs）
+  - id: ws-kbs-one
+    call: GET /api/v1/workspaces/${ws_id}/kbs
+    expect: { status: 200 }
+  - id: kb-get
+    call: GET /api/v1/kbs/${kb_id}
+    expect: { status: 200 }
+  - id: kb-patch
+    call: 'PATCH /api/v1/kbs/${kb_id} { "description": "contract scenario kb patched" }'
+    expect: { status: 200 }
+    target: java               # M4 任务 6 写步转 java（九字段可选；audit kb.updated）
+  - id: ontology-packs
+    call: GET /api/v1/ontology-packs
+    expect: { status: 200 }
+  # ---- M5 任务 5：install_packs 接真（422 降级退役）——建库带包的步转真 ----
+  - id: kb-create-with-packs
+    call: 'POST /api/v1/workspaces/${ws_id}/kbs { "name": "kb-contract-wskb-packs", "ontology_packs": ["w3c-org"] }'
+    capture: { kb_packs_id: body.id }
+    expect: { status: 200 }
+    target: java               # M5 任务 5：逐包 owl_import::apply（w3c-org 13 类），422 降级退役
+  - id: kb-packs-ontology
+    call: GET /api/v1/kbs/${kb_packs_id}/ontology
+    expect: { status: 200 }    # 双打读：包装没装上一读便知（收尾 ws-delete 级联清掉）
+  - id: my-kbs
+    call: GET /api/v1/workspaces/${ws_id}/my-kbs
+    expect: { status: 200 }
+  - id: kb-members-initial
+    call: GET /api/v1/kbs/${kb_id}/members
+    expect: { status: 200 }
+  - id: ws-members-initial
+    call: GET /api/v1/workspaces/${ws_id}/members
+    expect: { status: 200 }
+  # ---- 第二用户：先验证不可见（restricted 语义下隐藏为 404），再加为 viewer 验证只读 ----
+  - id: viewer-login-first
+    call: 'POST /api/v1/auth/login { "email": "${viewer}", "password": "${viewer_pw}" }'
+    capture:
+      cookie: set-cookie
+    expect: { status: 200 }
+  - id: viewer-me
+    call: GET /api/v1/auth/me
+    capture: { viewer_id: body.id }
+    expect: { status: 200 }
+  - id: viewer-kb-hidden
+    call: GET /api/v1/kbs/${kb_id}/readiness
+    expect: { status: 404 }
+  - id: owner-login-back
+    call: 'POST /api/v1/auth/login { "email": "${owner}", "password": "${owner_pw}" }'
+    capture:
+      cookie: set-cookie
+    expect: { status: 200 }
+  - id: kb-member-add-viewer
+    call: 'PUT /api/v1/kbs/${kb_id}/members/${viewer_id} { "role": "viewer" }'
+    expect: { status: 200 }
+    target: rust
+  - id: kb-members-two
+    call: GET /api/v1/kbs/${kb_id}/members
+    expect: { status: 200 }
+  - id: viewer-login-second
+    call: 'POST /api/v1/auth/login { "email": "${viewer}", "password": "${viewer_pw}" }'
+    capture:
+      cookie: set-cookie
+    expect: { status: 200 }
+  - id: viewer-read-ok
+    call: GET /api/v1/kbs/${kb_id}/readiness
+    expect: { status: 200 }
+  - id: viewer-write-forbidden
+    call: 'PATCH /api/v1/kbs/${kb_id} { "description": "viewer should not do this" }'
+    expect: { status: 403 }
+    target: java               # M4 任务 6 写步转 java（KB Admin 门槛的 403 分支）
+  - id: owner-login-back-second
+    call: 'POST /api/v1/auth/login { "email": "${owner}", "password": "${owner_pw}" }'
+    capture:
+      cookie: set-cookie
+    expect: { status: 200 }
+  - id: ws-member-add-viewer
+    call: 'PUT /api/v1/workspaces/${ws_id}/members/${viewer_id} { "role": "viewer" }'
+    expect: { status: 200 }
+    target: rust
+  - id: ws-members-two
+    call: GET /api/v1/workspaces/${ws_id}/members
+    expect: { status: 200 }
+  - id: ws-member-remove
+    call: DELETE /api/v1/workspaces/${ws_id}/members/${viewer_id}
+    expect: { status: 200 }
+    target: rust
+  - id: kb-member-remove
+    call: DELETE /api/v1/kbs/${kb_id}/members/${viewer_id}
+    expect: { status: 200 }
+    target: rust
+  - id: kb-members-after-remove
+    call: GET /api/v1/kbs/${kb_id}/members
+    expect: { status: 200 }
+  - id: kb-audit
+    call: GET /api/v1/kbs/${kb_id}/audit?limit=20&offset=0
+    expect: { status: 200 }
+  - id: kb-readiness
+    call: GET /api/v1/kbs/${kb_id}/readiness
+    expect: { status: 200 }
+  # kb-export（M5 任务 1 起双侧真导出）：RDF 响应按三元组集归一比对（Normalizer.triples——
+  # Turtle/JSON-LD 解析回 Model 落排序 N-Triples 行，空白节点按排序后首现重编 _:b0/:b1/…）。
+  # 不按字节比的原因：Jena（Java）与 oxrdfio（Rust）的序列化空白/前缀展开顺序天然不同；
+  # 按图同比与 Rust 侧 rdf.rs 测试「必须解析回来」的纪律同一条。
+  - id: kb-export
+    call: GET /api/v1/kbs/${kb_id}/export
+    expect: { status: 200 }
+  - id: kb-delete-default-refused
+    call: DELETE /api/v1/kbs/${kb_id}
+    expect: { status: 422 }
+    target: java               # M4 任务 6 写步转 java（default_kb_undeletable 分支）
+  - id: kb-create-second
+    call: 'POST /api/v1/workspaces/${ws_id}/kbs { "name": "kb-contract-wskb-second" }'
+    capture: { kb2_id: body.id }
+    expect: { status: 200 }
+    target: java               # M4 任务 6 写步转 java（第二个库非默认）
+  - id: kb-delete-second
+    call: DELETE /api/v1/kbs/${kb2_id}
+    expect: { status: 200 }
+    target: java               # M4 任务 6 写步转 java（audit kb.deleted 带库名）
+  - id: kb-get-zero-404
+    call: GET /api/v1/kbs/00000000-0000-0000-0000-000000000000
+    expect: { status: 404 }
+  - id: ws-get-zero-404
+    call: GET /api/v1/workspaces/00000000-0000-0000-0000-000000000000
+    expect: { status: 404 }
+  # ---- 工作区设置族（LLM/OCR/转写，未配置态）----
+  - id: ws-settings-get
+    call: GET /api/v1/workspaces/${ws_id}/settings
+    expect: { status: 200 }
+  - id: ws-settings-put
+    call: 'PUT /api/v1/workspaces/${ws_id}/settings {}'
+    expect: { status: 200 }
+    target: rust
+  - id: ws-settings-ocr-put
+    call: 'PUT /api/v1/workspaces/${ws_id}/settings/ocr { "provider": "mineru", "base_url": "http://127.0.0.1:1", "api_key": "contract-key", "backend": "contract-backend", "model": "contract-model" }'
+    expect: { status: 200 }
+    target: rust
+  - id: ws-settings-transcribe-put
+    call: 'PUT /api/v1/workspaces/${ws_id}/settings/transcribe { "base_url": "http://127.0.0.1:1", "api_key": "contract-key", "model": "contract-model" }'
+    expect: { status: 200 }
+    target: rust
+  - id: ws-settings-test
+    call: POST /api/v1/workspaces/${ws_id}/settings/test
+    expect: { status: 200 }
+    target: rust
+  # ---- 收尾：删工作区（级联清掉专属库，幂等收口）----
+  - id: ws-delete
+    call: DELETE /api/v1/workspaces/${ws_id}
+    expect: { status: 200 }
+    target: java               # M4 任务 6 写步转 java（ws Owner；级联收口）

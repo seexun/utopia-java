@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "chat-misc",
+    "step" : "conversation-rename-unknown-404",
+    "method" : "PATCH",
+    "path" : "/api/v1/kbs/${kb_id}/conversations/00000000-0000-0000-0000-000000000000",
+    "target" : "java",
+    "expectedStatus" : 404,
+    "status" : 404
+  },
+  "normalized" : {
+    "error" : "Not found"
+  }
+}

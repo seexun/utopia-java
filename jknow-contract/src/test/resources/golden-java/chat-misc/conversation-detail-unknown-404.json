@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "chat-misc",
+    "step" : "conversation-detail-unknown-404",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/conversations/00000000-0000-0000-0000-000000000000",
+    "target" : "both",
+    "expectedStatus" : 404,
+    "status" : 404
+  },
+  "normalized" : {
+    "error" : "Not found"
+  }
+}

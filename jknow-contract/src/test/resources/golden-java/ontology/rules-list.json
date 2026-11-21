@@ -1,0 +1,41 @@
+{
+  "meta" : {
+    "scenario" : "ontology",
+    "step" : "rules-list",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/rules",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "rules" : [ {
+      "capped" : 0,
+      "conclude_expr" : null,
+      "conclude_predicate_id" : null,
+      "conclude_predicate_label" : null,
+      "conclude_type_id" : "<uuid>",
+      "conclude_type_label" : "Firm",
+      "conclude_value" : null,
+      "conclusion" : "typing",
+      "conditions" : [ {
+        "group" : 0,
+        "op" : "present",
+        "operand" : null,
+        "predicate_id" : "<uuid>",
+        "predicate_label" : "headcount",
+        "side" : "x"
+      } ],
+      "derived_count" : 0,
+      "description" : "",
+      "enabled" : true,
+      "id" : "<uuid>",
+      "join_predicate_id" : null,
+      "join_predicate_label" : null,
+      "name" : "r-contract",
+      "subject_label" : "Firm",
+      "subject_type_id" : "<uuid>",
+      "version" : 1
+    } ]
+  }
+}

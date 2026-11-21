@@ -1,0 +1,77 @@
+# 域：heart-ledger——M3 心脏账本终态快照剧本骨架（m3-plan 任务 1 立骨架；任务 11 固定装置 SQL 化）。
+#
+# 锁 4 语义：共享库双打下「两侧各 dump 一次同一库」是退化的（必然相同）；正确语义是
+# **同一剧本两侧各自跑一遍完整写路径**——
+#   录 golden-heart-rust：Recorder --writes rust（写步 target:rust 全打 Rust，worker=Rust 容器），
+#   录 golden-heart-java：Recorder --writes java（写步整体重定向 Java，Java 以 UTOPIA_JOBS_WORKER=true
+#   起且 Rust 参照实例停机——共享队列双 worker 会抢 job，Java 必须消费自己的抽取/物化链，
+#   这正是切流预演）；快照步各 dump 自己写路径的库内终态，Diff --dual golden-heart 深度比对。
+#
+# 任务 11 改动：ws/kb 固定装置从 HTTP both 步（M2 裁定 Java 写域不含 workspace/KB 创建，
+# 曾挂 ws-kb-write-java-deferred）改为 **SQL 步**——装置与侧无关，两轮同串执行；java 轮
+# Rust 停机时剧本不再依赖 Rust HTTP。装置顺带把 inference_interval_minutes 调到一周上限
+# 并记 last_inference_at=now()：两侧各自的推理调度器（60s tick 扫到期库）在剧本窗口内
+# 不触发，推理与公理按需显式驱动（heart-replay 的物化 job / heart-axioms 的本体钩子）。
+#
+# 步骤定向说明：
+#   login/statements-source/push-statements target:rust——心脏写步（重定向对象；Java M2 已实现
+#   sources/statements 推送域，--writes java 今天即可跑通）；
+#   ledger-snapshot——快照步跟随写路径侧（--writes java 时随之记 golden-heart-java）；
+#   快照步不带 target（任务 1 审查 M-2 收口：装载器拒收非 HTTP 步的 target 死配置）。
+#
+# 幂等：setup.register 邮箱带 ${run_id}（引擎预种子的本轮唯一后缀）——每轮全新账号、
+# 全新工作空间/kb，不依赖历史状态，两轮互不串扰。
+name: heart-ledger
+desc: 心脏账本终态快照骨架（注册/登录/SQL 固定装置/陈述源/推送 2 条陈述/终态快照）
+setup:
+  register: { email: 'heart-${run_id}@test.local', password: HeartLedger!2026, display_name: Heart Ledger }
+steps:
+  - id: login
+    call: 'POST /api/v1/auth/login { "email": "${register.email}", "password": "${register.password}" }'
+    capture: { cookie: set-cookie }
+    expect: { status: 200 }
+    target: rust
+  # 固定装置（SQL，与侧无关）：注册用户组织下建工作空间 → kb（推理一周窗口+记过时戳）→
+  # owner 成员资格 + kb_members 矩阵 admin（写权限的唯一来源——建库 HTTP 给创建者的
+  # 正是它，SQL 装置对等补上）。捕获 ws_id/kb_id/user_id 供后续步骤引用。
+  - id: kb-fixture
+    sql:
+      statements:
+        - |
+          INSERT INTO workspaces (id, org_id, name)
+          SELECT gen_random_uuid(), org_id, 'ws-heart-${run_id}' FROM users
+           WHERE email = '${register.email}' RETURNING id AS ws_id
+        - |
+          INSERT INTO knowledge_bases (id, workspace_id, name, ontology_lang,
+                                       inference_interval_minutes, last_inference_at)
+          VALUES (gen_random_uuid(), '${ws_id}'::uuid, 'kb-heart-${run_id}', 'en', 10080, now())
+          RETURNING id AS kb_id
+        - |
+          INSERT INTO memberships (user_id, workspace_id, role)
+          SELECT id, '${ws_id}'::uuid, 'owner' FROM users
+           WHERE email = '${register.email}' RETURNING user_id AS user_id
+        # kb 成员矩阵（写权限的唯一来源——workspace owner 只给 open 库 Viewer）：
+        # 建库 HTTP 会给创建者 admin，SQL 装置对等补上
+        - |
+          INSERT INTO kb_members (kb_id, user_id, role)
+          VALUES ('${kb_id}'::uuid, '${user_id}'::uuid, 'admin')
+      capture: { ws_id: ws_id, kb_id: kb_id, user_id: user_id }
+  - id: statements-source
+    call: 'POST /api/v1/kbs/${kb_id}/sources { "kind": "statements", "name": "src-heart" }'
+    capture:
+      src_id: body.source.id
+      stmt_token: body.ingest_token
+    expect: { status: 200 }
+    target: rust
+  # 陈述契约推送（0054 信封：e=[name, kind, named]；s=[null, subject, phrase, object, value,
+  # qualifiers, when, ended]；n=[entity, name, null]；信封外键门口拒收）。两条陈述：
+  # works_at 实体→实体带时间词（2021）；known_as 字面值别名（names::record 语义）。
+  - id: push-statements
+    call: 'POST /api/v1/sources/${src_id}/statements { "external_id": "heart-1", "e": [["Cara", "person", null], ["Gamma", "organization", null]], "s": [[null, "Cara", "works_at", "Gamma", null, null, "2021-03-15", null], [null, "Cara", "known_as", null, "Cara Diaz", null, null, null]], "n": [] }'
+    headers: { Authorization: 'Bearer ${stmt_token}' }
+    expect: { status: 200 }
+    target: rust
+  # 终态快照：静默等待该 kb 的后台 job（摄取→抽取→时间解析链全落定）后，直连共享 PG dump
+  # 默认心脏表集（facts/entities/chunks 投影/documents 投影/errata 两表等，见 SnapshotTables 登记簿）。
+  - id: ledger-snapshot
+    snapshot: { kb_id: '${kb_id}' }

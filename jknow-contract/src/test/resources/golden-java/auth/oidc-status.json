@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "auth",
+    "step" : "oidc-status",
+    "method" : "GET",
+    "path" : "/api/v1/auth/oidc/status",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "enabled" : false
+  }
+}

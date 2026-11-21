@@ -1,0 +1,30 @@
+{
+  "meta" : {
+    "scenario" : "ontology",
+    "step" : "import-preview",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/ontology/imports/preview",
+    "target" : "java",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "filename" : "contract-mini.ttl",
+    "plan" : {
+      "attributes" : [ ],
+      "classes" : [ {
+        "disposition" : "update",
+        "has_description" : false,
+        "iri" : "http://contract/x/Company",
+        "key" : "company",
+        "label" : "Company"
+      } ],
+      "classes_without_description" : 1,
+      "format" : "turtle",
+      "functional_relations" : 0,
+      "relations" : [ ],
+      "triples" : 1,
+      "unprojected" : [ ]
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "mappings",
+    "step" : "ds-unmount-unknown-idempotent-ok",
+    "method" : "DELETE",
+    "path" : "/api/v1/kbs/${kb_id}/data-sources/00000000-0000-0000-0000-000000000000",
+    "target" : "java",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "ok" : true
+  }
+}

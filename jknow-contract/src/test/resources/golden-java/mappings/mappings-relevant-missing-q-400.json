@@ -1,0 +1,12 @@
+{
+  "meta" : {
+    "scenario" : "mappings",
+    "step" : "mappings-relevant-missing-q-400",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/mappings/relevant",
+    "target" : "both",
+    "expectedStatus" : 400,
+    "status" : 400
+  },
+  "normalized" : "Failed to deserialize query string: missing field `q`"
+}

@@ -1,0 +1,33 @@
+{
+  "meta" : {
+    "scenario" : "workspace-kb",
+    "step" : "kb-create-with-packs",
+    "method" : "POST",
+    "path" : "/api/v1/workspaces/${ws_id}/kbs",
+    "target" : "java",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "auto_extend_ontology" : true,
+    "auto_type_resolution" : true,
+    "created_at" : "<ts>",
+    "data_conventions" : null,
+    "data_description" : null,
+    "data_questions" : [ ],
+    "description" : null,
+    "governance" : true,
+    "governance_since" : "<ts>",
+    "id" : "<uuid>",
+    "inference_interval_minutes" : 60,
+    "is_default" : false,
+    "kind" : "knowledge",
+    "last_inference_at" : null,
+    "materialize_inferences" : true,
+    "name" : "kb-contract-wskb-packs",
+    "ontology_lang" : "en",
+    "updated_at" : "<ts>",
+    "visibility" : "open",
+    "workspace_id" : "<uuid>"
+  }
+}

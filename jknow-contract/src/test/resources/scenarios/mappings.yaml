@@ -1,0 +1,84 @@
+# 域：mappings——语义层口径：列表/筛选/相关口径/预览（未挂载数据源的两类 422）/改口径/修订史
+# + 库内数据源挂载面（未挂载现状）。
+# 幂等：自建专属库 kb-contract-map（空库形状确定）。管理员建数据源不可达（非 admin），
+# 挂载 happy path 仍 deferred（种子 admin 后建源挂载再补录，见 COVERAGE.md D7/D11——
+# M5 任务 3 已落 Java 写面（DatasourcesController/SchemaSync/六引擎），差的是 admin 种子）。
+# M5 任务 3：preview/revise 422 与挂载面五步转 target:java（query 包+写面落地）；
+# ws/kb 装置步与 workspace-kb.yaml 同口径（M4 任务 6 写步已 java）。
+name: mappings
+desc: 口径列表/相关/预览 422 形状/修订 404 形状 + 库内数据源面（自建 kb-contract-map）
+setup:
+  register: { email: contract-map@test.local, password: ContractMap!2026, display_name: Contract Map }
+steps:
+  - id: ws-create
+    call: 'POST /api/v1/workspaces { "name": "ws-contract-map" }'
+    capture: { ws_id: body.id }
+    expect: { status: 200 }
+    target: java               # M4 任务 6 写步转 java（WorkspaceKbWriteController）——与 workspace-kb.yaml 同口径
+  - id: kb-create
+    call: 'POST /api/v1/workspaces/${ws_id}/kbs { "name": "kb-contract-map", "description": "mappings scenario" }'
+    capture: { kb_id: body.id }
+    expect: { status: 200 }
+    target: java               # 同上
+  # ---- 口径列表与筛选 ----
+  - id: mappings-list
+    call: GET /api/v1/kbs/${kb_id}/mappings?limit=10&offset=0
+    expect: { status: 200 }
+  - id: mappings-filter
+    call: GET /api/v1/kbs/${kb_id}/mappings?status=confirmed&q=revenue&limit=5&offset=0
+    expect: { status: 200 }
+  - id: mappings-relevant
+    call: GET /api/v1/kbs/${kb_id}/mappings/relevant?q=total
+    expect: { status: 200 }
+  - id: mappings-relevant-missing-q-400
+    call: GET /api/v1/kbs/${kb_id}/mappings/relevant
+    expect: { status: 400 }
+  # ---- 预览：不落库的试算，两个可复现的错误形状 ----
+  - id: mapping-preview-empty-422
+    call: 'POST /api/v1/kbs/${kb_id}/mappings/preview { "source": "no-such-source" }'
+    expect: { status: 422 }
+    target: java               # M5 任务 3：preview 写面落地（MappingsController.preview/render_sql 三分）
+  - id: mapping-preview-unmounted-422
+    call: 'POST /api/v1/kbs/${kb_id}/mappings/preview { "source": "no-such-source", "table_name": "orders", "expr": "amount * 2", "summary": "doubled amount" }'
+    expect: { status: 422 }
+    target: java               # 同上
+  # ---- 改口径与修订史（不存在 id 的形状）----
+  - id: mapping-revise-empty-422
+    call: 'PATCH /api/v1/kbs/${kb_id}/mappings/00000000-0000-0000-0000-000000000000 { "derived": false }'
+    expect: { status: 422 }
+    target: java               # M5 任务 3：revise 写面落地（revise/快照 revisions 同事务）
+  - id: mapping-revisions-unknown
+    call: GET /api/v1/kbs/${kb_id}/mappings/00000000-0000-0000-0000-000000000000/revisions
+    expect: { status: 200 }
+  # ---- 库内数据源面（管理员源不可达，空集与 404 形状）----
+  - id: kb-data-sources
+    call: GET /api/v1/kbs/${kb_id}/data-sources
+    expect: { status: 200 }
+  - id: kb-data-sources-available
+    call: GET /api/v1/kbs/${kb_id}/data-sources/available
+    expect: { status: 200 }
+  - id: ds-mount-ungated-422
+    call: PUT /api/v1/kbs/${kb_id}/data-sources/00000000-0000-0000-0000-000000000000
+    expect: { status: 422 }
+    target: java               # M5 任务 3：mount 落地（is_granted 复查 → source_not_granted 422）
+  - id: ds-unmount-unknown-idempotent-ok
+    call: DELETE /api/v1/kbs/${kb_id}/data-sources/00000000-0000-0000-0000-000000000000
+    expect: { status: 200 }
+    target: java               # M5 任务 3：unmount 落地（幂等）
+  - id: ds-sync-schema-unknown-500
+    call: POST /api/v1/kbs/${kb_id}/data-sources/00000000-0000-0000-0000-000000000000/sync-schema
+    expect: { status: 500 }
+    target: java               # M5 任务 3：sync-schema 落地（未知源 → Data source not found 走 500 面）
+  - id: ds-explore-no-sources-422
+    call: POST /api/v1/kbs/${kb_id}/data-sources/explore
+    expect: { status: 422 }
+    target: java               # M5 任务 3：explore 落地（无挂载源 no_data_sources 422；job 本体属任务 5）
+  # ---- 未知库 ----
+  - id: mappings-unknown-kb-404
+    call: GET /api/v1/kbs/00000000-0000-0000-0000-000000000000/mappings?limit=5&offset=0
+    expect: { status: 404 }
+  # ---- 收尾 ----
+  - id: ws-delete
+    call: DELETE /api/v1/workspaces/${ws_id}
+    expect: { status: 200 }
+    target: java               # M4 任务 6 写步转 java——与 workspace-kb.yaml 同口径

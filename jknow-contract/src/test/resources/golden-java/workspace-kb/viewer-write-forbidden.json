@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "workspace-kb",
+    "step" : "viewer-write-forbidden",
+    "method" : "PATCH",
+    "path" : "/api/v1/kbs/${kb_id}",
+    "target" : "java",
+    "expectedStatus" : 403,
+    "status" : 403
+  },
+  "normalized" : {
+    "error" : "You don't have permission to do that"
+  }
+}

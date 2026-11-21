@@ -1,0 +1,83 @@
+# 域：admin-users——组织用户面 + 管理员面（非 admin 的 403 现状）+ 个人访问令牌全生命周期。
+# 参照实例只有部署首个用户是 admin 且口令不在手：管理员端点的 happy path deferred（M5 种子 admin，见 COVERAGE.md），
+# 这里忠实记录非 admin 的 403 与无权访问形状。个人令牌 issue→revoke→再 revoke 404 全链路确定性。
+# M5 任务 6 固定行数处置（pat-ratchet 挂账核销）：令牌列表行只打戳不删行——固定账号逐轮累积
+# 是棘轮的来源；注册体带 ${run_id} 唯一后缀（M3 起 Recorder 预种子），每轮全新账号，
+# tokens-list/tokens-list-after-issue 的行数由剧本构造钉死（0/1），全量 body 亦随之确定。
+name: admin-users
+desc: /users 系 + /admin/* 403 现状 + /me/tokens 全生命周期（contract-admin-${run_id}@test.local）
+setup:
+  register: { email: 'contract-admin-${run_id}@test.local', password: ContractAdmin!2026, display_name: Contract Admin }
+steps:
+  # ---- 组织用户面（非 admin 可读）----
+  - id: users-list
+    call: GET /api/v1/users
+    expect: { status: 200 }
+  - id: users-deactivated-forbidden
+    call: GET /api/v1/users/deactivated
+    expect: { status: 403 }
+  # ---- 管理员面：非 admin 一律 403（happy deferred）----
+  - id: admin-create-user-forbidden
+    call: 'POST /api/v1/admin/users { "email": "contract-made@test.local", "display_name": "Made", "password": "ContractMade!2026", "role": "viewer" }'
+    expect: { status: 403 }
+  - id: admin-deactivate-forbidden
+    call: DELETE /api/v1/admin/users/00000000-0000-0000-0000-000000000000
+    expect: { status: 403 }
+  - id: admin-reactivate-forbidden
+    call: POST /api/v1/admin/users/00000000-0000-0000-0000-000000000000
+    expect: { status: 403 }
+  - id: admin-deployment-forbidden
+    call: GET /api/v1/admin/deployment
+    expect: { status: 403 }
+  - id: admin-deployment-put-forbidden
+    call: 'PUT /api/v1/admin/deployment { "open_registration": true }'
+    expect: { status: 403 }
+  - id: admin-oidc-identities-forbidden
+    call: GET /api/v1/admin/oidc/identities
+    expect: { status: 403 }
+  - id: admin-oidc-unbind-forbidden
+    call: DELETE /api/v1/admin/oidc/identities/00000000-0000-0000-0000-000000000000
+    expect: { status: 403 }
+  # ---- 管理员数据源面：同上 403 现状 ----
+  - id: admin-ds-list-forbidden
+    call: GET /api/v1/admin/data-sources
+    expect: { status: 403 }
+  - id: admin-ds-create-forbidden
+    call: 'POST /api/v1/admin/data-sources { "name": "contract-ds", "conn_string": "postgres://127.0.0.1:1/x" }'
+    expect: { status: 403 }
+  - id: admin-ds-test-forbidden
+    call: 'POST /api/v1/admin/data-sources/test { "conn_string": "postgres://127.0.0.1:1/x" }'
+    expect: { status: 403 }
+  - id: admin-ds-delete-forbidden
+    call: DELETE /api/v1/admin/data-sources/00000000-0000-0000-0000-000000000000
+    expect: { status: 403 }
+  - id: admin-ds-grants-forbidden
+    call: GET /api/v1/admin/data-sources/00000000-0000-0000-0000-000000000000/grants
+    expect: { status: 403 }
+  - id: admin-ds-grant-forbidden
+    call: PUT /api/v1/admin/data-sources/00000000-0000-0000-0000-000000000000/grants/00000000-0000-0000-0000-000000000000
+    expect: { status: 403 }
+  - id: admin-ds-revoke-forbidden
+    call: DELETE /api/v1/admin/data-sources/00000000-0000-0000-0000-000000000000/grants/00000000-0000-0000-0000-000000000000
+    expect: { status: 403 }
+  # ---- 个人访问令牌（PAT）：issue→list→revoke→再 revoke 404 ----
+  - id: tokens-list
+    call: GET /api/v1/me/tokens
+    expect: { status: 200 }
+  - id: token-issue
+    call: 'POST /api/v1/me/tokens { "name": "contract-admin-pat", "scope": "read", "expires_in_days": 1 }'
+    capture:
+      token_id: body.info.id
+    expect: { status: 200 }
+    target: rust
+  - id: tokens-list-after-issue
+    call: GET /api/v1/me/tokens
+    expect: { status: 200 }
+  - id: token-revoke
+    call: DELETE /api/v1/me/tokens/${token_id}
+    expect: { status: 200 }
+    target: rust
+  - id: token-revoke-again-404
+    call: DELETE /api/v1/me/tokens/${token_id}
+    expect: { status: 404 }
+    target: rust

@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "sources-ingest",
+    "step" : "api-rotate-token",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/sources/${api_id}/rotate-token",
+    "target" : "java",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "ingest_token" : "<masked>"
+  }
+}

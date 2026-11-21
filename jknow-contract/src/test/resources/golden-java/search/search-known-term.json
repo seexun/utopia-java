@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "search",
+    "step" : "search-known-term",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/search",
+    "target" : "java",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "results" : [ ]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "meta" : {
+    "scenario" : "mappings",
+    "step" : "mappings-list",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/mappings?limit=10&offset=0",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "counts" : {
+      "confirmed" : 0,
+      "proposed" : 0,
+      "rejected" : 0
+    },
+    "items" : [ ],
+    "last_run" : null,
+    "total" : 0
+  }
+}

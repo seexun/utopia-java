@@ -1,0 +1,31 @@
+{
+  "meta" : {
+    "scenario" : "ontology",
+    "step" : "import-apply",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/ontology/imports",
+    "target" : "java",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "import_id" : "<uuid>",
+    "plan" : {
+      "attributes" : [ ],
+      "classes" : [ {
+        "disposition" : "update",
+        "has_description" : false,
+        "iri" : "http://contract/x/Company",
+        "key" : "company",
+        "label" : "Company"
+      } ],
+      "classes_without_description" : 1,
+      "format" : "turtle",
+      "functional_relations" : 0,
+      "relations" : [ ],
+      "triples" : 1,
+      "unprojected" : [ ]
+    },
+    "violations" : 0
+  }
+}

@@ -1,0 +1,32 @@
+# 域：alerts——告警中心四操作 + 已读组标记。
+# 幂等：专属账号 contract-alerts 不自产告警（不建库不摄入），列表/未读数在重录间保持空。
+# 告警流 /alerts/events 是 SSE：无会话 401 用例在 auth 剧本，已认证的流式行为 deferred（见 COVERAGE.md）。
+name: alerts
+desc: 告警列表/搜索/未读/全部已读/分组已读（contract-alerts@test.local，空告警账号）
+setup:
+  register: { email: contract-alerts@test.local, password: ContractAlerts!2026, display_name: Contract Alerts }
+steps:
+  - id: alerts-page
+    call: GET /api/v1/alerts?limit=10&offset=0
+    expect: { status: 200 }
+  - id: alerts-search-no-match
+    call: GET /api/v1/alerts?q=nothing-matches-this&limit=5&offset=0
+    expect: { status: 200 }
+  - id: alerts-unread
+    call: GET /api/v1/alerts/unread
+    expect: { status: 200 }
+  - id: alerts-read-all
+    call: POST /api/v1/alerts/read-all
+    expect: { status: 200 }
+    target: rust
+  - id: alerts-unread-after-read-all
+    call: GET /api/v1/alerts/unread
+    expect: { status: 200 }
+  - id: alerts-read-group
+    call: 'POST /api/v1/alerts/read-group { "kb_id": null, "kind": "doc.missing", "from": "2020-01-01T00:00:00Z", "to": "2030-01-01T00:00:00Z" }'
+    expect: { status: 200 }
+    target: rust
+  - id: alerts-read-group-missing-range
+    call: 'POST /api/v1/alerts/read-group { "kb_id": null, "kind": "doc.missing" }'
+    expect: { status: 422 }
+    target: rust

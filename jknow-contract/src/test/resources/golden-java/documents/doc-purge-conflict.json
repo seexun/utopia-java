@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "documents",
+    "step" : "doc-purge-conflict",
+    "method" : "POST",
+    "path" : "/api/v1/documents/${doc_id}/purge",
+    "target" : "java",
+    "expectedStatus" : 409,
+    "status" : 409
+  },
+  "normalized" : {
+    "error" : "The document was already purged"
+  }
+}

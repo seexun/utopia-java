@@ -1,0 +1,23 @@
+# 登录链路剧本：cookie 会话 + 变量捕获 + expect（含鉴权 404 分支）。
+# setup 语义：注册拿会话；409（账号已在）转登录——连录两遍、干净环境首录都成立，setup 不进黄金样本。
+# M1 双打：setup 整体与 login 步骤都是写路径（会话+审计事件）→ target: rust（m1-recon §5）；
+# me/graph-404 是读步骤，缺省 both 双打各录。语法口径见 SCENARIOS.md。
+name: auth-login
+desc: 登录→auth/me（会话）→不存在的库 404（录制账号 contract0@test.local）
+setup:
+  register: { email: contract0@test.local, password: Contract0!2026, display_name: Contract Zero }
+steps:
+  # 注意：call 行带 JSON 体时用单引号包裹——YAML plain 标量不能含「冒号+空格」，不包会解析失败。
+  - id: login
+    call: 'POST /api/v1/auth/login { "email": "${register.email}", "password": "${register.password}" }'
+    target: rust                # 写路径：建会话 + 写审计 auth.login_failed/login —— 归 Rust
+    capture:
+      cookie: set-cookie        # 会话 cookie：后续步骤自动携带
+      token: body.token         # 变量捕获演示（token 是噪声字段，黄金样本中已掩码）
+    expect: { status: 200 }
+  - id: me
+    call: GET /api/v1/auth/me
+    expect: { status: 200 }
+  - id: graph-404
+    call: GET /api/v1/kbs/00000000-0000-0000-0000-000000000000/graph/overview
+    expect: { status: 404 }

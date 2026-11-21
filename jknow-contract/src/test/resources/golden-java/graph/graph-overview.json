@@ -1,0 +1,17 @@
+{
+  "meta" : {
+    "scenario" : "graph",
+    "step" : "graph-overview",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/graph/overview?limit=50",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "edges" : [ ],
+    "nodes" : [ ],
+    "total_edges" : 0,
+    "total_nodes" : 0
+  }
+}

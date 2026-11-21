@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "documents",
+    "step" : "extraction-drops",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/extraction-drops",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "drops" : [ ]
+  }
+}

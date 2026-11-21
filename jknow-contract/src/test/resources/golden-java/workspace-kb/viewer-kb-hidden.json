@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "workspace-kb",
+    "step" : "viewer-kb-hidden",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/readiness",
+    "target" : "both",
+    "expectedStatus" : 404,
+    "status" : 404
+  },
+  "normalized" : {
+    "error" : "Not found"
+  }
+}

@@ -1,0 +1,136 @@
+# 域：heart-replay——M3 专属剧本①：观测回放闭合链（规格 §5；m3-plan 任务 11）。
+#
+# 语义：同一事实多次推送/撤回/恢复后时间线闭合正确（temporal 域）。写路径在测：
+#   推送陈述 → 抽取（pushed 块即契约，无模型）→ 时间解析（when/ended 代码直读 #1089——
+#   只说了一刻的 when 读成点，起止同值）→ 物化（due 查询经 insert_fact_on 的闭合分支族：
+#   补终点/精确重复复用/时间精化对账 #899）→ 文档删除=事件（仅以它为出处的行作废+牵连
+#   时间线 tidy）→ 恢复（作废名单复活+reattest+tidy）。终态快照裁决两侧 temporal/落库门的等价。
+#
+# 装置（SQL，两轮同串）：kb 固定装置 + relation_type works_at 经本体 HTTP（两侧共有写面）
+# + phrase_binding（'works_at'→works_at，forward，bound，marks='start'——#966：点陈述在
+# 状态属性下按「那一刻是开始」读，没有 marks 会被 MOMENT_UNREAD 整个排除）+ materialize_typed
+# job 直接入队（对齐队列写端点属 M4，人定签名的「同事务交付 job」由 SQL 等价承担——装置而非
+# 被测路径，被测路径是 job 消费侧的 TypedMaterializeService/materialize.rs）。
+#
+# 回放链（每步之间 wait 静默——后台 job 是链的一环，落定才进下一拍）：
+#   obs-1：Cara works_at Gamma 自 2021-03-15 → 物化 → 类型化行 A（2021-03-15..open）
+#   obs-2：Cara works_at Gamma 2023-04-01..2024-05-20（同断言的有界段观测，独立 external_id）
+#          → 开放陈述去重并锚/按陈述合起止 → 物化重算（对账收口）
+#   obs-3：Cara works_at Delta 自 2022-09-09（另一断言 → 独立行 B；它将是撤回/恢复的载体——
+#          Gamma 的陈述有两份文档作证，删一份不动它，「删重复上传不掀图」的语义顺带钉住）
+#   删 obs-3 的文档 → 撤回：仅以它为出处的行作废（Delta 陈述+行 B）+ 时间线 tidy
+#   恢复 obs-3 → 作废名单复活（只认删除事务的作废时间）+ reattest + tidy
+name: heart-replay
+desc: 观测回放闭合链（推送/物化/二次观测闭合/撤回/恢复后时间线终态快照）
+setup:
+  register: { email: 'replay-${run_id}@test.local', password: Replay!2026x, display_name: Heart Replay }
+steps:
+  - id: login
+    call: 'POST /api/v1/auth/login { "email": "${register.email}", "password": "${register.password}" }'
+    capture: { cookie: set-cookie }
+    expect: { status: 200 }
+    target: rust
+  - id: kb-fixture
+    sql:
+      statements:
+        - |
+          INSERT INTO workspaces (id, org_id, name)
+          SELECT gen_random_uuid(), org_id, 'ws-replay-${run_id}' FROM users
+           WHERE email = '${register.email}' RETURNING id AS ws_id
+        - |
+          INSERT INTO knowledge_bases (id, workspace_id, name, ontology_lang,
+                                       inference_interval_minutes, last_inference_at)
+          VALUES (gen_random_uuid(), '${ws_id}'::uuid, 'kb-replay-${run_id}', 'en', 10080, now())
+          RETURNING id AS kb_id
+        - |
+          INSERT INTO memberships (user_id, workspace_id, role)
+          SELECT id, '${ws_id}'::uuid, 'owner' FROM users
+           WHERE email = '${register.email}' RETURNING user_id AS user_id
+        # kb 成员矩阵（写权限的唯一来源——workspace owner 只给 open 库 Viewer）：
+        # 建库 HTTP 会给创建者 admin，SQL 装置对等补上
+        - |
+          INSERT INTO kb_members (kb_id, user_id, role)
+          VALUES ('${kb_id}'::uuid, '${user_id}'::uuid, 'admin')
+      capture: { ws_id: ws_id, kb_id: kb_id, user_id: user_id }
+  - id: statements-source
+    call: 'POST /api/v1/kbs/${kb_id}/sources { "kind": "statements", "name": "src-replay" }'
+    capture:
+      src_id: body.source.id
+      stmt_token: body.ingest_token
+    expect: { status: 200 }
+    target: rust
+  # 本体写面（两侧共有）：works_at 关系（state，无公理——公理变更属 heart-axioms 的戏份）
+  - id: relation-works-at
+    call: 'POST /api/v1/kbs/${kb_id}/ontology/relation-types { "key": "works_at", "label": "Works At", "temporal": "state" }'
+    capture: { rel_id: body.id }
+    expect: { status: 200 }
+    target: rust
+  # 观测一：Cara 自 2021-03-15 在 Gamma 工作（when 直读成点，绑定 marks=start 把它读成开始）
+  - id: push-obs-1
+    call: 'POST /api/v1/sources/${src_id}/statements { "external_id": "replay-1", "e": [["Cara", "person", null], ["Gamma", "organization", null]], "s": [[null, "Cara", "works_at", "Gamma", null, null, "2021-03-15", null]], "n": [] }'
+    headers: { Authorization: 'Bearer ${stmt_token}' }
+    expect: { status: 200 }
+    target: rust
+  # 装置：短语绑定 + 物化 job 入队（等抽取/时间解析链静默后；binding 两端类 NULL 匹配
+  # 未绑类别词的实体——e 的类别词 person/organization 未绑类，实体 type_id NULL）
+  - id: bind-and-materialize-1
+    sql:
+      wait_quiet: '${kb_id}'
+      statements:
+        - |
+          INSERT INTO phrase_bindings (id, kb_id, phrase, subject_type_id, object_type_id,
+                                       object_is_value, relation_type_id, direction, status, marks, decided_by)
+          VALUES (gen_random_uuid(), '${kb_id}'::uuid, 'works_at', NULL, NULL, false,
+                  '${rel_id}'::uuid, 'forward', 'bound', 'start', 'person')
+        - |
+          INSERT INTO jobs (kind, payload, max_attempts)
+          VALUES ('materialize_typed', jsonb_build_object('kb_id', '${kb_id}'), 3)
+      capture: {}
+  - id: wait-materialize-1
+    wait: { kb_id: '${kb_id}' }
+  # 观测二：同断言的有界段（2023-04-01..2024-05-20）——独立 external_id 的独立观测：
+  # 开放陈述去重并锚 + 按陈述合起止，下一轮物化对账收口
+  - id: push-obs-2
+    call: 'POST /api/v1/sources/${src_id}/statements { "external_id": "replay-2", "e": [["Cara", "person", null], ["Gamma", "organization", null]], "s": [[null, "Cara", "works_at", "Gamma", null, null, "2023-04-01", "2024-05-20"]], "n": [] }'
+    headers: { Authorization: 'Bearer ${stmt_token}' }
+    expect: { status: 200 }
+    target: rust
+  - id: wait-obs-2
+    wait: { kb_id: '${kb_id}' }
+  # 观测三：另一断言（Delta）——撤回/恢复的载体（它的陈述只有这份文档作证）
+  - id: push-obs-3
+    call: 'POST /api/v1/sources/${src_id}/statements { "external_id": "replay-3", "e": [["Cara", "person", null], ["Delta", "organization", null]], "s": [[null, "Cara", "works_at", "Delta", null, null, "2022-09-09", null]], "n": [] }'
+    headers: { Authorization: 'Bearer ${stmt_token}' }
+    expect: { status: 200 }
+    target: rust
+  - id: materialize-2
+    sql:
+      wait_quiet: '${kb_id}'
+      statements:
+        - |
+          INSERT INTO jobs (kind, payload, max_attempts)
+          VALUES ('materialize_typed', jsonb_build_object('kb_id', '${kb_id}'), 3)
+      capture: {}
+  - id: wait-materialize-2
+    wait: { kb_id: '${kb_id}' }
+  # 撤回：删除观测三的文档（删除是事件：仅以它为出处的行作废——Delta 陈述+行 B，
+  # 牵连时间线按固定序锁后 tidy）。文档定位按文件名过滤（推送文档名={external_id}.json，
+  # 唯一命中），不依赖列表顺序
+  - id: find-obs-3-doc
+    call: GET /api/v1/kbs/${kb_id}/documents?q=replay-3&limit=5&offset=0
+    capture: { doc3_id: body.docs.0.id }
+    expect: { status: 200 }
+    target: rust
+  - id: delete-obs-3-doc
+    call: DELETE /api/v1/documents/${doc3_id}
+    expect: { status: 200 }
+    target: rust
+  # 恢复：作废名单复活（只认删除事务留下的作废时间）+ reattest + tidy
+  - id: restore-obs-3-doc
+    call: POST /api/v1/documents/${doc3_id}/restore
+    expect: { status: 200 }
+    target: rust
+  # 终态快照：facts（open/typed 两层的 supersedes/invalidated 形状）/time_mentions/entities/
+  # typed_fact_sources/documents 投影等全表深度比对——闭合链的对错由库内终态裁决
+  - id: replay-snapshot
+    snapshot: { kb_id: '${kb_id}' }

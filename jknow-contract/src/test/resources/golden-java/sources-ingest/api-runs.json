@@ -1,0 +1,38 @@
+{
+  "meta" : {
+    "scenario" : "sources-ingest",
+    "step" : "api-runs",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/sources/${api_id}/runs",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "runs" : [ {
+      "created_docs" : 0,
+      "error" : null,
+      "finished_at" : "<ts>",
+      "id" : "<uuid>",
+      "started_at" : "<ts>",
+      "status" : "ok",
+      "updated_docs" : 0
+    }, {
+      "created_docs" : 0,
+      "error" : null,
+      "finished_at" : "<ts>",
+      "id" : "<uuid>",
+      "started_at" : "<ts>",
+      "status" : "ok",
+      "updated_docs" : 1
+    }, {
+      "created_docs" : 1,
+      "error" : null,
+      "finished_at" : "<ts>",
+      "id" : "<uuid>",
+      "started_at" : "<ts>",
+      "status" : "ok",
+      "updated_docs" : 0
+    } ]
+  }
+}

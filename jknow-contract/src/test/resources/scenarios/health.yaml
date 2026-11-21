@@ -1,0 +1,7 @@
+# 最小可录剧本：健康检查（无鉴权、无 setup），自比对的手工起点。
+name: health
+desc: GET /api/v1/health 稳定 JSON（status/name/version）
+steps:
+  - id: health
+    call: GET /api/v1/health
+    expect: { status: 200 }

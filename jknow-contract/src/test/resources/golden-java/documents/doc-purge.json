@@ -1,0 +1,16 @@
+{
+  "meta" : {
+    "scenario" : "documents",
+    "step" : "doc-purge",
+    "method" : "POST",
+    "path" : "/api/v1/documents/${doc_id}/purge",
+    "target" : "java",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "blobs" : 1,
+    "chunks" : 1,
+    "ok" : true
+  }
+}

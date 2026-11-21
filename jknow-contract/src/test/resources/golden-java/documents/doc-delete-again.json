@@ -1,0 +1,16 @@
+{
+  "meta" : {
+    "scenario" : "documents",
+    "step" : "doc-delete-again",
+    "method" : "DELETE",
+    "path" : "/api/v1/documents/${doc_id}",
+    "target" : "java",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "deletion_id" : "<uuid>",
+    "invalidated_facts" : 0,
+    "ok" : true
+  }
+}

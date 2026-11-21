@@ -1,0 +1,18 @@
+{
+  "meta" : {
+    "scenario" : "documents",
+    "step" : "upload-empty-file",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/documents",
+    "target" : "java",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "created" : [ ],
+    "skipped" : [ {
+      "filename" : "empty.txt",
+      "reason" : "empty file"
+    } ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "admin-users",
+    "step" : "users-deactivated-forbidden",
+    "method" : "GET",
+    "path" : "/api/v1/users/deactivated",
+    "target" : "both",
+    "expectedStatus" : 403,
+    "status" : 403
+  },
+  "normalized" : {
+    "error" : "You don't have permission to do that"
+  }
+}

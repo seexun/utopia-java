@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "sources-ingest",
+    "step" : "missing-cleanup",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/sources/${folder_id}/missing/cleanup",
+    "target" : "java",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "deleted" : 0
+  }
+}

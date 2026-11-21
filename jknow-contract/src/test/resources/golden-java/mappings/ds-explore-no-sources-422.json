@@ -1,0 +1,15 @@
+{
+  "meta" : {
+    "scenario" : "mappings",
+    "step" : "ds-explore-no-sources-422",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/data-sources/explore",
+    "target" : "java",
+    "expectedStatus" : 422,
+    "status" : 422
+  },
+  "normalized" : {
+    "code" : "no_data_sources",
+    "error" : "No data sources mounted"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "meta" : {
+    "scenario" : "mappings",
+    "step" : "ws-create",
+    "method" : "POST",
+    "path" : "/api/v1/workspaces",
+    "target" : "java",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "created_at" : "<ts>",
+    "id" : "<uuid>",
+    "name" : "ws-contract-map",
+    "org_id" : "<uuid>"
+  }
+}

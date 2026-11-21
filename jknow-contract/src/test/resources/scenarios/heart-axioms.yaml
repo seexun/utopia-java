@@ -1,0 +1,135 @@
+# 域：heart-axioms——M3 专属剧本④：互斥违规进公理队列且仅此条（规格 §5）。
+#
+# 语义两半：
+#   ①同名不并——本体声明互斥（entity_type_disjoint）后，同名不同类的两次观测各自成实体
+#     （消解的 declared_disjoint_from 递归 CTE 判 Disjoint：候选忽略、不并、不提议）；
+#   ②违规恰一条——works_at 声明 functional 后，同一主语两段重叠区间指向两个宾语
+#     （Ivy works_at Ferrum 2021-2023；Ivy works_at Acme 2022-2024）→ 公理检查出一组
+#     functional clash，settle 进 axiom_violations 恰一行（半开区间交集 2022-2023 非空）。
+#
+# 触发链（全部两侧共有写面，无 LLM）：
+#   本体写面（POST entity-types ×3 带 disjoint、POST relation-types）→ SQL 造 type_bindings
+#   （类别词→类；推送的 e 类别词经它给实体定类）→ 推送两份观测 → 抽取/时间解析静默 →
+#   SQL 短语绑定+物化 job → 静默（类型化两行落地）→ PUT relation-types functional=true
+#   （本体改判据 → 同事务 detection_keys 写前/reconcile 写后——公理检查的确定性触发点，
+#   不依赖 consistency/check HTTP（M4）与推理调度器时序）→ 快照。
+name: heart-axioms
+desc: 互斥声明同名不并 + functional 重叠双值恰一条公理违规（axiom_violations 终态快照）
+setup:
+  register: { email: 'axioms-${run_id}@test.local', password: Axioms!2026x, display_name: Heart Axioms }
+steps:
+  - id: login
+    call: 'POST /api/v1/auth/login { "email": "${register.email}", "password": "${register.password}" }'
+    capture: { cookie: set-cookie }
+    expect: { status: 200 }
+    target: rust
+  - id: kb-fixture
+    sql:
+      statements:
+        - |
+          INSERT INTO workspaces (id, org_id, name)
+          SELECT gen_random_uuid(), org_id, 'ws-axioms-${run_id}' FROM users
+           WHERE email = '${register.email}' RETURNING id AS ws_id
+        - |
+          INSERT INTO knowledge_bases (id, workspace_id, name, ontology_lang,
+                                       inference_interval_minutes, last_inference_at)
+          VALUES (gen_random_uuid(), '${ws_id}'::uuid, 'kb-axioms-${run_id}', 'en', 10080, now())
+          RETURNING id AS kb_id
+        - |
+          INSERT INTO memberships (user_id, workspace_id, role)
+          SELECT id, '${ws_id}'::uuid, 'owner' FROM users
+           WHERE email = '${register.email}' RETURNING user_id AS user_id
+        # kb 成员矩阵（写权限的唯一来源——workspace owner 只给 open 库 Viewer）：
+        # 建库 HTTP 会给创建者 admin，SQL 装置对等补上
+        - |
+          INSERT INTO kb_members (kb_id, user_id, role)
+          VALUES ('${kb_id}'::uuid, '${user_id}'::uuid, 'admin')
+      capture: { ws_id: ws_id, kb_id: kb_id, user_id: user_id }
+  - id: statements-source
+    call: 'POST /api/v1/kbs/${kb_id}/sources { "kind": "statements", "name": "src-axioms" }'
+    capture:
+      src_id: body.source.id
+      stmt_token: body.ingest_token
+    expect: { status: 200 }
+    target: rust
+  # 本体三个类 + 互斥声明（company 与 agency disjoint——建 agency 时带上）
+  - id: type-person
+    call: 'POST /api/v1/kbs/${kb_id}/ontology/entity-types { "key": "person", "label": "Person" }'
+    capture: { person_type: body.id }
+    expect: { status: 200 }
+    target: rust
+  - id: type-company
+    call: 'POST /api/v1/kbs/${kb_id}/ontology/entity-types { "key": "company", "label": "Company" }'
+    capture: { company_type: body.id }
+    expect: { status: 200 }
+    target: rust
+  - id: type-agency
+    call: 'POST /api/v1/kbs/${kb_id}/ontology/entity-types { "key": "agency", "label": "Agency", "disjoint": ["${company_type}"] }'
+    capture: { agency_type: body.id }
+    expect: { status: 200 }
+    target: rust
+  # works_at 先不带公理（functional 后面经 PUT 加——公理检查的触发点）
+  - id: relation-works-at
+    call: 'POST /api/v1/kbs/${kb_id}/ontology/relation-types { "key": "works_at", "label": "Works At", "temporal": "state" }'
+    capture: { rel_id: body.id }
+    expect: { status: 200 }
+    target: rust
+  # 类别词→类（SQL 装置：对齐队列写端点属 M4；绑定后推送的 e 类别词给实体定类——
+  # 同名不并与 functional 违规都以「实体有类」为前提）
+  - id: kind-word-bindings
+    sql:
+      statements:
+        - |
+          INSERT INTO type_bindings (id, kb_id, kind_word, type_id, status, decided_by)
+          VALUES (gen_random_uuid(), '${kb_id}'::uuid, 'person', '${person_type}'::uuid, 'bound', 'person'),
+                 (gen_random_uuid(), '${kb_id}'::uuid, 'company', '${company_type}'::uuid, 'bound', 'person'),
+                 (gen_random_uuid(), '${kb_id}'::uuid, 'agency', '${agency_type}'::uuid, 'bound', 'person')
+      capture: {}
+  # 观测一：Ivy(person) 在 Ferrum(company) 2021-2023、在 Acme(company) 2022-2024——
+  # functional 违规的两条边（对象不同、区间重叠）
+  - id: push-obs-1
+    call: 'POST /api/v1/sources/${src_id}/statements { "external_id": "axioms-1", "e": [["Ivy", "person", null], ["Ferrum", "company", null], ["Acme", "company", null]], "s": [[null, "Ivy", "works_at", "Ferrum", null, null, "2021-01-10", "2023-03-31"], [null, "Ivy", "works_at", "Acme", null, null, "2022-06-01", "2024-09-30"]], "n": [] }'
+    headers: { Authorization: 'Bearer ${stmt_token}' }
+    expect: { status: 200 }
+    target: rust
+  # 观测一落定（抽取/时间解析链静默）：观测二的「同名不并」以观测一的 Acme(company)
+  # 已存在为前提，且两文档并行抽取会让两个 Acme 的创建顺序翻转（时间戳秩与签名定序
+  # 的输入）——串行化是确定性的前提，不是可选项
+  - id: wait-obs-1
+    wait: { kb_id: '${kb_id}' }
+  # 观测二（独立 external_id——e 重名留首，同一次推送装不下两个同名）：Acme(agency)——
+  # 消解对已存在的 Acme(company) 判类型漂移：company/agency 声明互斥 → Disjoint → 不并，
+  # 新建 agency 实体（advises 短语未绑定，陈述留开放图谱，不进公理边集）
+  - id: push-obs-2
+    call: 'POST /api/v1/sources/${src_id}/statements { "external_id": "axioms-2", "e": [["Acme", "agency", null], ["Nadia", "person", null]], "s": [[null, "Nadia", "advises", "Acme", null, null, "2020-11-12", null]], "n": [] }'
+    headers: { Authorization: 'Bearer ${stmt_token}' }
+    expect: { status: 200 }
+    target: rust
+  # 短语绑定 + 物化 job（等两份观测的抽取/时间解析链静默）
+  - id: bind-and-materialize
+    sql:
+      wait_quiet: '${kb_id}'
+      statements:
+        - |
+          INSERT INTO phrase_bindings (id, kb_id, phrase, subject_type_id, object_type_id,
+                                       object_is_value, relation_type_id, direction, status, decided_by)
+          VALUES (gen_random_uuid(), '${kb_id}'::uuid, 'works_at',
+                  '${person_type}'::uuid, '${company_type}'::uuid, false,
+                  '${rel_id}'::uuid, 'forward', 'bound', 'person')
+        - |
+          INSERT INTO jobs (kind, payload, max_attempts)
+          VALUES ('materialize_typed', jsonb_build_object('kb_id', '${kb_id}'), 3)
+      capture: {}
+  - id: wait-materialize
+    wait: { kb_id: '${kb_id}' }
+  # 公理触发点（本体改判据 → reconcile 同事务收/开违规行，0062）：
+  # works_at 声明 functional——重叠双值恰一组 clash，settle 进 axiom_violations 恰一行
+  - id: works-at-declare-functional
+    call: 'PATCH /api/v1/kbs/${kb_id}/ontology/relation-types/${rel_id} { "key": "works_at", "label": "Works At", "temporal": "state", "functional": true }'
+    expect: { status: 200 }
+    target: rust
+  # 终态快照：axiom_violations（恰一行 functional——行数即断言）/entity_type_disjoint/
+  # entities（两个 Acme 各持其类、互不并）/facts+typed_fact_sources（两条 works_at 边）/
+  # resolution_reviews（Disjoint 不提议——应为空表）——公理面终态裁决
+  - id: axioms-snapshot
+    snapshot: { kb_id: '${kb_id}' }

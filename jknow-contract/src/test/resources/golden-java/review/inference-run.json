@@ -1,0 +1,19 @@
+{
+  "meta" : {
+    "scenario" : "review",
+    "step" : "inference-run",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/inference/run",
+    "target" : "java",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "capped" : 0,
+    "derived" : 0,
+    "edges" : 0,
+    "inserted" : 0,
+    "invalidated" : 0,
+    "rules" : 0
+  }
+}

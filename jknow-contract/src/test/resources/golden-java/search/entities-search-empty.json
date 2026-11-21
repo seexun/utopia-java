@@ -1,0 +1,15 @@
+{
+  "meta" : {
+    "scenario" : "search",
+    "step" : "entities-search-empty",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/entities?q=Zz&limit=3",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "entities" : [ ],
+    "total" : 0
+  }
+}

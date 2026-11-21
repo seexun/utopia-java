@@ -1,0 +1,12 @@
+{
+  "meta" : {
+    "scenario" : "auth",
+    "step" : "register-missing-display-name",
+    "method" : "POST",
+    "path" : "/api/v1/auth/register",
+    "target" : "both",
+    "expectedStatus" : 422,
+    "status" : 422
+  },
+  "normalized" : "Failed to deserialize the JSON body into the target type: missing field `display_name` at line 1 column 71"
+}

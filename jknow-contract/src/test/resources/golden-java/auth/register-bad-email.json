@@ -1,0 +1,15 @@
+{
+  "meta" : {
+    "scenario" : "auth",
+    "step" : "register-bad-email",
+    "method" : "POST",
+    "path" : "/api/v1/auth/register",
+    "target" : "both",
+    "expectedStatus" : 422,
+    "status" : 422
+  },
+  "normalized" : {
+    "code" : "bad_email",
+    "error" : "Invalid email address"
+  }
+}

@@ -1,0 +1,91 @@
+# 域：heart-merge——M3 专属剧本③：实体合并无孤儿（规格 §5）。
+#
+# 语义：decide_review store 层合并后无悬空引用——合并十步事务把事实/证据/限定/审核改指到
+# 存活者（evidence/qualifier/review 改指），entity_merges 留痕，被并者的名字成又名事实；
+# 快照全表深度比对自然覆盖孤儿检查（任何一侧漏改指，行集即分叉）。
+#
+# M3/M4 边界与 store: 步：14 队列写端点（POST /review/{id}）属 M4，Java 侧 M3 只有 store 层
+# ResolutionService.decideReview（survivor 链≤16 跳 + merge_direction 度数定向 + 十步事务）。
+# 本剧本以 SQL 造裁决前提（resolution_reviews 行——消解审核队列的写端点同样属 M4），
+# 裁决本身走 store: 步：Rust 轮映射 Rust 的 HTTP 端点（review_routes::decide，handler 主体
+# 即 store 调用；台账/事件不进快照），Java 轮经 StoreBridge 直调 store bean——两侧比的是
+# 各自心脏合并代码的库内终态（切流预演口径）。
+#
+# 数据面：Nadir(person) works at Orion(organization)（带限定词 as=director）自 2020；
+# Nadir chairs Meridian(organization) 自 2021；Orion 又名 Orion Holdings（n 槽）。
+# 合并 Orion×Meridian：Orion 度数 2（works_at 的宾语 + known_as 的主语）> Meridian 度数 1
+# （chairs 的宾语）→ Orion 存活、Meridian 并入——两向改写（宾语侧换 id + 名字搬运）都走得到。
+name: heart-merge
+desc: 实体合并无孤儿（SQL 造审核前提 + store 裁决 merge + 十步事务终态快照）
+setup:
+  register: { email: 'merge-${run_id}@test.local', password: Merge!2026x, display_name: Heart Merge }
+steps:
+  - id: login
+    call: 'POST /api/v1/auth/login { "email": "${register.email}", "password": "${register.password}" }'
+    capture: { cookie: set-cookie }
+    expect: { status: 200 }
+    target: rust
+  - id: kb-fixture
+    sql:
+      statements:
+        - |
+          INSERT INTO workspaces (id, org_id, name)
+          SELECT gen_random_uuid(), org_id, 'ws-merge-${run_id}' FROM users
+           WHERE email = '${register.email}' RETURNING id AS ws_id
+        - |
+          INSERT INTO knowledge_bases (id, workspace_id, name, ontology_lang,
+                                       inference_interval_minutes, last_inference_at)
+          VALUES (gen_random_uuid(), '${ws_id}'::uuid, 'kb-merge-${run_id}', 'en', 10080, now())
+          RETURNING id AS kb_id
+        - |
+          INSERT INTO memberships (user_id, workspace_id, role)
+          SELECT id, '${ws_id}'::uuid, 'owner' FROM users
+           WHERE email = '${register.email}' RETURNING user_id AS user_id
+        # kb 成员矩阵（写权限的唯一来源——workspace owner 只给 open 库 Viewer）：
+        # 建库 HTTP 会给创建者 admin，SQL 装置对等补上
+        - |
+          INSERT INTO kb_members (kb_id, user_id, role)
+          VALUES ('${kb_id}'::uuid, '${user_id}'::uuid, 'admin')
+      capture: { ws_id: ws_id, kb_id: kb_id, user_id: user_id }
+  - id: statements-source
+    call: 'POST /api/v1/kbs/${kb_id}/sources { "kind": "statements", "name": "src-merge" }'
+    capture:
+      src_id: body.source.id
+      stmt_token: body.ingest_token
+    expect: { status: 200 }
+    target: rust
+  # 三实体两陈述一带限定词、一别名（n 槽走 names::record 的 known_as 值事实）
+  - id: push-obs-1
+    call: 'POST /api/v1/sources/${src_id}/statements { "external_id": "merge-1", "e": [["Nadir", "person", null], ["Orion", "organization", null], ["Meridian", "organization", null]], "s": [[null, "Nadir", "works at", "Orion", null, { "as": "director" }, "2020-02-10", null], [null, "Nadir", "chairs", "Meridian", null, null, "2021-08-05", null]], "n": [["Orion", "Orion Holdings", null]] }'
+    headers: { Authorization: 'Bearer ${stmt_token}' }
+    expect: { status: 200 }
+    target: rust
+  # 裁决前提（SQL，两轮同串）：等抽取静默后按名字定位两个实体，造一条 pending 的
+  # resolution_reviews（reason=namesake, stage=human——store 层 decide_review 只认 pending，
+  # 对 stage 不设限；human 档语义=等人裁）。审核行捕获 review_id 供裁决步引用。
+  - id: review-fixture
+    sql:
+      wait_quiet: '${kb_id}'
+      statements:
+        - |
+          INSERT INTO resolution_reviews (id, kb_id, left_id, right_id, score, reason, stage)
+          SELECT gen_random_uuid(), '${kb_id}'::uuid,
+                 (SELECT id FROM entities WHERE kb_id = '${kb_id}'::uuid
+                  AND canonical_name = 'Orion' AND merged_into IS NULL),
+                 (SELECT id FROM entities WHERE kb_id = '${kb_id}'::uuid
+                  AND canonical_name = 'Meridian' AND merged_into IS NULL),
+                 0.95, 'namesake', 'human'
+          RETURNING id AS review_id
+      capture: { review_id: review_id }
+  # 裁决（写路径侧自己的代码）：Rust 轮 POST /kbs/{kb}/review/{id}（action=merge）；
+  # Java 轮 StoreBridge→ResolutionService.decideReview——合并十步事务两侧各自跑
+  - id: review-decide-merge
+    store:
+      op: decide_review
+      args: { kb_id: '${kb_id}', review_id: '${review_id}', user_id: '${user_id}',
+              action: merge, rationale: 'heart-merge scenario' }
+  # 终态快照：entities（merged_into/又名搬运）/entity_merges/facts（两向改指后的主宾）/
+  # fact_evidence/statement_qualifiers（随行跟走）/resolution_reviews（merged 收场）——
+  # 任何一侧漏一步改指，行集即分叉（无孤儿由深度比对裁决）
+  - id: merge-snapshot
+    snapshot: { kb_id: '${kb_id}' }

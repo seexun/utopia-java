@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "documents",
+    "step" : "doc-restore-purged-409",
+    "method" : "POST",
+    "path" : "/api/v1/documents/${doc_id}/restore",
+    "target" : "java",
+    "expectedStatus" : 409,
+    "status" : 409
+  },
+  "normalized" : {
+    "error" : "The document's content was purged; there is nothing to restore"
+  }
+}

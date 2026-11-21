@@ -1,0 +1,12 @@
+{
+  "meta" : {
+    "scenario" : "mappings",
+    "step" : "mapping-revise-empty-422",
+    "method" : "PATCH",
+    "path" : "/api/v1/kbs/${kb_id}/mappings/00000000-0000-0000-0000-000000000000",
+    "target" : "java",
+    "expectedStatus" : 422,
+    "status" : 422
+  },
+  "normalized" : "Failed to deserialize the JSON body into the target type: missing field `table_name` at line 1 column 20"
+}

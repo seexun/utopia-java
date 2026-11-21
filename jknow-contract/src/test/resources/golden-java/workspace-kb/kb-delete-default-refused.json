@@ -1,0 +1,15 @@
+{
+  "meta" : {
+    "scenario" : "workspace-kb",
+    "step" : "kb-delete-default-refused",
+    "method" : "DELETE",
+    "path" : "/api/v1/kbs/${kb_id}",
+    "target" : "java",
+    "expectedStatus" : 422,
+    "status" : 422
+  },
+  "normalized" : {
+    "code" : "default_kb_undeletable",
+    "error" : "The default knowledge base cannot be deleted."
+  }
+}

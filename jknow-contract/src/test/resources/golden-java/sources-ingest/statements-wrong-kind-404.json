@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "sources-ingest",
+    "step" : "statements-wrong-kind-404",
+    "method" : "POST",
+    "path" : "/api/v1/sources/${api_id}/statements",
+    "target" : "java",
+    "expectedStatus" : 404,
+    "status" : 404
+  },
+  "normalized" : {
+    "error" : "Not found"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "documents",
+    "step" : "doc-detail-zero-404",
+    "method" : "GET",
+    "path" : "/api/v1/documents/00000000-0000-0000-0000-000000000000",
+    "target" : "both",
+    "expectedStatus" : 404,
+    "status" : 404
+  },
+  "normalized" : {
+    "error" : "Not found"
+  }
+}

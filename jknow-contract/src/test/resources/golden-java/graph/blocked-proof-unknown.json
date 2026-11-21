@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "graph",
+    "step" : "blocked-proof-unknown",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/violations/00000000-0000-0000-0000-000000000000/proof",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "steps" : null
+  }
+}

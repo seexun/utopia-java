@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "documents",
+    "step" : "doc-restore-conflict",
+    "method" : "POST",
+    "path" : "/api/v1/documents/${doc_id}/restore",
+    "target" : "java",
+    "expectedStatus" : 409,
+    "status" : 409
+  },
+  "normalized" : {
+    "error" : "Document is not deleted"
+  }
+}

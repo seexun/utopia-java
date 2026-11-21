@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "review",
+    "step" : "alignment-kind-word-decide",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/review/alignment/kind-words/contract-kind-word",
+    "target" : "java",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "ok" : true
+  }
+}

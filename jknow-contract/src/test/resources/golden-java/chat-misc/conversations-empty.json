@@ -1,0 +1,15 @@
+{
+  "meta" : {
+    "scenario" : "chat-misc",
+    "step" : "conversations-empty",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/conversations?limit=5&offset=0",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "conversations" : [ ],
+    "total" : 0
+  }
+}
