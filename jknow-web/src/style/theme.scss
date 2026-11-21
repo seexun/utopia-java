@@ -3,7 +3,7 @@
  * 依赖 tokens.scss（在 main.js 中先于本文件引入）。
  * 本文件在所有全局样式（含 anivia.scss）之后加载，作为最终视觉基准：
  * - 页面样式只引用 --color-* / --el-* token，禁止硬编码色值
- * - 三级圆角：卡片 12px / 控件 8px / 胶囊 999px；双层阴影：卡片 --shadow-card、浮层 --shadow-pop
+ * - 三级圆角：卡片 8px / 控件 6px / 胶囊 999px；双层阴影：卡片 --shadow-card、浮层 --shadow-pop
  * - 状态一律 .badge-soft-*（soft 浅底 + 深色同系字），不用彩色实心 tag
  */
 

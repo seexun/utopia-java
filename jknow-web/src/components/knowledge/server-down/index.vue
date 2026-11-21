@@ -51,7 +51,7 @@ function reload() {
   justify-content: center;
   min-height: 100vh;
   padding: 0 16px;
-  background: #f6f8fb;
+  background: #f5f7fa;
 }
 
 .punishment-bg {
@@ -71,7 +71,7 @@ function reload() {
   max-width: 420px;
   margin: 16px auto 0;
   font-size: 14px;
-  color: #475569;
+  color: #6b7280;
 }
 
 .punishment-actions {
@@ -84,7 +84,7 @@ function reload() {
 
 .punishment-link {
   font-size: 13px;
-  color: #475569;
+  color: #6b7280;
   text-decoration: underline;
   text-underline-offset: 3px;
 }

@@ -8,7 +8,7 @@
   /* ===== 项目自有 token ===== */
   --color-primary: #2563eb;
   --color-primary-hover: #1d4ed8;
-  --color-primary-soft: #eff4fe;
+  --color-primary-soft: #eff6ff;
   --color-primary-text: #1d4ed8;
   --color-primary-glow: rgb(37 99 235 / 12%);
 
@@ -25,12 +25,12 @@
   --color-danger-soft: #fef2f2;
   --color-danger-text: #b91c1c;
 
-  --color-bg: #f6f8fb;
-  --color-border: #e5eaf1;
+  --color-bg: #f5f7fa;
+  --color-border: #e5eaf0;
   --color-neutral-soft: #f1f5f9;
-  --color-ink: #0f172a;
-  --color-ink-2: #475569;
-  --color-ink-3: #94a3b8;
+  --color-ink: #1f2937;
+  --color-ink-2: #6b7280;
+  --color-ink-3: #9ca3af;
 
   /* 分类色板（头像/图表循环使用） */
   --cat-1: #2563eb;
@@ -41,8 +41,8 @@
   --cat-6: #4d7c0f;
 
   /* 圆角 / 阴影 / 动效 */
-  --radius-card: 12px;
-  --radius-ctl: 8px;
+  --radius-card: 8px;
+  --radius-ctl: 6px;
   --radius-full: 999px;
   --shadow-card: 0 1px 2px rgb(15 23 42 / 6%);
   --shadow-pop: 0 8px 24px rgb(15 23 42 / 12%);

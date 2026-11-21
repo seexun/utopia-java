@@ -168,7 +168,7 @@ function localDateTime(iso: string): string {
   >
     <template #reference>
       <span class="alert-bell-trigger" :title="S.alerts.badgeLabel as string" role="button" tabindex="0">
-        <BellIcon width="15" height="15" style="color: #475569" />
+        <BellIcon width="15" height="15" style="color: #6b7280" />
         <!-- 角标也是个点，不是数字。"有事没看"是二元的，具体几条打开就知道；
              数字还会随重试一路往上跳，跳到三位数就把铃铛撑变形了（旧仓注释原话） -->
         <span v-if="unreadCount > 0" class="unread-dot" />
@@ -176,15 +176,15 @@ function localDateTime(iso: string): string {
     </template>
 
     <!-- 标题行。**不再兼任关闭键**：关闭归 Esc、外点与铃铛本身（旧仓注释原话） -->
-    <div class="flex items-center gap-3 border-b px-4 py-3" style="border-color: #e5eaf1">
-      <BellIcon width="15" height="15" style="color: #475569" />
+    <div class="flex items-center gap-3 border-b px-4 py-3" style="border-color: #e5eaf0">
+      <BellIcon width="15" height="15" style="color: #6b7280" />
       <span class="min-w-0 flex-1 truncate text-sm font-medium">
         {{ S.alerts.title }}
       </span>
     </div>
 
     <!-- 查找与库切换器同一副样子：它是面板的一段，不是面板里摆的一个控件 -->
-    <div class="border-b px-4 py-3" style="border-color: #e5eaf1">
+    <div class="border-b px-4 py-3" style="border-color: #e5eaf0">
       <el-input
         v-model="q"
         :placeholder="S.alerts.searchPlaceholder as string"
@@ -195,10 +195,10 @@ function localDateTime(iso: string): string {
 
     <el-scrollbar max-height="420px">
       <div v-if="groups.length === 0" class="px-4 py-8 text-center">
-        <p class="text-sm" style="color: #475569">
+        <p class="text-sm" style="color: #6b7280">
           {{ q ? S.alerts.noMatch : S.alerts.empty }}
         </p>
-        <p v-if="!q" class="mt-1 text-xs" style="color: #94a3b8">
+        <p v-if="!q" class="mt-1 text-xs" style="color: #9ca3af">
           {{ S.alerts.emptyHint }}
         </p>
       </div>
@@ -217,7 +217,7 @@ function localDateTime(iso: string): string {
             <div class="flex items-center gap-2">
               <span
                 class="min-w-0 flex-1 truncate text-sm"
-                :style="g.unread > 0 ? 'font-weight:500;color:#0f172a' : 'color:#475569'"
+                :style="g.unread > 0 ? 'font-weight:500;color:#1f2937' : 'color:#6b7280'"
               >
                 {{ worded(g.kind)?.title ?? S.alerts.unknownKind(g.kind) }}
               </span>
@@ -227,7 +227,7 @@ function localDateTime(iso: string): string {
                 class="rounded-full px-2 py-0.5 text-xs tabular-nums"
                 :style="{
                   background: SEVERITY_STYLE[g.severity]?.bg ?? '#f1f5f9',
-                  color: SEVERITY_STYLE[g.severity]?.color ?? '#475569'
+                  color: SEVERITY_STYLE[g.severity]?.color ?? '#6b7280'
                 }"
                 >{{ g.count }}</span
               >
@@ -238,7 +238,7 @@ function localDateTime(iso: string): string {
                 class="rounded px-1.5 py-0.5 text-xs"
                 :style="
                   g.kb_name
-                    ? 'background:#f1f5f9;color:#475569'
+                    ? 'background:#f1f5f9;color:#6b7280'
                     : 'background:#e6f4ff;color:#1677ff'
                 "
               >
@@ -246,12 +246,12 @@ function localDateTime(iso: string): string {
               </span>
               <span
                 class="ml-auto shrink-0 text-xs tabular-nums"
-                style="color: #94a3b8"
+                style="color: #9ca3af"
               >
                 {{ localDateTime(g.latest_at) }}
               </span>
             </div>
-            <p v-if="worded(g.kind)" class="mt-1 text-xs" style="color: #475569">
+            <p v-if="worded(g.kind)" class="mt-1 text-xs" style="color: #6b7280">
               {{ worded(g.kind)!.hint }}
             </p>
             <ul v-if="g.lines.length > 0" class="mt-1 space-y-1">
@@ -259,7 +259,7 @@ function localDateTime(iso: string): string {
                 v-for="t in tallyLines(g)"
                 :key="t.line"
                 class="text-xs break-words"
-                style="color: #94a3b8"
+                style="color: #9ca3af"
               >
                 {{ t.line
                 }}<span v-if="t.n > 1" class="tabular-nums"> ×{{ t.n }}</span>
@@ -267,7 +267,7 @@ function localDateTime(iso: string): string {
               <li
                 v-if="g.count > rawLineCount(g)"
                 class="text-xs"
-                style="color: #94a3b8"
+                style="color: #9ca3af"
               >
                 {{ S.alerts.andMore(g.count - rawLineCount(g)) }}
               </li>
@@ -291,7 +291,7 @@ function localDateTime(iso: string): string {
     <div
       v-if="groups.length > 0"
       class="flex items-center gap-3 border-t px-4 py-2"
-      style="border-color: #e5eaf1"
+      style="border-color: #e5eaf0"
     >
       <!-- underline 用新 API（'always'|'hover'|'never'）：布尔值在 EP 3.0 移除
            （遗留 5-③ EP deprecation 消音，告警铃底栏「全部已读」） -->
@@ -319,7 +319,7 @@ function localDateTime(iso: string): string {
 
 <style scoped>
 .alert-row {
-  border-bottom: 1px solid #e5eaf1;
+  border-bottom: 1px solid #e5eaf0;
   padding: 12px 16px;
   cursor: pointer;
 }

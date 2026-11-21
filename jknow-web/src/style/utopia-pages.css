@@ -272,7 +272,7 @@
   height: 28px;
   border-radius: 1px;
   background: var(--color-ink);
-  box-shadow: 0 0 0 1.5px rgba(246, 248, 251, 0.95);
+  box-shadow: 0 0 0 1.5px rgba(245, 247, 250, 0.95); /* 纸底色环（--color-bg 的三元组） */
   cursor: ew-resize;
 }
 .scrubber-range::-moz-range-thumb {
@@ -281,7 +281,7 @@
   border: none;
   border-radius: 1px;
   background: var(--color-ink);
-  box-shadow: 0 0 0 1.5px rgba(246, 248, 251, 0.95);
+  box-shadow: 0 0 0 1.5px rgba(245, 247, 250, 0.95); /* 纸底色环（--color-bg 的三元组） */
   cursor: ew-resize;
 }
 .scrubber-range::-webkit-slider-runnable-track {
@@ -420,9 +420,9 @@
 
 /* 拖拽悬停 / 检索批量命中的提亮框（文库拖放区） */
 .highlight {
-  border-color: rgba(15, 23, 42, 0.45) !important;
-  background: rgba(15, 23, 42, 0.06) !important;
-  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.12);
+  border-color: rgba(31, 41, 55, 0.45) !important;
+  background: rgba(31, 41, 55, 0.06) !important;
+  box-shadow: 0 0 0 2px rgba(31, 41, 55, 0.12);
 }
 
 /* ---------- 幽灵按钮（分页器的翻页键） ---------- */
@@ -575,9 +575,9 @@
 .thinking {
   background-image: linear-gradient(
     90deg,
-    rgba(15, 23, 42, 0.4) 35%,
-    rgba(15, 23, 42, 0.95) 50%,
-    rgba(15, 23, 42, 0.4) 65%
+    rgba(31, 41, 55, 0.4) 35%,
+    rgba(31, 41, 55, 0.95) 50%,
+    rgba(31, 41, 55, 0.4) 65%
   );
   background-size: 250% 100%;
   -webkit-background-clip: text;
@@ -761,7 +761,7 @@
   margin: 0.15em 0;
 }
 .chat-prose strong {
-  color: var(--color-ink); /* 旧垫片墨色 #0f172a */
+  color: var(--color-ink); /* 旧垫片墨色改令牌（--color-ink） */
   font-weight: 600;
 }
 .chat-prose h1,
@@ -774,12 +774,12 @@
 }
 .chat-prose hr {
   border: 0;
-  border-top: 1px solid var(--color-border); /* 旧垫片线色 #e5eaf1 */
+  border-top: 1px solid var(--color-border); /* 旧垫片线色改令牌（--color-border） */
   margin: 1em 0;
 }
 .chat-prose code {
   font-size: 0.85em;
-  background: rgba(15, 23, 42, 0.08);
+  background: rgba(31, 41, 55, 0.08);
   border-radius: var(--radius-ctl); /* 旧 --radius-cell = 8px */
   padding: 0.1em 0.35em;
 }
@@ -821,7 +821,7 @@
 .chat-prose blockquote {
   border-left: 2px solid var(--color-line-strong);
   padding-left: 0.75em;
-  color: var(--color-ink-2); /* 旧垫片次级字色 #475569 */
+  color: var(--color-ink-2); /* 旧垫片次级字色改令牌（--color-ink-2） */
   margin: 0.4em 0;
 }
 

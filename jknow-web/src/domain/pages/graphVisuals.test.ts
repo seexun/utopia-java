@@ -44,7 +44,7 @@ describe("mix", () => {
    （vite.config.ts：纯逻辑单测）。最小替身就够——要测的是「算出什么」，
    不是浏览器。摊平底色不再走 getComputedStyle：它是画布常量
    （第 3 波任务 2：原垫片 ground-rgb 三元组在新令牌里无 hex 之外的对应，
-   按垫片 B 段值定为常量 246,248,251 = --color-bg #f6f8fb）。 */
+   按垫片 B 段值定为常量 245,247,250 = --color-bg #f5f7fa）。 */
 describe("flattenOnLight", () => {
   const stub = () => {
     const g = globalThis as Record<string, unknown>;
@@ -57,7 +57,7 @@ describe("flattenOnLight", () => {
 
   it("flattens rgba against the paper", () => {
     stub();
-    // 176,120,20 @0.6 摊在 246,248,251 的纸底上：204,171,112
+    // 176,120,20 @0.6 摊在 245,247,250 的纸底上：204,171,112
     expect(flattenOnLight("rgba(176,120,20,0.6)")).toBe("rgb(204,171,112)");
   });
 

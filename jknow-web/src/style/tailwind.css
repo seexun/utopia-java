@@ -62,7 +62,7 @@
 @theme {
   /* 语义三件套 */
   --color-primary-hover: #1d4ed8;
-  --color-primary-soft: #eff4fe;
+  --color-primary-soft: #eff6ff;
   --color-primary-text: #1d4ed8;
   --color-success: #10b981;
   --color-success-soft: #ecfdf5;
@@ -77,12 +77,12 @@
   --color-violet: #7c3aed;
 
   /* 中性：card/fill/line 是工具别名 */
-  --color-bg: #f6f8fb;
-  --color-border: #e5eaf1;
+  --color-bg: #f5f7fa;
+  --color-border: #e5eaf0;
   --color-neutral-soft: #f1f5f9;
-  --color-ink: #0f172a;
-  --color-ink-2: #475569;
-  --color-ink-3: #94a3b8;
+  --color-ink: #1f2937;
+  --color-ink-2: #6b7280;
+  --color-ink-3: #9ca3af;
   --color-card: #ffffff;
   --color-fill: var(--color-neutral-soft);
   --color-line: var(--color-border);
@@ -100,8 +100,8 @@
   --text-stat: 28px;
 
   /* 圆角 / 阴影 / 字体 */
-  --radius-ctl: 8px;
-  --radius-card: 12px;
+  --radius-ctl: 6px;
+  --radius-card: 8px;
   --shadow-card: 0 1px 2px rgb(15 23 42 / 6%);
   --shadow-pop: 0 8px 24px rgb(15 23 42 / 12%);
 }

@@ -19,7 +19,7 @@ export let NODE_BORDER_BASE = "#909090"; // 淡入渐变的描边兜底（原 #7
    退场——类型色直接填满，上面那几个底色只剩 muted 与播放淡入的渐变
    还把它们当兜底用 */
 /** 白描边与 hover 白环的那一个白。不是令牌：这是画布节点语言自带的白，
- *  在 #f6f8fb 的纸底与白卡停靠面板上都立得住（规格 §2） */
+ *  在 #f5f7fa 的纸底与白卡停靠面板上都立得住（规格 §2） */
 export const STROKE_WHITE = "#ffffff";
 /** 选中态的主色（规格 §2）。胶囊 v2 里它是悬停/选中那圈主色描边的色值
  *  （drawNodeLabel：1.5/2px 两档）；节点本体的环宽是程序级全局值，选中的
@@ -336,8 +336,8 @@ export let INK_RGB = "255,255,255";
  * 没被 utility 用到就不进产物，getComputedStyle 读不到。于是按垫片 B 段
  * 的亮色字面量定为常量（原变量名去前缀逐条注明），**只换读法不换色**——
  * 画布色值仍是第 2 波已走查过的那一份。 */
-const LIGHT_GROUND_RGB = "246,248,251"; // 原 ground-rgb（= --color-bg #f6f8fb 的三元组；摊平边色用的纸底）
-const LIGHT_INK_RGB = "15,23,42"; // 原 ink-rgb（= --color-ink #0f172a）
+const LIGHT_GROUND_RGB = "245,247,250"; // 原 ground-rgb（= --color-bg #f5f7fa 的三元组；摊平边色用的纸底）
+const LIGHT_INK_RGB = "31,41,55"; // 原 ink-rgb（= --color-ink #1f2937）
 const LIGHT_CONTEST_RGB = "180,83,9"; // 原 contest-rgb（= #b45309，与 --color-warning-text 同值）
 /* 原 violet-rgb（= #6d28d9）。**不等于 --color-violet #7c3aed**：图例那档
    读令牌（浅一档），边色用这档深的——两个值在垫片里本就不同，逐值照搬 */
@@ -408,8 +408,8 @@ export function refreshPalette() {
   CANVAS_TEXT_2 = token("--color-ink-2", CANVAS_TEXT_2); // 原 text-2：#475569
   // 普通边退为结构网（规格 §2.2）：α0.55——远看是安静的灰网，
   // 选中/hover 的 boost 亮线才跳出来。禁用/推断/派生/争议边保持原值
-  EDGE = withAlpha(token("--color-ink-3", "#94a3b8"), 0.55);
-  // 方向 A（规格 §3）：推断边升一档墨（#475569），与普通边（ink-3）拉开。
+  EDGE = withAlpha(token("--color-ink-3", "#9ca3af"), 0.55);
+  // 方向 A（规格 §3）：推断边升一档墨（#6b7280），与普通边（ink-3）拉开。
   // 原计划虚线 8/5，sigma 3 无 dash 支持，走「实线+色档」备选
   EDGE_INFERRED = token("--color-ink-2", EDGE_INFERRED); // 原 edge-inferred：#cbd5e1
   EDGE_DIM = token("--color-border", EDGE_DIM); // 原 edge-dim：#e5eaf1

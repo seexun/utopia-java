@@ -107,7 +107,7 @@ function goAdminTab(key: string) {
   display: flex;
   gap: 4px;
   padding: 0 16px;
-  border-bottom: 1px solid var(--el-border-color-light, #e5eaf1);
+  border-bottom: 1px solid var(--el-border-color-light, #e5eaf0);
   background: var(--el-bg-color, #fff);
 }
 
@@ -119,7 +119,7 @@ function goAdminTab(key: string) {
   padding: 0 14px;
   font-size: 14px;
   font-weight: 500;
-  color: var(--el-text-color-regular, #475569);
+  color: var(--el-text-color-regular, #6b7280);
   border-bottom: 2px solid transparent;
   transition:
     color 120ms,
@@ -127,7 +127,7 @@ function goAdminTab(key: string) {
 }
 
 .account-tab:hover {
-  color: var(--el-text-color-primary, #0f172a);
+  color: var(--el-text-color-primary, #1f2937);
 }
 
 .account-tab.is-active {
@@ -151,7 +151,7 @@ function goAdminTab(key: string) {
   padding: 0 14px;
   font-size: 13px;
   font-weight: 500;
-  color: var(--el-text-color-regular, #475569);
+  color: var(--el-text-color-regular, #6b7280);
   background: transparent;
   border: 0;
   border-radius: 8px;
@@ -162,7 +162,7 @@ function goAdminTab(key: string) {
 }
 
 .subtab:hover {
-  color: var(--el-text-color-primary, #0f172a);
+  color: var(--el-text-color-primary, #1f2937);
   background: var(--el-fill-color-light, #f1f5f9);
 }
 

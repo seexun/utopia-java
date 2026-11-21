@@ -47,8 +47,8 @@
   --el-bg-color: var(--color-card);
   --el-bg-color-page: var(--color-bg);
 
-  /* 圆角（旧 radius-ctl 8 / radius-card 12） */
-  --el-border-radius-base: 8px;
+  /* 圆角（旧 radius-ctl 8 / radius-card 12；2026-11-21 校准后走令牌 6/8） */
+  --el-border-radius-base: var(--radius-ctl);
   --el-border-radius-small: 6px;
   --el-border-radius-round: 999px;
 
@@ -91,7 +91,7 @@
    W1 三栏壳（旧仓 styles.css §布局骨架（规格 §4.1 定稿 v2）的移植）：
    侧栏 240px 白底右边框、菜单条目、库切换器胶囊、顶栏、用户 chip。
    pure-admin 的布局机制（sidebar-container/navbar/app-main）保持原样，
-   这里只按旧壳观感覆写颜色与几何。分界线走旧 line 色 #e5eaf1。
+   这里只按旧壳观感覆写颜色与几何。分界线走 line 色令牌（--color-border）。
    ============================================================ */
 
 /* 侧栏宽度对齐旧壳 240px（pure-admin 垂直布局默认 210px）；
@@ -119,7 +119,7 @@ body[layout="vertical"] .app-wrapper.openSidebar {
   font-size: 14px;
   font-weight: 800;
   color: var(--el-color-white);
-  border-radius: 8px;
+  border-radius: var(--radius-ctl);
   background: var(--gradient-brand); /* tokens.scss 品牌渐变（#2563eb→#06b6d4） */
 }
 
@@ -368,7 +368,7 @@ body[layout="vertical"] .app-wrapper .sidebar-container {
   width: 32px;
   height: 32px;
   cursor: pointer;
-  border-radius: 8px;
+  border-radius: var(--radius-ctl);
 
   &:hover {
     background: var(--el-fill-color-light);
@@ -385,11 +385,11 @@ body[layout="vertical"] .app-wrapper .sidebar-container {
   }
 }
 
-/* 壳级弹层面板（库切换器/告警/用户菜单共用一副）：白底、1px line、8px 圆角、
-   弹层阴影——对齐旧 .menu-panel */
+/* 壳级弹层面板（库切换器/告警/用户菜单共用一副）：白底、1px line、卡片档圆角、
+   弹层阴影——对齐旧 .menu-panel（面板随 --radius-card=8px） */
 .shell-pop {
   border: 1px solid var(--el-border-color);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   box-shadow:
     0 4px 6px -2px rgb(0 0 0 / 5%),
     0 10px 15px -3px rgb(0 0 0 / 10%);
