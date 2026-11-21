@@ -6,9 +6,9 @@
 
 | 任务 | Commit | 改动 | 验收结论 |
 |---|---|---|---|
-| T1 echarts 按需 | `f46c1ae` | monitor/cache 改 `echarts/core`+Pie/Gauge/Tooltip/Canvas 按需；manualChunks vendor-utils 去 echarts；删 init 死主题参数；PieChart 图标别名补丁 | **DONE**：vendor-utils 1.2MB→114KB（**-91%**）；echarts 落缓存监控页懒加载 chunk（cache-\*.js 434KB raw / 148KB gz），仅该页拉取 |
+| T1 echarts 按需 | `f46c1ae` | monitor/cache 改 `echarts/core`+Pie/Gauge/Tooltip/Canvas 按需；manualChunks vendor-utils 去 echarts；删 init 死主题参数；PieChart 图标别名补丁 | **DONE**：vendor-utils 1.2MB→114KB（**-91%**）；echarts 落缓存监控页懒加载 chunk（cache-\*.js 444,029B raw / 148KB gz），仅该页拉取 |
 | T2 hljs 入桶+分页基座拆除 | `333e0eb` | manualChunks vendor-md +`highlight.js`（钉桶）；pnpm add highlight.js@11.11.2（幽灵依赖修复）；ruoyi.scss 删分页条透明压制行 | **DONE**（产物维度假设证伪见 §2）：分页条 card 令牌激活（亮 #fff / 暗 #212121 双态验证，t2-01/02）；hljs 本体 T2 前就已随 rehype-highlight 闭包在 vendor-md（312K 前后不变） |
-| T3 Quill 桶化+验证汇总 | `c24e994` | manualChunks 新增 `vendor-quill`；pnpm add quill@2.0.2（幽灵依赖修复，简报预判"无幽灵依赖"证伪） | **DONE**：主 entry 814,657B→608,334B（**-206KB raw / -201.5KB gzip，-25.3%**），vendor-quill 205,545B 独立桶；network 三页断言全过（§3）；全量回归全绿（§5） |
+| T3 Quill 桶化+验证汇总 | `c24e994` | manualChunks 新增 `vendor-quill`；pnpm add quill@2.0.2（幽灵依赖修复，简报预判"无幽灵依赖"证伪） | **DONE**：主 entry 814,657B→608,334B（**-206,323B raw / -61,357B gzip（≈-59.9KB），-25.3%**），vendor-quill 205,545B raw / 61,563B gzip 独立桶；network 三页断言全过（§3）；全量回归全绿（§5） |
 
 ## 1. 产物前后对比表（pnpm build:prod，raw 字节）
 
@@ -19,9 +19,10 @@
 | vendor-md | 312K | 316,329 B | 316,329 B | 持平（T2 钉桶；hljs 早已在桶，见 §2） |
 | 主 entry（index-\*.js） | 796K | 814,657 B | **608,334 B** | **-206,323 B（-25.3%，T3 Quill 桶化）** |
 | echarts 懒加载 chunk | 无独立（在 vendor-utils 内） | cache-HU1ZNWAd.js 443,994 B | cache-Cx-VWlAQ.js 444,029 B | T1 起独立懒加载（仅缓存监控页拉取） |
-| vendor-quill（T3 新增） | —（在主 entry 内） | —（在主 entry 内） | **205,545 B**（gzip 61.5KB） | 新增独立桶，业务发版不动其 hash |
+| vendor-quill（T3 新增） | —（在主 entry 内） | —（在主 entry 内） | **205,545 B raw / 61,563 B gzip** | 新增独立桶，业务发版不动其 hash |
 
-主 entry gzip：273.37KB → 213.48KB。index.html 直引 JS：index + vendor-vue + vendor-utils + vendor-ep + vendor-quill（5 个）。
+主 entry gzip：279,887B → 218,530B（**-61,357B ≈ -59.9KB**；raw -206,323B / -25.3%）。index.html 直引 JS：index + vendor-vue + vendor-utils + vendor-ep + vendor-quill（5 个）。
+首屏 gzip 对冲说明：主 entry gz -59.9KB vs vendor-quill 首屏直引 +61,563B gz（Editor 全局注册）——首屏净 gz 近乎持平；本改动的真实收益是**缓存分离**（业务发版不动 vendor-quill hash，回访命中强缓存）与主 entry 解析/执行成本下降，而非首屏传输缩减。
 注：批前"796K/312K/1.1MB"侦察值与本批 T3 前干净重建（795.56kb/308.92kb/1059.16kb，vite 输出口径）一致，数字互证成立。
 
 ## 2. hljs 证伪记录（T2 实证，T3 终裁）
@@ -52,8 +53,8 @@
 
 ### 3.2 产物断言
 
-- `ls dist/static/js/ | grep vendor-quill` → `vendor-quill-DabgaIBt.js` 存在（205,545 B raw / 200.73KB gzip）。
-- 主 entry `index-C8SGUcW4.js` 608,334 B（前 814,657 B，**-206KB raw / -201.5KB gzip，-25.3%**）——"~200KB 级缩量"达成；简报"Quill ~590KB"预估值口径不明（实测移出 205.5KB raw / 61.5KB gzip，590KB 疑为 Quill 未压缩 dist 体积误读，deviation #3）。
+- `ls dist/static/js/ | grep vendor-quill` → `vendor-quill-DabgaIBt.js` 存在（205,545 B raw / 61,563 B gzip ≈ 61.5KB）。
+- 主 entry `index-C8SGUcW4.js` 608,334 B（前 814,657 B，**-206,323 B raw / -61,357 B gzip（≈-59.9KB），-25.3%**）——"~200KB 级缩量"达成（raw 口径；gzip 口径为 -59.9KB，首屏对冲见 §1）；简报"Quill ~590KB"预估值口径不明（实测移出 205,545 B raw / 61,563 B gzip，590KB 疑为 Quill 未压缩 dist 体积误读，deviation #3）。
 - vendor-quill 内 quill/ql-editor 字面 23 处；主 entry 'ql-editor' 0 处——Quill 代码彻底出主 entry。
 
 ### 3.3 走查（dev 24110，admin 登录，截图 t3-00-quill-pages.png 三屏）
@@ -110,7 +111,7 @@ Playwright + performance API，传输大小为 gzip 实传（transferSize）。
 
 1. **任务描述"Editor 消费方=首页（src/views/index.vue）+审查页（review/index.vue）"证伪**：两文件 grep 命中均为更新日志文本/权限注释，模板无 `<editor>`；全仓唯一模板消费方为 `src/views/system/notice/index.vue:147`（通知公告新增/修改对话框）。走查修正为：通知公告断言 `.ql-editor`（✅）；首页/审查页走查渲染无回归（Editor 全局注册链路经首页加载间接验证——vendor-quill 正常拉取执行且零 error）。
 2. **简报"quill 为直接依赖、无幽灵依赖"证伪**（§3.1），处置 pnpm add quill@2.0.2 入库（他机/CI 构建必需）。
-3. 简报"Quill ~590KB 移出"实测为 205.5KB raw（61.5KB gzip）；"主 entry 缩 ~200KB 级"达成（-206KB raw / -201.5KB gzip）。
+3. 简报"Quill ~590KB 移出"实测为 205,545 B raw（61,563 B gzip）；"主 entry 缩 ~200KB 级"达成（raw 口径 -206,323B；gzip 口径 -61,357B ≈ -59.9KB，首屏对冲见 §1）。
 4. preview network 验证需临时 `/prod-api` 代理（环境态已还原）。
 5. T2 截图（t2-01/02/03）与 t3-00 随本报告一并入库（T2 时未提交，按计划留 T3 统一归档）。
 6. Quill 桶化后 index.html 直引多一个 vendor-quill（登录页/首页均拉 61KB gz）——Editor 全局注册的必然代价，已如任务口径记录；若后续要登录页也不拉它，需把 Editor 注册改按需（超本批范围，留待后续）。
