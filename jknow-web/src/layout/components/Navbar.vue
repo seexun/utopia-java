@@ -185,7 +185,7 @@ async function toggleTheme(event?: MouseEvent): Promise<void> {
 }
 
 .navbar {
-  height: 50px;
+  height: 54px;
   overflow: hidden;
   position: relative;
   background: var(--navbar-bg);
@@ -198,7 +198,7 @@ async function toggleTheme(event?: MouseEvent): Promise<void> {
   box-sizing: border-box;
 
   .hamburger-container {
-    line-height: 46px;
+    line-height: 50px;
     height: 100%;
     cursor: pointer;
     transition: background 0.3s;
@@ -233,7 +233,7 @@ async function toggleTheme(event?: MouseEvent): Promise<void> {
 
   .right-menu {
     height: 100%;
-    line-height: 50px;
+    line-height: 54px;
     display: flex;
     align-items: center;
     margin-left: auto;

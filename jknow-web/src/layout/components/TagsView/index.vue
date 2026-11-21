@@ -371,7 +371,7 @@ function handleScroll(): void {
 </script>
 
 <style lang="scss" scoped>
-$tags-bar-height: 34px;
+$tags-bar-height: 38px;
 
 .tags-view-container {
   height: $tags-bar-height;
@@ -426,8 +426,8 @@ $tags-bar-height: 34px;
       align-items: center;
       position: relative;
       cursor: pointer;
-      height: 26px;
-      line-height: 26px;
+      height: 30px;
+      line-height: 30px;
       border: 1px solid var(--tags-item-border, #d8dce5);
       color: var(--tags-item-text, #495060);
       background: var(--tags-item-bg, #fff);
@@ -550,8 +550,8 @@ $tags-bar-height: 34px;
         justify-content: center;
         position: relative;
         z-index: 1;
-        height: 30px;
-        min-height: 30px;
+        height: 34px;
+        min-height: 34px;
         margin: 0 0 -1px;
         padding: 0 12px;
         font-size: 13px;
@@ -612,8 +612,8 @@ $tags-bar-height: 34px;
         }
 
         &.active {
-          height: 31px;
-          min-height: 31px;
+          height: 35px;
+          min-height: 35px;
           padding: 0 14px;
           color: var(--chrome-tab-text-active) !important;
           font-weight: 500;
@@ -700,14 +700,14 @@ $tags-bar-height: 34px;
 
 .main-container.fullscreen-mode .app-main {
   position: fixed;
-  top: 34px;
+  top: 38px;
   left: 0;
   right: 0;
   bottom: 0;
   margin: 0 !important;
   padding: 0 !important;
-  height: calc(100vh - 34px) !important;
-  min-height: calc(100vh - 34px) !important;
+  height: calc(100vh - 38px) !important;
+  min-height: calc(100vh - 38px) !important;
   overflow: auto;
 }
 </style>

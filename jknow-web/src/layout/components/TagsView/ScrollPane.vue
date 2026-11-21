@@ -155,7 +155,7 @@ defineExpose({
     bottom: 0px;
   }
   :deep(.el-scrollbar__wrap) {
-    height: 34px;
+    height: 38px;
     display: flex;
     align-items: center;
   }

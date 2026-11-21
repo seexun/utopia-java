@@ -65,8 +65,8 @@ onMounted(() => {
 
 .topbar-menu.el-menu--horizontal > .el-menu-item {
   float: left;
-  height: 50px !important;
-  line-height: 50px !important;
+  height: 54px !important;
+  line-height: 54px !important;
   color: #303133 !important;
   padding: 0 5px !important;
   margin: 0 10px !important;
@@ -79,7 +79,7 @@ onMounted(() => {
 /* sub-menu item */
 .topbar-menu.el-menu--horizontal > .el-sub-menu .el-sub-menu__title {
   float: left;
-  line-height: 50px !important;
+  line-height: 54px !important;
   color: #303133 !important;
   margin: 0 15px -3px!important;
 }

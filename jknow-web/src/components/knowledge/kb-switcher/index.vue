@@ -159,9 +159,9 @@ const switcherBorder = computed(() =>
 
 <style lang="scss">
 /* teleported 弹层不吃 scoped（popper 挂 body 下）：popper-class 全局覆盖，
-   宽度对齐侧栏展开宽（200px），库多时长列表滚动 */
+   宽度对齐侧栏展开宽（210px，随 $base-sidebar-width），库多时长列表滚动 */
 .kb-switcher-popper {
-  width: 200px;
+  width: 210px;
 
   .el-dropdown-menu {
     max-height: 300px;

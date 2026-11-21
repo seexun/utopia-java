@@ -4,7 +4,7 @@
       $base-menu-* 不适用）；
    2) mobile hideSidebar 的 translate3d(-var(...)) 为 gvdata 原文无效写法，改
       calc(-1 * var(...))（jknow mobile 抽屉行为保持）；
-   3) 尾部追加：has-logo calc（jknow Logo 50px）与 theme-dark/theme-light 容器块
+   3) 尾部追加：has-logo calc（jknow Logo 54px）与 theme-dark/theme-light 容器块
       （jknow 壳 --current-color 换色跟随；fallback 已对齐 #2563eb）。
    舍弃的 jknow 侧改动（让位 gvdata 观感）：菜单 44px 行高、svg-icon 10px 边距、
    hideSidebar 54px、box-shadow 0-0-8px——详见任务报告合并点清单。 */
@@ -347,16 +347,17 @@
   }
 }
 
-/* ===== 浅色侧栏（企业科技感 SaaS Light）：白底、右分割线、菜单项 40px/圆角 8px ===== */
+/* ===== 浅色侧栏（企业科技感 SaaS Light）：白底、右分割线、菜单分档 一级 44px/二级 40px、圆角 var(--radius-ctl) ===== */
 #app .sidebar-container.sidebar-light {
   box-shadow: none;
   border-right: 1px solid var(--color-border);
 
   .theme-light {
+    // 一级分档（el-menu 顶层菜单项与分组标题）：44px；二级及以下在 .nest-menu 档回归 40px
     .el-menu-item,
     .el-sub-menu__title {
-      height: 40px;
-      line-height: 40px;
+      height: 44px;
+      line-height: 44px;
       margin: 2px 8px;
       border-radius: var(--radius-ctl);
       transition: background-color var(--transition-base), color var(--transition-base);
@@ -365,6 +366,13 @@
         background-color: var(--color-neutral-soft) !important;
         color: var(--color-ink) !important;
       }
+    }
+
+    // 二级及以下分档（嵌套层 SidebarItem 挂 .nest-menu）：40px
+    .nest-menu .el-menu-item,
+    .nest-menu .el-sub-menu__title {
+      height: 40px;
+      line-height: 40px;
     }
 
     // 二级菜单项宽度不撑破带 margin 的圆角容器
@@ -397,10 +405,10 @@
 /* ===== jknow 壳特有段（合并保留，见文件头注）===== */
 #app .sidebar-container {
 
-  // Logo（50px）与菜单区为兄弟节点：无 flex 兜底的浏览器里保持原 calc 行为
+  // Logo（54px）与菜单区为兄弟节点：无 flex 兜底的浏览器里保持原 calc 行为
   &.has-logo {
     .el-scrollbar {
-      height: calc(100% - 50px);
+      height: calc(100% - 54px);
     }
   }
 
