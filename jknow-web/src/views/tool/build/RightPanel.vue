@@ -798,7 +798,7 @@ function tagChange(tagIcon: string): void {
 
   .field-box {
     position: relative;
-    height: calc(100vh - 50px - 40px - 42px);
+    height: calc(100vh - var(--offset-app-content) - 42px);
     box-sizing: border-box;
     overflow: hidden;
   }

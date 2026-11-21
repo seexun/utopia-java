@@ -127,6 +127,11 @@
 
   --el-font-size-base: 14px;
   --el-font-family: "Plus Jakarta Sans", "PingFang SC", "Microsoft YaHei", "HarmonyOS Sans SC", sans-serif;
+
+  /* ── 布局偏移单源（ui-ledger-cleanup §3）──
+     124 = 顶栏 54 + 标签栏 38 + .app-main 上下 padding 16×2
+     消费方：tool/build、RightPanel（CSS calc）+ iFrame、InnerLink（JS 读取） */
+  --offset-app-content: 124px;
 }
 
 /* 暗态覆盖档（规格 §5）——亮态值不动，仅 html.dark 下覆盖。

@@ -16,8 +16,13 @@ const props = defineProps({
   }
 })
 
-/* 124 = 顶栏 54 + 标签栏 38（§B 尺寸校准）+ .app-main 上下 padding 16×2 */
-const height = ref<string>(document.documentElement.clientHeight - 124 + "px;")
+/* 偏移单源 tokens.scss --offset-app-content（124 = 54+38+16×2）；fallback 兜底 */
+function appOffset(): number {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue('--offset-app-content')
+  const parsed = parseFloat(raw)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 124
+}
+const height = ref<string>(document.documentElement.clientHeight - appOffset() + "px;")
 const loading = ref<boolean>(true)
 const url = computed(() => props.src)
 
@@ -26,7 +31,7 @@ onMounted(() => {
     loading.value = false
   }, 300)
   window.onresize = function temp(): void {
-    height.value = document.documentElement.clientHeight - 124 + "px;"
+    height.value = document.documentElement.clientHeight - appOffset() + "px;"
   }
 })
 </script>

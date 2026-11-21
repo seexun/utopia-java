@@ -22,8 +22,13 @@ const props = defineProps({
 })
 
 const loading = ref<boolean>(true)
-/* 124 = 顶栏 54 + 标签栏 38（§B 尺寸校准）+ .app-main 上下 padding 16×2 */
-const height = ref<string>(document.documentElement.clientHeight - 124 + 'px')
+/* 偏移单源 tokens.scss --offset-app-content（124 = 54+38+16×2）；fallback 兜底 */
+function appOffset(): number {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue('--offset-app-content')
+  const parsed = parseFloat(raw)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 124
+}
+const height = ref<string>(document.documentElement.clientHeight - appOffset() + 'px')
 const iframeRef = ref<HTMLIFrameElement | null>(null)
 
 onMounted(() => {
