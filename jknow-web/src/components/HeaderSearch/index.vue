@@ -251,7 +251,7 @@ watch(searchPool, (list: SearchItem[]) => {
 }
 
 :deep(.highlight) {
-  color: red;
+  color: var(--color-danger);
   font-weight: 600;
 }
 
@@ -274,7 +274,7 @@ watch(searchPool, (list: SearchItem[]) => {
   color: var(--color-ink-3);
 
   strong {
-    color: red;
+    color: var(--color-danger);
     font-weight: 600;
   }
 }

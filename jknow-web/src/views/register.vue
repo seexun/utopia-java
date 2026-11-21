@@ -213,7 +213,7 @@ getCode()
   bottom: 0;
   width: 100%;
   text-align: center;
-  color: var(--color-ink-3);
+  color: var(--color-ink-2);
   font-family: Arial;
   font-size: 12px;
   letter-spacing: 1px;
