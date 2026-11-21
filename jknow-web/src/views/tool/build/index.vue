@@ -323,7 +323,7 @@ $lighterBlue: var(--color-primary);
   position: relative;
   width: 100%;
   background-color: var(--el-bg-color-overlay);
-  height: calc(100vh - 50px - 40px);
+  height: calc(100vh - 124px);
   overflow: hidden;
 
   .left-board {
@@ -331,7 +331,7 @@ $lighterBlue: var(--color-primary);
     position: absolute;
     left: 0;
     top: 0;
-    height: calc(100vh - 50px - 40px);
+    height: calc(100vh - 124px);
 
     .logo-wrapper {
       position: relative;
@@ -432,7 +432,7 @@ $lighterBlue: var(--color-primary);
   }
 
   .center-board {
-    height: calc(100vh - 50px - 40px);
+    height: calc(100vh - 124px);
     width: auto;
     margin: 0 350px 0 260px;
     box-sizing: border-box;
@@ -456,7 +456,7 @@ $lighterBlue: var(--color-primary);
     }
 
     .center-scrollbar {
-      height: calc(100vh - 50px - 40px - 42px);
+      height: calc(100vh - 124px - 42px);
       overflow: hidden;
       border-left: 1px solid var(--el-border-color-extra-light);
       border-right: 1px solid var(--el-border-color-extra-light);
@@ -472,7 +472,7 @@ $lighterBlue: var(--color-primary);
 
         &>.el-form {
           // 69 = 12+15+42
-          height: calc(100vh - 50px - 40px - 69px);
+          height: calc(100vh - 124px - 69px);
           flex: 1;
 
           .drawing-board {

@@ -168,23 +168,29 @@ getCookie()
 </script>
 
 <style lang='scss' scoped>
+/* SaaS Light 对齐（§十四-1 背景/卡片一致——T3 走查）：
+   旧版为 RuoYi 出厂照片背景+硬编码灰字；改令牌底色+主色 soft 氛围光，
+   暗档由 html.dark 令牌翻转自动成立 */
 .login {
   display: flex;
   justify-content: center;
   align-items: center;
   height: 100%;
-  background-image: url("../assets/images/login-background.jpg");
-  background-size: cover;
+  background:
+    radial-gradient(1100px 560px at 78% -8%, var(--color-primary-soft), transparent 62%),
+    var(--color-bg);
 }
 .title {
   margin: 0px auto 30px auto;
   text-align: center;
-  color: #707070;
+  color: var(--color-ink);
 }
 
 .login-form {
-  border-radius: 6px;
-  background: #ffffff;
+  border-radius: var(--radius-card);
+  background: var(--el-bg-color);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-card);
   width: 400px;
   padding: 25px 25px 5px 25px;
   z-index: 1;
@@ -203,7 +209,7 @@ getCookie()
 .login-tip {
   font-size: 13px;
   text-align: center;
-  color: #bfbfbf;
+  color: var(--color-ink-3);
 }
 .login-code {
   width: 33%;
@@ -221,7 +227,7 @@ getCookie()
   bottom: 0;
   width: 100%;
   text-align: center;
-  color: #fff;
+  color: var(--color-ink-3);
   font-family: Arial;
   font-size: 12px;
   letter-spacing: 1px;
@@ -231,11 +237,7 @@ getCookie()
   padding-left: 12px;
 }
 
-html.dark .login {
-  background-image: linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.55)), url("../assets/images/login-background.jpg");
-  .login-form {
-    background: var(--el-bg-color-overlay) !important;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
-  }
+html.dark .login-form {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
 }
 </style>

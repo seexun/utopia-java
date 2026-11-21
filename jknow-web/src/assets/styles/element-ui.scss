@@ -94,3 +94,8 @@
 .el-dropdown .el-dropdown-link{
   color: var(--el-color-primary) !important;
 }
+
+// el-card 圆角对齐令牌（§八 三级圆角：卡片 8px）——EP 默认 4px 与业务卡 8px 跨页不一致（T3 走查）
+.el-card {
+  border-radius: var(--radius-card);
+}

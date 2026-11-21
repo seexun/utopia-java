@@ -87,7 +87,8 @@
             </template>
          </el-table-column>
          <el-table-column label="创建者" align="center" prop="createBy" width="100" />
-         <el-table-column label="创建时间" align="center" prop="createTime" width="100">
+         <!-- 160 与用户/代码生成等页"创建时间"列一致（原 100 日期折行——T3 走查） -->
+         <el-table-column label="创建时间" align="center" prop="createTime" width="160">
             <template #default="scope">
                <span>{{ parseTime(scope.row.createTime, '{y}-{m}-{d}') }}</span>
             </template>

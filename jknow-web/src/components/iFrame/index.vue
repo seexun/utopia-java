@@ -16,7 +16,8 @@ const props = defineProps({
   }
 })
 
-const height = ref<string>(document.documentElement.clientHeight - 94.5 + "px;")
+/* 124 = 顶栏 54 + 标签栏 38（§B 尺寸校准）+ .app-main 上下 padding 16×2 */
+const height = ref<string>(document.documentElement.clientHeight - 124 + "px;")
 const loading = ref<boolean>(true)
 const url = computed(() => props.src)
 
@@ -25,7 +26,7 @@ onMounted(() => {
     loading.value = false
   }, 300)
   window.onresize = function temp(): void {
-    height.value = document.documentElement.clientHeight - 94.5 + "px;"
+    height.value = document.documentElement.clientHeight - 124 + "px;"
   }
 })
 </script>

@@ -110,7 +110,14 @@ function getList(): void {
           min: 0,
           max: 1000,
           detail: {
-            formatter: cache.value!.info.used_memory_human
+            formatter: cache.value!.info.used_memory_human,
+            offsetCenter: [0, "42%"]
+          },
+          /* 标题放仪表盘底部开口区（指针 270° 扫过区之外），数值同步下移避开指针锚点扫掠，
+             避免指针穿过"内存消耗"/数值文字（T3 走查） */
+          title: {
+            offsetCenter: [0, "78%"],
+            fontSize: 13
           },
           data: [
             {
