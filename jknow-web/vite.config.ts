@@ -73,7 +73,8 @@ export default defineConfig(({ mode, command }) => {
               'remark-rehype',
               'remark-gfm',
               'rehype-highlight',
-              'unified'
+              'unified',
+              'highlight.js'
             ],
             'vendor-utils': ['axios', 'dayjs', '@vueuse/core', 'qs']
           }

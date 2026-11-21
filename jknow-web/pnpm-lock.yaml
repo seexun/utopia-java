@@ -83,6 +83,9 @@ importers:
       graphology-layout-forceatlas2:
         specifier: ^0.10.1
         version: 0.10.1(graphology-types@0.24.8)
+      highlight.js:
+        specifier: 11.11.2
+        version: 11.11.2
       js-beautify:
         specifier: 1.15.4
         version: 1.15.4
