@@ -119,6 +119,9 @@ importers:
       qs:
         specifier: ^6.16.0
         version: 6.17.1
+      quill:
+        specifier: 2.0.2
+        version: 2.0.2
       rehype-highlight:
         specifier: ^7.0.2
         version: 7.0.2

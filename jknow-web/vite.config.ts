@@ -76,7 +76,11 @@ export default defineConfig(({ mode, command }) => {
               'unified',
               'highlight.js'
             ],
-            'vendor-utils': ['axios', 'dayjs', '@vueuse/core', 'qs']
+            'vendor-utils': ['axios', 'dayjs', '@vueuse/core', 'qs'],
+            // Quill 桶（T3 增补）：Editor 组件全局注册于 main.ts，此前 quill+
+            // @vueup/vue-quill 随闭包落主 entry（~590KB，主 entry 796K 大头）；
+            // 拆独立桶后主 entry 显著缩，Quill 代码 hash 独立缓存
+            'vendor-quill': ['quill', '@vueup/vue-quill']
           }
         }
       }
