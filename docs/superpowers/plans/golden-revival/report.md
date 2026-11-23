@@ -11,7 +11,9 @@
 - **19 族全量对表（rust 权威面 vs jknow 实录）：失配 0，复活成立。**
   全 19 剧本 Recorder 单打实录 286 样本全绿（exit 0×19）；全树 Diff 首轮 108 差异逐例归因，
   除 health 残面（version 0.1.0→1.0.0，权威面文件随实情修正）外全部显式挂账（107 行新
-  WAIVERS）；处置后 Diff **exit 0：一致 88 / 失配 0 / 挂账 178 / 单侧存照跳过 91**。
+  WAIVERS + 终审补挂 2 行 pat-surface-retired）；处置后 Diff **exit 0：一致 88 / 失配 0 /
+  挂账 180 / 单侧存照跳过 89**（终审补挂前为 178/91，两键 chat-misc/pat-issue、
+  chat-misc/pat-revoke 由单侧存照移入挂账，复跑实测）。
 - **处置分支**：非 heart/auth/admin 预期面失配 ≈0 → 走「README 验证入口」分支——验证节新增
   「golden 契约对表（人工验证面，非 CI 门）」小节（命令序列+env+captcha 开关纪律+非 CI 门声明）。
 - **全量回归**：清卷口径全仓 `mvn test` BUILD SUCCESS（**SUREFIRE 合计 1339 run / 0 FAIL /
@@ -48,7 +50,7 @@
 
 **首轮（仅 T2 83 行挂账）：比对 128、差异 108、挂账 71、单侧跳过 91。** 108 差异逐例归因见 §3。
 
-**处置后（最终轮）：比对 88 全部一致（exit 0）、挂账 178、单侧跳过 91。四类计数表（19 族）：**
+**处置后（终态，含终审补挂）：比对 88 全部一致（exit 0）、挂账 180、单侧跳过 89。四类计数表（19 族）：**
 
 | 族 | 一致 | 失配 | 退役（T2 挂账） | 豁免（T3 挂账） | 单侧存照 | 实录样本 |
 |---|---|---|---|---|---|---|
@@ -63,7 +65,7 @@
 | graph | 9 | 0 | 9 | 0 | 10 | 19 |
 | workspace-kb | 10 | 0 | 7 | 18 | 8 | 36 |
 | admin-users | 0 | 0 | 6 | 15 | 0 | 15 |
-| chat-misc | 4 | 0 | 7 | 3 | 4 | 11 |
+| chat-misc | 4 | 0 | 7 | 5 | 2 | 11 |
 | documents | 14 | 0 | 1 | 14 | 5 | 33 |
 | sources-ingest | 4 | 0 | 0 | 15 | 3 | 22 |
 | heart-ledger | 0 | 0 | 2 | 1 | 1 | 2 |
@@ -71,18 +73,23 @@
 | heart-errata | 0 | 0 | 2 | 1 | 2 | 3 |
 | heart-axioms | 0 | 0 | 3 | 1 | 6 | 7 |
 | heart-replay | 0 | 0 | 7 | 1 | 2 | 3 |
-| **合计** | **88** | **0** | **69** | **109** | **91** | **286** |
+| **合计** | **88** | **0** | **69** | **111** | **89** | **286** |
 
 口径注：
 
 - **一致** = 两侧同名样本树等价（Diff compared 全绿，含 health 残面修正后）；**失配** = 未归因
   差异（终态 0，Diff exit 0 即机械证明）；**退役** = T2 生效清单命中的挂账（剧本已删步，权威面
   遗留样本「仅左侧存在」豁免）；**豁免** = T3 新增 107 行 + T2 ontology import 两行
-  （authority-java-side-absent 同码），覆盖「仅右侧存在」（权威面缺步/heart 快照）与 40 个
-  结构性/环境性内容差样本；**单侧存照** = 权威面 `target=rust` 步按 Diff 语义跳过比对
-  （91 = 89 有 jknow 同名实录 + 2 无对应），双打时代语义保留，不计入四类。
-- 挂账 178 = T2 83 行中命中 69 + T3 107 + T2 ontology 2；T2 83 行中 **12 行为休眠键**
-  （权威面无对应文件、实录亦不产该步：sources 推送 9、workspace-kb/viewer-write-forbidden、
+  （authority-java-side-absent 同码）+ 终审补挂 `pat-surface-retired` 2 行，覆盖「仅右侧存在」
+  （权威面缺步/heart 快照）与 40 个结构性/环境性内容差样本；**单侧存照** = 权威面
+  `target=rust` 步按 Diff 语义跳过比对（89 = 87 有 jknow 同名实录 + 2 无对应），双打时代
+  语义保留，不计入四类。
+- **终审补挂点名（单侧 91 → 挂账 +2）**：首轮单侧存照 91 中 `chat-misc/pat-issue`、
+  `chat-misc/pat-revoke` 两键系权威面 `target=rust` 无剧本步（T2 chat-misc 适配已删 PAT 现发/撤）
+  且原无挂账行的无主样本——终审以新码 `pat-surface-retired` 补挂 2 行（WAIVERS 生效清单末尾）
+  后移入豁免列，复跑 Diff exit 0：挂账 178→180、单侧 91→89，一致 88/失配 0 不变。
+- 挂账 180 = T2 83 行中命中 69 + T3 107 + T2 ontology 2 + 终审 pat 2；T2 83 行中 **12 行为
+  休眠键**（权威面无对应文件、实录亦不产该步：sources 推送 9、workspace-kb/viewer-write-forbidden、
   heart-errata/errata-retract-applied、heart-merge/review-fixture），留引擎扩展后核销对账。
 
 ## §3 失配逐例归因表（108 → 0）
@@ -216,3 +223,9 @@ golden-jknow/ 实录树）、`spike-t1/`、`spike-t2/`、`jknow-contract/src/tes
 3. **休眠挂账键 12 行**：引擎扩展后以「重录-对账-核销」流程清理（WAIVERS.md T3 段已列）。
 4. **`time-window-relative` 面**：review-summary 滚动窗口锚录制日——若未来要求该步常规比对，
    需 Normalizer 增「日期窗口键占位」原语（当前挂账口径足够）。
+5. **smoke 脚本 captcha 复位**（§5 运维发现 / §6-7）：`scripts/smoke-p0.sh:10-12`、
+   `scripts/smoke-p1.sh:16-18` 只关不清——脚本开头 UPDATE captchaEnabled=false + flushdb 后
+   跑毕不复位。补法：脚本收尾复位 `sys_config captchaEnabled=true` + redis
+   `DEL sys_config:sys.account.captchaEnabled` + 无验证码 /login 实测强制（期望
+   `{"msg":"验证码已失效","code":500}`），落点 scripts 层复位逻辑。本轮已手动复位并实测，
+   未动脚本（不入本批）。

@@ -117,15 +117,15 @@ pnpm dev                                              # http://localhost（vite 
 ```bash
 ./scripts/smoke-p0.sh                                  # ALL PASS 20/20
 ./scripts/smoke-p1.sh                                  # ALL PASS (PASS=67 SKIP=1)
-mvn -q test                                            # 全仓 1330 run / 0 fail / 9 skip
-cd jknow-web && pnpm test && pnpm typecheck && pnpm build:prod   # test 418 passed；typecheck 与 build 均零错零告警退出 0
+mvn -q test                                            # 全仓 1339 run / 0 fail / 9 skip
+cd jknow-web && pnpm test && pnpm typecheck && pnpm build:prod   # test 425 passed；typecheck 与 build 均零错零告警退出 0
 ```
 
 ### golden 契约对表（人工验证面，非 CI 门）
 
 19 族契约剧本对表：`jknow-contract/src/test/resources/golden-rust/`（rust 权威快照面，随仓）
 vs jknow 实录（Recorder 单打现录），Diff 全树比对 + `WAIVERS.md` 挂账单列（P3 复活批基线：
-一致 88 / 失配 0 / 挂账 178 / 单侧存照跳过 91，见 [golden-revival report](docs/superpowers/plans/golden-revival/report.md)）。
+一致 88 / 失配 0 / 挂账 180 / 单侧存照跳过 89，见 [golden-revival report](docs/superpowers/plans/golden-revival/report.md)）。
 **非 CI 门**：需要常驻后端（27401 演示态）、演示库与 captcha 开关序列，属人工验证面，不在 `mvn test` 自动化内。
 
 ```bash

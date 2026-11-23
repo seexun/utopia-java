@@ -16,7 +16,7 @@ P3 golden 复活批 T2（2026-11-23）新增八组挂账——全部是「jknow 
 键为 golden 权威面（golden-rust）侧遗留步（剧本已删步，Diff 时按「仅左侧存在」命中）；
 装载器按键单行装载（Waivers.load 一行一键），同组多行共用原因码。
 
-P3 golden 复活批 T3（2026-11-23）全量对表新增 107 行（八组原因码一次落账，全树
+P3 golden 复活批 T3（2026-11-23）全量对表新增 107 行（11 组原因码一次落账，全树
 `--left golden-rust --right <实录> --waivers` 形态）——首轮 Diff 108 差异逐例归因后除
 health 残面（version 0.1.0→1.0.0，权威面文件随本轮修正为 jknow 产品版本，不挂账）外全部
 显式挂账：62 行 `authority-java-side-absent`（权威面缺步：源仓录制期 target:java 单侧样本
@@ -26,7 +26,8 @@ T2 ontology import 两步同码扩面）＋5 行 `heart-skeleton-surface`（hear
 `admin-shape-rewritten` 14，T2 §3/§1 处置的对表落账）＋16 行环境/身份/投影面
 （`env-user-set` 1、`demo-seed-visible` 2、`identity-account-naming` 8、
 `role-projection-precedence` 1、`env-workspace-set` 1、`time-window-relative` 1、
-`push-chain-evidence-gap` 2）。生效清单 T3 后合计 190 行（T2 83 行中 12 行为休眠键：
+`push-chain-evidence-gap` 2）。终审收尾（同日）补挂 2 行 `pat-surface-retired`（见生效清单
+末尾）——生效清单 T3 后合计 192 行（T2 83 行中 12 行为休眠键：
 权威面无对应文件、实录亦不产该步，留引擎扩展后核销对账）。
 
 安全注记（T3/运维知会）：`multi-user-single-token` 组的预建用户 `contract_viewer`（sys_user 固定
@@ -227,6 +228,8 @@ bcrypt**——即演示库第二个已知口令（admin123）的账号，仅作�
 | review/review-summary | time-window-relative | decided.daily 为 14 天滚动窗口锚定录制日（首日=录制日-13）：权威面锚 2026-10-30、jknow 锚 2026-11-10，窗口内计数双侧同形（全 0）——时间相对面非契约差。 |
 | sources-ingest/api-runs | push-chain-evidence-gap | 推送退役下游证据缺口：api 源 0 推送（step-auth-override-dead 连锁）→ runs 空/doc_count 0，权威面 3 行运行史/1 文档为源仓推送时代存照——引擎步级鉴权扩展重录后核销 |
 | sources-ingest/sources-after-delete | push-chain-evidence-gap | 推送退役下游证据缺口：api 源 0 推送（step-auth-override-dead 连锁）→ runs 空/doc_count 0，权威面 3 行运行史/1 文档为源仓推送时代存照——引擎步级鉴权扩展重录后核销 |
+| chat-misc/pat-issue | pat-surface-retired | PAT 面属源仓 token 装置（个人令牌现发，target=rust 存照步）：jknow 无对应路由/剧本步（T2 chat-misc 适配已删），终审收尾对单侧存照中两个无主键（pat-issue/pat-revoke）补挂——引擎 PAT 域实装后以专用载体恢复。 |
+| chat-misc/pat-revoke | pat-surface-retired | PAT 面属源仓 token 装置（个人令牌撤销，target=rust 存照步）：jknow 无对应路由/剧本步（T2 chat-misc 适配已删），终审收尾对单侧存照中两个无主键（pat-issue/pat-revoke）补挂——引擎 PAT 域实装后以专用载体恢复。 |
 
 （历史：M5 任务 6 挂账清零——pat-ratchet 2 条与 fulltext-store-ownership 1 条均已核销，见下方已核销节。）
 
