@@ -72,7 +72,8 @@ import tech.seexun.jknow.contract.model.Target;
  * <p>P3 golden 复活批（jknow 对表）：setup 增 ruoyi_login 模式（{@code setup.mode: ruoyi_login}
  * ——POST /login 捕 token，会话标识 {@code "bearer:<token>"} 走 Authorization 默认注入，
  * cookie 路径零触碰）；ruoyi_login 剧本的 owner 侧普通步增假 200 识别（若依 renderString
- * 恒 HTTP 200，body code ∉ {200,0} 判步失败）。
+ * 恒 HTTP 200，body code ∉ {200,0} 判步失败；修复轮收窄：expect 显式声明非 200 的
+ * 预期业务错误步跳过，由 expect 兜底）。
  */
 public final class ScenarioRunner {
 
@@ -592,7 +593,12 @@ public final class ScenarioRunner {
                 resp = send(base, call.method(), path, body, headers, cookie[0]);
             }
             if (owner) {
-                if (scenario.setup() != null && scenario.setup().ruoyiLogin()) {
+                // 假 200 识别闸收窄（P3 修复轮，审查 Important-1）：步显式声明 expect.status≠200
+                // 即「预期业务错误步」（T2 auth 401 族/admin 403 族）——交 expect/契约面兜底，
+                // 不在此误杀；expect 200 或未声明 expect 的步维持保护（未声明即没有错误预期，
+                // 业务码异常仍应早失败）。
+                boolean expectErrorDeclared = step.expectStatus() != null && step.expectStatus() != 200;
+                if (!expectErrorDeclared && scenario.setup() != null && scenario.setup().ruoyiLogin()) {
                     assertBusinessOk(scenario, step, resp);
                 }
                 applyCaptures(scenario, step, resp, vars, cookie);
@@ -725,6 +731,9 @@ public final class ScenarioRunner {
      * renderString 把业务错误也写成 HTTP 200，body code ∉ {200, 0} 即步失败（错误带 msg）。
      * expect/capture 前先过这道——业务失败时捕获与 expect 的报错都不如 msg 直接。
      * 无 code 字段的响应（utopia 形状如 404 的 {"error":...}、空集形状、非 JSON 体）不受影响。
+     *
+     * <p>修复轮收窄（审查 Important-1）：调用方对「步显式声明 expect.status≠200」的
+     * 预期业务错误步跳过本闸（由 expect/契约面兜底），expect 200 或未声明的步维持保护。
      */
     private static void assertBusinessOk(Scenario scenario, Step step, Resp resp) {
         JsonNode body;
