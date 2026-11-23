@@ -16,6 +16,19 @@ P3 golden 复活批 T2（2026-11-23）新增八组挂账——全部是「jknow 
 键为 golden 权威面（golden-rust）侧遗留步（剧本已删步，Diff 时按「仅左侧存在」命中）；
 装载器按键单行装载（Waivers.load 一行一键），同组多行共用原因码。
 
+P3 golden 复活批 T3（2026-11-23）全量对表新增 107 行（八组原因码一次落账，全树
+`--left golden-rust --right <实录> --waivers` 形态）——首轮 Diff 108 差异逐例归因后除
+health 残面（version 0.1.0→1.0.0，权威面文件随本轮修正为 jknow 产品版本，不挂账）外全部
+显式挂账：62 行 `authority-java-side-absent`（权威面缺步：源仓录制期 target:java 单侧样本
+不进权威面——documents 14/review 23/sources-ingest 13/workspace-kb 9/chat-misc 3，
+T2 ontology import 两步同码扩面）＋5 行 `heart-skeleton-surface`（heart 快照骨架：权威面
+未随迁 heart 快照，无左侧对应文件）＋24 行预期结构签名（`fake-200-ruoyi-entry` 10 +
+`admin-shape-rewritten` 14，T2 §3/§1 处置的对表落账）＋16 行环境/身份/投影面
+（`env-user-set` 1、`demo-seed-visible` 2、`identity-account-naming` 8、
+`role-projection-precedence` 1、`env-workspace-set` 1、`time-window-relative` 1、
+`push-chain-evidence-gap` 2）。生效清单 T3 后合计 190 行（T2 83 行中 12 行为休眠键：
+权威面无对应文件、实录亦不产该步，留引擎扩展后核销对账）。
+
 安全注记（T3/运维知会）：`multi-user-single-token` 组的预建用户 `contract_viewer`（sys_user 固定
 utopia_uuid `0190d3e0-0000-7d5a-8000-00000000cafe`，role 2，dept 103）口令串**复用 admin 的
 bcrypt**——即演示库第二个已知口令（admin123）的账号，仅作剧本 sql 步预建装置；viewer 登录面
@@ -107,6 +120,113 @@ bcrypt**——即演示库第二个已知口令（admin123）的账号，仅作�
 | documents/jobs-requeue-all-forbidden | admin-requeue-all-writes | admin 身份下 POST /api/v1/jobs/requeue 是真写（探针实录 200 {"requeued":47}——全实例 job 重排队），403 语义随 admin 失效；为保录制幂等与演示库态不录。 |
 | ontology/import-preview | authority-java-side-absent | 权威树（golden-rust）缺该步（源仓录制期它是 target:java 单侧样本，只进 golden-java 不进权威面）；jknow 侧实录 200（multipart 预览 plan），留作右侧新增。T3 若启用 golden-java 合并对照可核销。 |
 | ontology/import-apply | authority-java-side-absent | 同上（落库回执 200 {import_id,...}）。 |
+| chat-misc/chat-stop-unknown-404 | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| chat-misc/conversation-delete-unknown-404 | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| chat-misc/conversation-rename-unknown-404 | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| documents/doc-delete-again | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| documents/doc-delete | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| documents/doc-extract | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| documents/doc-purge-conflict | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| documents/doc-purge | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| documents/doc-reprocess | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| documents/doc-restore-conflict | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| documents/doc-restore-purged-409 | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| documents/doc-restore | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| documents/retry-failed | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| documents/upload-duplicate | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| documents/upload-empty-file | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| documents/upload-zero-kb-404 | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| documents/upload | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| review/alignment-kind-word-decide | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| review/alignment-phrase-unknown-404 | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| review/alignment-rule-unknown-404 | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| review/conflict-resolve-unknown-404 | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| review/consistency-check | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| review/errata-unknown-404 | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| review/fact-close-unknown-404 | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| review/fact-confirm-unknown-404 | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| review/fact-reject-unknown-404 | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| review/inference-run | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| review/kb-create | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| review/merge-revert-unknown-404 | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| review/review-agent-unknown-404 | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| review/review-batch-empty-422 | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| review/review-batch-unknown-ids | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| review/review-decide-unknown-404 | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| review/review-defect-unknown-404 | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| review/review-mapping-unknown-404 | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| review/review-pending-decide-unknown-404 | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| review/review-violation-bad-resolution-422 | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| review/review-violation-unknown-404 | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| review/ws-create | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| review/ws-delete | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| sources-ingest/api-create | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| sources-ingest/api-rotate-token | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| sources-ingest/folder-create | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| sources-ingest/folder-delete-again-404 | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| sources-ingest/folder-delete | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| sources-ingest/folder-patch | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| sources-ingest/folder-re-extract | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| sources-ingest/folder-sync | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| sources-ingest/kb-ingest-created | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| sources-ingest/kb-ingest-empty-filename | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| sources-ingest/kb-ingest-unchanged | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| sources-ingest/missing-cleanup | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| sources-ingest/statements-create | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| workspace-kb/kb-create-second | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| workspace-kb/kb-create-with-packs | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| workspace-kb/kb-create | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| workspace-kb/kb-delete-default-refused | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| workspace-kb/kb-delete-second | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| workspace-kb/kb-patch | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| workspace-kb/ws-create | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| workspace-kb/ws-delete | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| workspace-kb/ws-rename | authority-java-side-absent | 权威面缺步：源仓录制期该步为 target:java 单侧样本只进 golden-java 不进权威面；jknow 实录（target=both）为右侧新增证据，T2 ontology import 两步同码——启用 golden-java 合并对照时可核销 |
+| heart-axioms/axioms-snapshot.snapshot | heart-skeleton-surface | heart 快照骨架面：引擎单 token 模型推送链退役（step-auth-override-dead 连锁），jknow 侧为装置+空库骨架快照；权威面未随迁 heart 快照样本（无左侧对应文件），0054 陈述信封（e/s/n）证据缺口留引擎步级鉴权扩展后重录 |
+| heart-errata/errata-snapshot.snapshot | heart-skeleton-surface | heart 快照骨架面：引擎单 token 模型推送链退役（step-auth-override-dead 连锁），jknow 侧为装置+空库骨架快照；权威面未随迁 heart 快照样本（无左侧对应文件），0054 陈述信封（e/s/n）证据缺口留引擎步级鉴权扩展后重录 |
+| heart-ledger/ledger-snapshot.snapshot | heart-skeleton-surface | heart 快照骨架面：引擎单 token 模型推送链退役（step-auth-override-dead 连锁），jknow 侧为装置+空库骨架快照；权威面未随迁 heart 快照样本（无左侧对应文件），0054 陈述信封（e/s/n）证据缺口留引擎步级鉴权扩展后重录 |
+| heart-merge/merge-snapshot.snapshot | heart-skeleton-surface | heart 快照骨架面：引擎单 token 模型推送链退役（step-auth-override-dead 连锁），jknow 侧为装置+空库骨架快照；权威面未随迁 heart 快照样本（无左侧对应文件），0054 陈述信封（e/s/n）证据缺口留引擎步级鉴权扩展后重录 |
+| heart-replay/replay-snapshot.snapshot | heart-skeleton-surface | heart 快照骨架面：引擎单 token 模型推送链退役（step-auth-override-dead 连锁），jknow 侧为装置+空库骨架快照；权威面未随迁 heart 快照样本（无左侧对应文件），0054 陈述信封（e/s/n）证据缺口留引擎步级鉴权扩展后重录 |
+| auth/alerts-401 | fake-200-ruoyi-entry | 未认证扫描步的若依假 200 形：jknow 走若依认证入口点（HTTP 200+{msg,code:401}），权威面为源仓 401 形——T2 §3 (a) 处置的预期结构签名（剧本 expect 已按实形改写），非回归 |
+| auth/jobs-noop-401 | fake-200-ruoyi-entry | 未认证扫描步的若依假 200 形：jknow 走若依认证入口点（HTTP 200+{msg,code:401}），权威面为源仓 401 形——T2 §3 (a) 处置的预期结构签名（剧本 expect 已按实形改写），非回归 |
+| auth/kb-export-401 | fake-200-ruoyi-entry | 未认证扫描步的若依假 200 形：jknow 走若依认证入口点（HTTP 200+{msg,code:401}），权威面为源仓 401 形——T2 §3 (a) 处置的预期结构签名（剧本 expect 已按实形改写），非回归 |
+| auth/kb-mcp-401 | fake-200-ruoyi-entry | 未认证扫描步的若依假 200 形：jknow 走若依认证入口点（HTTP 200+{msg,code:401}），权威面为源仓 401 形——T2 §3 (a) 处置的预期结构签名（剧本 expect 已按实形改写），非回归 |
+| auth/kb-readiness-401 | fake-200-ruoyi-entry | 未认证扫描步的若依假 200 形：jknow 走若依认证入口点（HTTP 200+{msg,code:401}），权威面为源仓 401 形——T2 §3 (a) 处置的预期结构签名（剧本 expect 已按实形改写），非回归 |
+| auth/kb-search-401 | fake-200-ruoyi-entry | 未认证扫描步的若依假 200 形：jknow 走若依认证入口点（HTTP 200+{msg,code:401}），权威面为源仓 401 形——T2 §3 (a) 处置的预期结构签名（剧本 expect 已按实形改写），非回归 |
+| auth/me-401 | fake-200-ruoyi-entry | 未认证扫描步的若依假 200 形：jknow 走若依认证入口点（HTTP 200+{msg,code:401}），权威面为源仓 401 形——T2 §3 (a) 处置的预期结构签名（剧本 expect 已按实形改写），非回归 |
+| auth/ontology-packs-401 | fake-200-ruoyi-entry | 未认证扫描步的若依假 200 形：jknow 走若依认证入口点（HTTP 200+{msg,code:401}），权威面为源仓 401 形——T2 §3 (a) 处置的预期结构签名（剧本 expect 已按实形改写），非回归 |
+| auth/users-401 | fake-200-ruoyi-entry | 未认证扫描步的若依假 200 形：jknow 走若依认证入口点（HTTP 200+{msg,code:401}），权威面为源仓 401 形——T2 §3 (a) 处置的预期结构签名（剧本 expect 已按实形改写），非回归 |
+| auth/workspaces-401 | fake-200-ruoyi-entry | 未认证扫描步的若依假 200 形：jknow 走若依认证入口点（HTTP 200+{msg,code:401}），权威面为源仓 401 形——T2 §3 (a) 处置的预期结构签名（剧本 expect 已按实形改写），非回归 |
+| admin-users/admin-create-user-forbidden | admin-shape-rewritten | admin 面 403 实形改写签名：jknow ruoyi admin 是真 admin（可读面 200/未实装写端点 500/不存在路由 404），权威面为源仓非 admin 合同账号 403 形——T2 admin 实形处置的预期签名 |
+| admin-users/admin-deactivate-forbidden | admin-shape-rewritten | admin 面 403 实形改写签名：jknow ruoyi admin 是真 admin（可读面 200/未实装写端点 500/不存在路由 404），权威面为源仓非 admin 合同账号 403 形——T2 admin 实形处置的预期签名 |
+| admin-users/admin-deployment-forbidden | admin-shape-rewritten | admin 面 403 实形改写签名：jknow ruoyi admin 是真 admin（可读面 200/未实装写端点 500/不存在路由 404），权威面为源仓非 admin 合同账号 403 形——T2 admin 实形处置的预期签名 |
+| admin-users/admin-deployment-put-forbidden | admin-shape-rewritten | admin 面 403 实形改写签名：jknow ruoyi admin 是真 admin（可读面 200/未实装写端点 500/不存在路由 404），权威面为源仓非 admin 合同账号 403 形——T2 admin 实形处置的预期签名 |
+| admin-users/admin-ds-delete-forbidden | admin-shape-rewritten | admin 面 403 实形改写签名：jknow ruoyi admin 是真 admin（可读面 200/未实装写端点 500/不存在路由 404），权威面为源仓非 admin 合同账号 403 形——T2 admin 实形处置的预期签名 |
+| admin-users/admin-ds-grant-forbidden | admin-shape-rewritten | admin 面 403 实形改写签名：jknow ruoyi admin 是真 admin（可读面 200/未实装写端点 500/不存在路由 404），权威面为源仓非 admin 合同账号 403 形——T2 admin 实形处置的预期签名 |
+| admin-users/admin-ds-grants-forbidden | admin-shape-rewritten | admin 面 403 实形改写签名：jknow ruoyi admin 是真 admin（可读面 200/未实装写端点 500/不存在路由 404），权威面为源仓非 admin 合同账号 403 形——T2 admin 实形处置的预期签名 |
+| admin-users/admin-ds-list-forbidden | admin-shape-rewritten | admin 面 403 实形改写签名：jknow ruoyi admin 是真 admin（可读面 200/未实装写端点 500/不存在路由 404），权威面为源仓非 admin 合同账号 403 形——T2 admin 实形处置的预期签名 |
+| admin-users/admin-ds-revoke-forbidden | admin-shape-rewritten | admin 面 403 实形改写签名：jknow ruoyi admin 是真 admin（可读面 200/未实装写端点 500/不存在路由 404），权威面为源仓非 admin 合同账号 403 形——T2 admin 实形处置的预期签名 |
+| admin-users/admin-ds-test-forbidden | admin-shape-rewritten | admin 面 403 实形改写签名：jknow ruoyi admin 是真 admin（可读面 200/未实装写端点 500/不存在路由 404），权威面为源仓非 admin 合同账号 403 形——T2 admin 实形处置的预期签名 |
+| admin-users/admin-oidc-identities-forbidden | admin-shape-rewritten | admin 面 403 实形改写签名：jknow ruoyi admin 是真 admin（可读面 200/未实装写端点 500/不存在路由 404），权威面为源仓非 admin 合同账号 403 形——T2 admin 实形处置的预期签名 |
+| admin-users/admin-oidc-unbind-forbidden | admin-shape-rewritten | admin 面 403 实形改写签名：jknow ruoyi admin 是真 admin（可读面 200/未实装写端点 500/不存在路由 404），权威面为源仓非 admin 合同账号 403 形——T2 admin 实形处置的预期签名 |
+| admin-users/admin-reactivate-forbidden | admin-shape-rewritten | admin 面 403 实形改写签名：jknow ruoyi admin 是真 admin（可读面 200/未实装写端点 500/不存在路由 404），权威面为源仓非 admin 合同账号 403 形——T2 admin 实形处置的预期签名 |
+| admin-users/users-deactivated-forbidden | admin-shape-rewritten | admin 面 403 实形改写签名：jknow ruoyi admin 是真 admin（可读面 200/未实装写端点 500/不存在路由 404），权威面为源仓非 admin 合同账号 403 形——T2 admin 实形处置的预期签名 |
+| admin-users/users-list | env-user-set | 组织用户集环境差（源仓先例码）：jknow 组织挂若依 admin+seed 用户+contract 预建账号，权威面为源仓共享实例合同账号集——账号集随环境漂移，M1 任务 5 同款豁免。 |
+| alerts/alerts-page | demo-seed-visible | 演示态环境面：jknow 剧本身份 admin 名下可见 seed 演示库的 3 条待审勘误告警（审查队列 3 待审的告警投影），权威面为源仓合同账号干净态——身份+seed 态差，非契约回归 |
+| alerts/alerts-unread | demo-seed-visible | 演示态环境面：jknow 剧本身份 admin 名下可见 seed 演示库的 3 条待审勘误告警（审查队列 3 待审的告警投影），权威面为源仓合同账号干净态——身份+seed 态差，非契约回归 |
+| ontology/imports-list-after-apply | identity-account-naming | 账号/成员显示名身份差：jknow 剧本身份是若依 admin（nick 若依）+ 共享预建 viewer（graph 族先录、nick Contract Graph Viewer），权威面为源仓 per 族合同账号（Contract Wskb/Wskb Viewer 等）——T2 §8-3 身份差类的落地口径 |
+| workspace-kb/kb-audit | identity-account-naming | 账号/成员显示名身份差：jknow 剧本身份是若依 admin（nick 若依）+ 共享预建 viewer（graph 族先录、nick Contract Graph Viewer），权威面为源仓 per 族合同账号（Contract Wskb/Wskb Viewer 等）——T2 §8-3 身份差类的落地口径 |
+| workspace-kb/kb-members-after-remove | identity-account-naming | 账号/成员显示名身份差：jknow 剧本身份是若依 admin（nick 若依）+ 共享预建 viewer（graph 族先录、nick Contract Graph Viewer），权威面为源仓 per 族合同账号（Contract Wskb/Wskb Viewer 等）——T2 §8-3 身份差类的落地口径 |
+| workspace-kb/kb-members-initial | identity-account-naming | 账号/成员显示名身份差：jknow 剧本身份是若依 admin（nick 若依）+ 共享预建 viewer（graph 族先录、nick Contract Graph Viewer），权威面为源仓 per 族合同账号（Contract Wskb/Wskb Viewer 等）——T2 §8-3 身份差类的落地口径 |
+| workspace-kb/kb-members-two | identity-account-naming | 账号/成员显示名身份差：jknow 剧本身份是若依 admin（nick 若依）+ 共享预建 viewer（graph 族先录、nick Contract Graph Viewer），权威面为源仓 per 族合同账号（Contract Wskb/Wskb Viewer 等）——T2 §8-3 身份差类的落地口径 |
+| workspace-kb/my-kbs | identity-account-naming | 账号/成员显示名身份差：jknow 剧本身份是若依 admin（nick 若依）+ 共享预建 viewer（graph 族先录、nick Contract Graph Viewer），权威面为源仓 per 族合同账号（Contract Wskb/Wskb Viewer 等）——T2 §8-3 身份差类的落地口径 |
+| workspace-kb/ws-members-initial | identity-account-naming | 账号/成员显示名身份差：jknow 剧本身份是若依 admin（nick 若依）+ 共享预建 viewer（graph 族先录、nick Contract Graph Viewer），权威面为源仓 per 族合同账号（Contract Wskb/Wskb Viewer 等）——T2 §8-3 身份差类的落地口径 |
+| workspace-kb/ws-members-two | identity-account-naming | 账号/成员显示名身份差：jknow 剧本身份是若依 admin（nick 若依）+ 共享预建 viewer（graph 族先录、nick Contract Graph Viewer），权威面为源仓 per 族合同账号（Contract Wskb/Wskb Viewer 等）——T2 §8-3 身份差类的落地口径 |
+| workspace-kb/kb-get | role-projection-precedence | my_role 投影优先级差：权威面（源仓）全局 admin 优先投影 admin，jknow 按 kb_members 成员角色投影 owner（建库者语义更精确）——语义投影分歧非回归。 |
+| workspace-kb/workspaces-list-before | env-workspace-set | 组织工作区集环境差：权威面为源仓共享实例残留（Default Workspace+上轮合同工作区），jknow 为 seed 演示工作区（剧本 list 步先于自建工作区）——列表值随环境漂移。 |
+| review/review-summary | time-window-relative | decided.daily 为 14 天滚动窗口锚定录制日（首日=录制日-13）：权威面锚 2026-10-30、jknow 锚 2026-11-10，窗口内计数双侧同形（全 0）——时间相对面非契约差。 |
+| sources-ingest/api-runs | push-chain-evidence-gap | 推送退役下游证据缺口：api 源 0 推送（step-auth-override-dead 连锁）→ runs 空/doc_count 0，权威面 3 行运行史/1 文档为源仓推送时代存照——引擎步级鉴权扩展重录后核销 |
+| sources-ingest/sources-after-delete | push-chain-evidence-gap | 推送退役下游证据缺口：api 源 0 推送（step-auth-override-dead 连锁）→ runs 空/doc_count 0，权威面 3 行运行史/1 文档为源仓推送时代存照——引擎步级鉴权扩展重录后核销 |
 
 （历史：M5 任务 6 挂账清零——pat-ratchet 2 条与 fulltext-store-ownership 1 条均已核销，见下方已核销节。）
 

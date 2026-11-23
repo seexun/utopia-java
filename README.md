@@ -121,6 +121,39 @@ mvn -q test                                            # 全仓 1330 run / 0 fai
 cd jknow-web && pnpm test && pnpm typecheck && pnpm build:prod   # test 418 passed；typecheck 与 build 均零错零告警退出 0
 ```
 
+### golden 契约对表（人工验证面，非 CI 门）
+
+19 族契约剧本对表：`jknow-contract/src/test/resources/golden-rust/`（rust 权威快照面，随仓）
+vs jknow 实录（Recorder 单打现录），Diff 全树比对 + `WAIVERS.md` 挂账单列（P3 复活批基线：
+一致 88 / 失配 0 / 挂账 178 / 单侧存照跳过 91，见 [golden-revival report](docs/superpowers/plans/golden-revival/report.md)）。
+**非 CI 门**：需要常驻后端（27401 演示态）、演示库与 captcha 开关序列，属人工验证面，不在 `mvn test` 自动化内。
+
+```bash
+# 1) 起后端（演示数据态：worker+ES 对账；先 docker compose -f docker-compose.dev.yml up -d；seed 见快速开始）
+JKNOW_PG_PORT=15432 SERVER_PORT=27401 JKNOW_ES_RECONCILE=1 JKNOW_JOBS_WORKER=true \
+  JKNOW_DATA_DIR=$(pwd)/data java -jar jknow-admin/target/jknow-admin.jar   # 或 mvn spring-boot:run -pl jknow-admin
+
+# 2) 录制期临时关 captcha（录完务必复位 true 并实测强制）
+docker compose -f docker-compose.dev.yml exec -T pg psql -U postgres -d jknow -c \
+  "UPDATE sys_config SET config_value='false' WHERE config_key='sys.account.captchaEnabled'"
+docker compose -f docker-compose.dev.yml exec -T redis redis-cli DEL sys_config:sys.account.captchaEnabled
+
+# 3) Recorder 全量实录（19 剧本逐个；sql 步带 UTOPIA_JDBC 连接串；out 目录自定义）
+export UTOPIA_JDBC_URL=jdbc:postgresql://localhost:15432/jknow UTOPIA_DB_USERNAME=postgres UTOPIA_DB_PASSWORD=postgres
+for fam in health auth-login auth alerts search mappings review ontology graph workspace-kb \
+           admin-users chat-misc documents sources-ingest heart-ledger heart-merge heart-errata heart-axioms heart-replay; do
+  mvn -q -pl jknow-contract exec:java -Dexec.mainClass=tech.seexun.jknow.contract.Recorder \
+    -Dexec.args="--target http://localhost:27401 --scenario jknow-contract/src/test/resources/scenarios/$fam.yaml --out target/golden-live" || echo "FAIL $fam"
+done
+
+# 4) 复位 captcha true（同 2) 序列，config_value 换回 'true'）并实测：无验证码 /login 应返回 {"msg":"验证码已失效","code":500}
+
+# 5) 全树对表（rust 权威面 vs 实录；挂账单列不算差异；exit 0=无未归因失配）
+mvn -q -pl jknow-contract exec:java -Dexec.mainClass=tech.seexun.jknow.contract.Diff \
+  -Dexec.args="--left jknow-contract/src/test/resources/golden-rust --right target/golden-live \
+  --waivers jknow-contract/src/test/resources/scenarios/WAIVERS.md"
+```
+
 清卷重建（全新环境从零到闭环）：`docker compose -f docker-compose.dev.yml down -v && docker compose -f docker-compose.dev.yml up -d` → 起后端（Flyway 107 自动建）→ seed → 上述全部闸门照跑（P3 已演练，见 p3-report）。
 
 注：全仓 `mvn -q test` 的测试前提**已自足**（test-infra 批起三测试 fixture 自建 org 根行/General 库链），清卷空库起后端建 schema 后可直接 `mvn test`，无热身 SQL 前置（历史注记：手工热身 SQL 三行见 [p3-report §五-1](docs/superpowers/plans/p3-report.md)）。

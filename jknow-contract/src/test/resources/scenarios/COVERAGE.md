@@ -28,6 +28,12 @@ setup 原样）。本节记录设计性退役与挂账（挂账明细见 WAIVERS
 - **admin 实形改写**：admin-users 剧本身份从「非 admin 合同账号」换 ruoyi admin——403 现状
   步按实录实形改 expect（可读面 200、未实装写端点 500、OIDC 管理面 404）；PAT 五步
   （admin-pat-ratchet）与 admin-ds-create（admin-ds-create-writes）挂账退役。
+- **T3 全量对表（2026-11-23）**：19 族实录（286 样本）全树 Diff，四类账目 = 一致 88 /
+  失配 0 / 挂账 178 / 单侧存照跳过 91——失配清零的处置：health 残面修正（权威面 version
+  0.1.0→1.0.0 随 jknow 产品版本）+ 107 行新挂账（62 权威面缺步 authority-java-side-absent、
+  5 heart 快照骨架、24 预期结构签名、16 环境/身份/投影面，明细见 WAIVERS.md 生效清单 T3 段）。
+  复活结论：非 heart 族与 auth/admin 预期签名之外失配为 0，复活成立；README 验证节增
+  「golden 契约对表」人工验证入口（非 CI 门）。报告：docs/superpowers/plans/golden-revival/report.md。
 - 以下 M0 矩阵为源仓口径存照（参照服务 1516 已不在对表面）；jknow 对表账目以 golden-rust
   快照面与 WAIVERS.md 生效清单为准。
 
