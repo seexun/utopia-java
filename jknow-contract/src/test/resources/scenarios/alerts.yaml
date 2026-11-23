@@ -1,10 +1,13 @@
 # 域：alerts——告警中心四操作 + 已读组标记。
-# 幂等：专属账号 contract-alerts 不自产告警（不建库不摄入），列表/未读数在重录间保持空。
-# 告警流 /alerts/events 是 SSE：无会话 401 用例在 auth 剧本，已认证的流式行为 deferred（见 COVERAGE.md）。
+# P3 golden 复活批（T2）：setup 换 ruoyi_login（若依 admin，Bearer 会话引擎默认注入）；
+# admin 账号本身不产新告警（本剧本不建库不摄入），read-all 把既有未读清零后未读数恒 0。
+# 告警流 /alerts/events 是 SSE：未认证 401 用例在 auth 剧本，已认证的流式行为 deferred（见 COVERAGE.md）。
 name: alerts
-desc: 告警列表/搜索/未读/全部已读/分组已读（contract-alerts@test.local，空告警账号）
+desc: 告警列表/搜索/未读/全部已读/分组已读（ruoyi admin，既有告警只读不新增）
 setup:
-  register: { email: contract-alerts@test.local, password: ContractAlerts!2026, display_name: Contract Alerts }
+  mode: ruoyi_login
+  username: admin
+  password: admin123
 steps:
   - id: alerts-page
     call: GET /api/v1/alerts?limit=10&offset=0

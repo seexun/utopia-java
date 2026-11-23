@@ -1,6 +1,37 @@
 # M0 契约剧本覆盖矩阵（COVERAGE）
 
-- 参照服务：http://127.0.0.1:1516（Rust utopia 0.1.0，开放注册，共享实例）
+## §0 P3 golden 复活批（2026-11-23，T2 剧本适配与退役记录）
+
+jknow 对表形态下（对照面 `golden-rust/` 权威快照 vs jknow 实录，Recorder 单打），22 剧本全部
+适配引擎 `setup.mode: ruoyi_login`（若依 admin/admin123，Bearer 会话引擎默认注入；health 无
+setup 原样）。本节记录设计性退役与挂账（挂账明细见 WAIVERS.md 生效清单六组）：
+
+- **auth 域退役（auth-retired）**：`/api/v1/auth/*` 在 jknow 无路由（P1 源仓设计性退役）。
+  - auth-login：login/me 两步删除（退役定位：T1 报告 §4 + 本节）。
+  - auth：31 步 → 11 步。保留的无会话扫描步按 jknow 实形处置——未认证请求走若依认证入口
+    点返回 **HTTP 200 + {"msg":...,"code":401} 假 200 形**，expect 显式声明 200（若依实形），
+    体形状由 normalized 对表裁决（10 步；source-push-unknown-404 匿名路由真 404 维持原样）。
+    退役 20 步：OIDC 四步（oidc-status/start/callback/exchange）、注册/登录错误分支五步
+    （login-wrong-password/register-duplicate/register-bad-email/register-short-password/
+    register-missing-display-name）、会话段十一步（login/me/me-patch/me-patch-empty-name/
+    password-wrong-current/password-set-temp/password-revert/logout/me-after-logout/
+    oidc-me/oidc-me-unlink）——语义依赖的业务码（409/422/303）与响应形状不可复现，录了
+    只是路由缺失痕迹。OIDC happy 恢复路径同 §4-D5/D6（jknow 域实装后）。
+- **多用户与令牌头挂账（multi-user-single-token / step-auth-override-dead）**：引擎单 token
+  会话模型——bearer 恒占第一个 Authorization 头（服务端 getHeader 取第一个，实录已证），
+  步级 Authorization 覆盖落空。影响：graph/workspace-kb 的 viewer 身份步 7 步、来源/陈述推送
+  与 MCP/PAT 头步（含 heart 五剧本的推送链）26 步挂账退役；第二用户本体由剧本 sql 步预建
+  （contract_viewer，sys_user 固定 utopia_uuid + admin bcrypt 串 + role 2），成员矩阵步以
+  admin 身份保留。规格开放点：引擎增步级会话切换后恢复（任务 2 报告）。
+- **admin 实形改写**：admin-users 剧本身份从「非 admin 合同账号」换 ruoyi admin——403 现状
+  步按实录实形改 expect（可读面 200、未实装写端点 500、OIDC 管理面 404）；PAT 五步
+  （admin-pat-ratchet）与 admin-ds-create（admin-ds-create-writes）挂账退役。
+- 以下 M0 矩阵为源仓口径存照（参照服务 1516 已不在对表面）；jknow 对表账目以 golden-rust
+  快照面与 WAIVERS.md 生效清单为准。
+
+---
+
+- 参照服务：http://127.0.0.1:1516（Rust utopia 0.1.0，开放注册，共享实例）（存照，已退役）
 - 剧本：14 个 YAML（任务 3 的 `health` / `auth-login` + 任务 4 的 12 个域剧本），合计 **331 步**，全部对 1516 录制绿（Recorder exit 0）
 - 黄金样本：`utopia-contract/golden/<剧本>/<步骤>.json`（规范化后：uuid/ts 占位、对象数组排序、浮点 6 位容差、噪声字段掩码）
 - 路由清单来自 `docs/design/m0-plan.md` §前置知识的展开：计划口径为 60 条路由，速记展开为 **58 个端点**

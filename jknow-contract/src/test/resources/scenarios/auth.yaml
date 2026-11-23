@@ -1,115 +1,56 @@
-# 域：auth——注册/登录/登出/改密/me/OIDC 状态族 + 无 cookie 401 扫描段。
-# 幂等：setup.ensure 保证 contract-auth 账号存在（注册或 409 转登录验证），不建会话——
-# 前半段无 cookie 正是 401 用例；login 步骤捕获 set-cookie 后进入有会话段。
-# 改密步骤结尾把口令改回原值，重录轮之间不漂移。
+# 域：auth——无会话 401 扫描段（源仓口径在 jknow 的实形）。
+#
+# P3 golden 复活批（T2）处置（31 步 → 11 步，逐步实录定形，全表见任务 2 报告）：
+#   setup 整段移除（原 ensure 走 /api/v1/auth/register——jknow 无该路由必失败；无 setup 即
+#   全部步未认证，业务码闸（仅 ruoyi_login 剧本启用）不生效，(a) 处置才成立）。
+#   (a) 未认证扫描步 10 步：jknow 未认证请求走若依认证入口点 renderString——HTTP 200 +
+#       {"msg":"请求访问：<path>，认证失败，无法访问系统资源","code":401}（假 200 形）。
+#       expect 显式声明 200（若依实形），体形状由 normalized 对表裁决（T3 Diff）。
+#       保留 me-401：/api/v1/auth/me 路由虽退役，未认证探测仍经认证入口点返回同一假 200 形，
+#       与其余扫描步同口径（auth 墙覆盖已退役路径也是契约事实）。
+#   source-push-unknown-404 不变：sources/{id}/ingest 是匿名放行路由（来源密钥自鉴权），
+#       未知源真 404 {"error":"Not found"}，与 golden 同形。
+#   (b) 退役 20 步（删除 + COVERAGE.md 记退役 + WAIVERS.md 挂账 auth-retired）：
+#       OIDC 四步（oidc-status/start/callback/exchange——/api/v1/auth/oidc/* 无路由）、
+#       注册/登录错误分支五步（login-wrong-password/register-duplicate/bad-email/
+#       short-password/missing-display-name——语义依赖 /api/v1/auth/* 业务码 409/422，
+#       jknow 全部为无路由假 200 形，录了也只是路由缺失痕迹）、
+#       会话段十一步（login/me/me-patch/me-patch-empty-name/password-wrong-current/
+#       password-set-temp/password-revert/logout/me-after-logout/oidc-me/oidc-me-unlink）。
 name: auth
-desc: 无会话 401 扫描→注册/登录错误分支→OIDC 状态族→me/改密/登出（contract-auth@test.local）
-setup:
-  ensure:
-    - { email: contract-auth@test.local, password: ContractAuth!2026, display_name: Contract Auth }
-vars:
-  acct: contract-auth@test.local
-  pw: ContractAuth!2026
+desc: 无会话 401 扫描 11 步（jknow 假 200 实形 expect:200；OIDC/注册登录/会话段退役挂账）
 steps:
-  # ---- 无 cookie 401 扫描（对共享实例的关键路由各打一发未认证请求）----
+  # ---- 无 cookie 401 扫描（jknow 实形：HTTP 200 + {"msg":...,"code":401} 假 200 形）----
   - id: me-401
     call: GET /api/v1/auth/me
-    expect: { status: 401 }
+    expect: { status: 200 }
   - id: alerts-401
     call: GET /api/v1/alerts?limit=5&offset=0
-    expect: { status: 401 }
+    expect: { status: 200 }
   - id: users-401
     call: GET /api/v1/users
-    expect: { status: 401 }
+    expect: { status: 200 }
   - id: workspaces-401
     call: GET /api/v1/workspaces
-    expect: { status: 401 }
+    expect: { status: 200 }
   - id: ontology-packs-401
     call: GET /api/v1/ontology-packs
-    expect: { status: 401 }
+    expect: { status: 200 }
   - id: kb-readiness-401
     call: GET /api/v1/kbs/00000000-0000-0000-0000-000000000000/readiness
-    expect: { status: 401 }
+    expect: { status: 200 }
   - id: kb-search-401
     call: 'POST /api/v1/kbs/00000000-0000-0000-0000-000000000000/search { "q": "x" }'
-    expect: { status: 401 }
+    expect: { status: 200 }
   - id: kb-export-401
     call: GET /api/v1/kbs/00000000-0000-0000-0000-000000000000/export
-    expect: { status: 401 }
+    expect: { status: 200 }
   - id: kb-mcp-401
     call: 'POST /api/v1/kbs/00000000-0000-0000-0000-000000000000/mcp { "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {} }'
-    expect: { status: 401 }
+    expect: { status: 200 }
   - id: source-push-unknown-404
     call: 'POST /api/v1/sources/00000000-0000-0000-0000-000000000000/ingest { "filename": "a.txt", "content": "x" }'
     expect: { status: 404 }
   - id: jobs-noop-401
     call: POST /api/v1/jobs/noop
-    expect: { status: 401 }
-  # ---- OIDC 状态族（未配置 IdP 的现状：status=false / start、callback 303 / exchange 404）----
-  - id: oidc-status
-    call: GET /api/v1/auth/oidc/status
     expect: { status: 200 }
-  - id: oidc-start
-    call: GET /api/v1/auth/oidc/start
-    expect: { status: 303 }
-  - id: oidc-callback
-    call: GET /api/v1/auth/oidc/callback?code=x&state=y
-    expect: { status: 303 }
-  - id: oidc-exchange
-    call: 'POST /api/v1/auth/oidc/exchange { "id_token": "x" }'
-    expect: { status: 404 }
-  # ---- 注册/登录错误分支（账号已由 setup.ensure 建好，409 分支稳定）----
-  - id: login-wrong-password
-    call: 'POST /api/v1/auth/login { "email": "${acct}", "password": "WrongPassword!1" }'
-    expect: { status: 401 }
-  - id: register-duplicate
-    call: 'POST /api/v1/auth/register { "email": "${acct}", "password": "${pw}", "display_name": "Contract Auth" }'
-    expect: { status: 409 }
-  - id: register-bad-email
-    call: 'POST /api/v1/auth/register { "email": "not-an-email", "password": "${pw}", "display_name": "X" }'
-    expect: { status: 422 }
-  - id: register-short-password
-    call: 'POST /api/v1/auth/register { "email": "contract-tmp@test.local", "password": "short", "display_name": "X" }'
-    expect: { status: 422 }
-  - id: register-missing-display-name
-    call: 'POST /api/v1/auth/register { "email": "contract-tmp@test.local", "password": "${pw}" }'
-    expect: { status: 422 }
-  # ---- 会话段：登录→me→改名→改密（改回）→登出→登出后仍有效（JWT 现状）----
-  - id: login
-    call: 'POST /api/v1/auth/login { "email": "${acct}", "password": "${pw}" }'
-    capture:
-      cookie: set-cookie
-    expect: { status: 200 }
-  - id: me
-    call: GET /api/v1/auth/me
-    expect: { status: 200 }
-  - id: me-patch
-    call: 'PATCH /api/v1/auth/me { "display_name": "Contract Auth Renamed" }'
-    expect: { status: 200 }
-  - id: me-patch-empty-name
-    call: 'PATCH /api/v1/auth/me { "display_name": "" }'
-    expect: { status: 422 }
-  - id: password-wrong-current
-    call: 'POST /api/v1/auth/password { "current_password": "NotMyPassword!1", "new_password": "Whatever!2026" }'
-    expect: { status: 422 }
-  - id: password-set-temp
-    call: 'POST /api/v1/auth/password { "current_password": "${pw}", "new_password": "ContractAuthTmp!2026" }'
-    target: rust                # 写路径（改密）：both 模式两服务对同一共享库先后写同一行——
-    expect: { status: 200 }     # Rust 先改成临时口令后，Java 侧再执行时 current_password 已失配必 422，
-                                # 结构性不可双打（m1-recon §5 写路径归 Rust；password-revert 同因）
-  - id: password-revert
-    call: 'POST /api/v1/auth/password { "current_password": "ContractAuthTmp!2026", "new_password": "${pw}" }'
-    target: rust                # 同上（顺序写冲突）
-    expect: { status: 200 }
-  - id: logout
-    call: POST /api/v1/auth/logout
-    expect: { status: 200 }
-  - id: me-after-logout
-    call: GET /api/v1/auth/me
-    expect: { status: 200 }
-  - id: oidc-me
-    call: GET /api/v1/auth/oidc/me
-    expect: { status: 200 }
-  - id: oidc-me-unlink
-    call: DELETE /api/v1/auth/oidc/me
-    expect: { status: 422 }

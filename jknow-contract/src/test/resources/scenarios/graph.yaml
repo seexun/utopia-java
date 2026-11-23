@@ -1,40 +1,56 @@
-# 域：graph——总览/邻域/实体检索/实体详情-改名/历史/证据/证明链/合并守卫/重建 + viewer 只读越权 403。
+# 域：graph——总览/邻域/实体检索/实体详情-改名/历史/证据/证明链/合并守卫/重建 + viewer 成员矩阵。
+# P3 golden 复活批（T2）：setup 换 ruoyi_login（若依 admin，Bearer 会话引擎默认注入）。
 # 幂等：自建专属库 kb-contract-graph，本体两类一谓词在剧本内自建；图恒为空（无模型抽取），
-# 各端点返回空集形状确定。第二用户 contract-graph-viewer 由 setup.ensure 保证。
-# M1 双打定向（任务 3 起）：setup 块引擎整体视为 rust；建工作区/库/本体两类一谓词/成员增删/
-# 重建等一切写路径步 target: rust（写路径归 Rust 至 M2，m1-recon §5）——读步（视图族/检索/
-# 详情 404/邻域空形状）缺省 both 双打。login 步沿 auth 剧本先例保持 both（两侧各写各的审计行、
-# token 掩码，user 形状一致）。实体详情族/证明链族的未实现读步挂 WAIVERS.md（见各步）。
+# 各端点返回空集形状确定。第二用户走 SQL 步预建（sys_user 固定 utopia_uuid + 复用 admin 的
+# bcrypt 串 + sys_user_role 绑 role 2）——viewer-* 身份步（hidden-404/overview-ok/write-403/
+# rebuild-403）因引擎单 token 模型不可达（服务端取第一个 Authorization 头=setup token，步级
+# Authorization 追加为第二头永远落空，实录已证），按简报预案走 WAIVERS.md 挂账
+# （multi-user-single-token，规格开放点见任务 2 报告）；成员矩阵两步以 admin 身份保留
+# （PUT/DELETE members/${viewer_id}，viewer_id 由 SQL 捕获）。
+# 原 /api/v1/auth/login|me 会话步（viewer-login/viewer-me/owner-login-back/viewer-login-again/
+# owner-login-final）随源仓 auth 域退役（jknow 无路由），不再出现在剧本里。
 name: graph
-desc: 图谱视图族+实体端点族+证明链+重建 + viewer 403/不可见 404（自建 kb-contract-graph）
+desc: 图谱视图族+实体端点族+证明链+重建 + 成员矩阵（自建 kb-contract-graph；viewer 预建不登录）
 setup:
-  register: { email: contract-graph@test.local, password: ContractGraph!2026, display_name: Contract Graph }
-  ensure:
-    - { email: contract-graph-viewer@test.local, password: ContractGraphView!2026, display_name: Contract Graph Viewer }
-vars:
-  owner: contract-graph@test.local
-  owner_pw: ContractGraph!2026
-  viewer: contract-graph-viewer@test.local
-  viewer_pw: ContractGraphView!2026
+  mode: ruoyi_login
+  username: admin
+  password: admin123
 steps:
   - id: ws-create
     call: 'POST /api/v1/workspaces { "name": "ws-contract-graph" }'
-    target: rust                # 写路径：建工作区（后续读步的图住它名下）
     capture: { ws_id: body.id }
     expect: { status: 200 }
   - id: kb-create
     call: 'POST /api/v1/workspaces/${ws_id}/kbs { "name": "kb-contract-graph", "description": "graph scenario" }'
-    target: rust                # 写路径：建库（缺省 visibility=open；creator 记 kb_members admin）
     capture: { kb_id: body.id }
     expect: { status: 200 }
+  # 第二用户预建（SQL 装置，与侧无关、幂等）：固定 utopia_uuid 的 contract_viewer（口令串
+  # 复用 admin 的 bcrypt 原文——同口令 admin123；绑普通角色 role 2；dept 103=迁移种子研发部）。
+  # 之所以只建不登：引擎单 token 模型不支持第二身份（见文件头注记与 WAIVERS.md）。
+  # 捕获 viewer_id（=固定 utopia_uuid）供成员矩阵两步引用。
+  - id: viewer-provision
+    sql:
+      statements:
+        - |
+          INSERT INTO sys_user (user_name, nick_name, password, status, del_flag, dept_id, utopia_uuid)
+          VALUES ('contract_viewer', 'Contract Viewer',
+                  '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '0', '0', 103,
+                  '0190d3e0-0000-7d5a-8000-00000000cafe')
+          ON CONFLICT (utopia_uuid) DO NOTHING
+        - |
+          INSERT INTO sys_user_role (user_id, role_id)
+          SELECT user_id, 2 FROM sys_user WHERE utopia_uuid = '0190d3e0-0000-7d5a-8000-00000000cafe'
+          ON CONFLICT DO NOTHING
+        - |
+          SELECT utopia_uuid AS viewer_id FROM sys_user
+           WHERE utopia_uuid = '0190d3e0-0000-7d5a-8000-00000000cafe'
+      capture: { viewer_id: viewer_id }
   - id: entity-type-create
     call: 'POST /api/v1/kbs/${kb_id}/ontology/entity-types { "key": "company", "label": "Company" }'
-    target: rust                # 写路径：本体（写路径归 Rust 至 M2）
     capture: { et_id: body.id }
     expect: { status: 200 }
   - id: relation-type-create
     call: 'POST /api/v1/kbs/${kb_id}/ontology/relation-types { "key": "employs", "label": "Employs", "kind": "relation" }'
-    target: rust                # 写路径：本体谓词
     expect: { status: 200 }
   # ---- 视图族（空图现状）----
   - id: graph-overview
@@ -53,80 +69,39 @@ steps:
   - id: entity-detail-404
     call: GET /api/v1/kbs/${kb_id}/entities/00000000-0000-0000-0000-000000000000
     expect: { status: 404 }
-    # Java 未配该路由 → 404 {"error":"Not found"} 与 Rust require 后的 NotFound 同形（both 直接双打一致）
+    # jknow 404 {"error":"Not found"} 与 golden（参照 require 后 NotFound）同形（T1 spike 已对表一致）
   - id: entity-patch-404
     call: 'PATCH /api/v1/kbs/${kb_id}/entities/00000000-0000-0000-0000-000000000000 { "canonical_name": "x" }'
-    target: rust                # 写路径端点（update_entity，M2）；404 于写前——定向不打 Java
     expect: { status: 404 }
   - id: entity-history-unknown
     call: GET /api/v1/kbs/${kb_id}/entities/00000000-0000-0000-0000-000000000000/history?page=0&per=10
-    expect: { status: 200 }     # 任务 6 已实现（entity_history，graph_routes.rs:463-483）
+    expect: { status: 200 }
   - id: fact-evidence-unknown
     call: GET /api/v1/kbs/${kb_id}/facts/00000000-0000-0000-0000-000000000000/evidence
-    expect: { status: 200 }     # 任务 3 实现（graph_routes.rs:451-459，SQL graph.rs:2163-2181）
+    expect: { status: 200 }
   - id: derived-proof-unknown
     call: GET /api/v1/kbs/${kb_id}/derived/00000000-0000-0000-0000-000000000000/proof
-    expect: { status: 200 }     # 任务 6 已实现（derived proof，graph_routes.rs:559-571）
+    expect: { status: 200 }
   - id: blocked-proof-unknown
     call: GET /api/v1/kbs/${kb_id}/violations/00000000-0000-0000-0000-000000000000/proof
-    expect: { status: 200 }     # 任务 6 已实现（blocked proof）
+    expect: { status: 200 }
   - id: merge-distinct-unknown-404
     call: 'POST /api/v1/kbs/${kb_id}/entities/merge { "source": "00000000-0000-0000-0000-000000000000", "target": "00000000-0000-0000-0000-000000000001" }'
-    target: rust                # 写路径端点（合并守卫，M2）
     expect: { status: 404 }
   - id: graph-rebuild
     call: POST /api/v1/kbs/${kb_id}/graph/rebuild
-    target: rust                # 写路径（清算+重排队列；viewer-rebuild-403 同族）
     expect: { status: 200 }
-  # ---- viewer：不可见 404（未加成员）→ 加为 viewer → 读 200/写 403 ----
-  - id: viewer-login
-    call: 'POST /api/v1/auth/login { "email": "${viewer}", "password": "${viewer_pw}" }'
-    capture:
-      cookie: set-cookie
-    expect: { status: 200 }
-  - id: viewer-me
-    call: GET /api/v1/auth/me
-    capture: { viewer_id: body.id }
-    expect: { status: 200 }
-  - id: viewer-kb-hidden-404
-    call: GET /api/v1/kbs/${kb_id}/graph/overview
-    expect: { status: 404 }
-  - id: owner-login-back
-    call: 'POST /api/v1/auth/login { "email": "${owner}", "password": "${owner_pw}" }'
-    capture:
-      cookie: set-cookie
-    expect: { status: 200 }
+  # ---- viewer 成员矩阵（viewer 身份步已挂账豁免——见文件头）----
+  # 原 viewer-kb-hidden-404 / viewer-overview-ok / viewer-entity-type-write-403 / viewer-rebuild-403
+  # 四步走 WAIVERS.md（multi-user-single-token）；kb-member-add/remove 以 admin 身份保留：
+  # 成员矩阵读面与写闭环仍是确定形状（jknow members 投影 {user_id,email,display_name,role}）。
   - id: kb-member-add-viewer
     call: 'PUT /api/v1/kbs/${kb_id}/members/${viewer_id} { "role": "viewer" }'
-    target: rust                # 写路径：成员矩阵（加 viewer——viewer-overview-ok 的前置）
-    expect: { status: 200 }
-  - id: viewer-login-again
-    call: 'POST /api/v1/auth/login { "email": "${viewer}", "password": "${viewer_pw}" }'
-    capture:
-      cookie: set-cookie
-    expect: { status: 200 }
-  - id: viewer-overview-ok
-    call: GET /api/v1/kbs/${kb_id}/graph/overview
-    expect: { status: 200 }
-  - id: viewer-entity-type-write-403
-    call: 'POST /api/v1/kbs/${kb_id}/ontology/entity-types { "key": "viewer-type", "label": "Viewer Type" }'
-    target: rust                # 写路径端点（本体写，viewer 403 判定随写面归 Rust）
-    expect: { status: 403 }
-  - id: viewer-rebuild-403
-    call: POST /api/v1/kbs/${kb_id}/graph/rebuild
-    target: rust                # 写路径（同 graph-rebuild）
-    expect: { status: 403 }
-  # ---- 收尾（owner 会话）----
-  - id: owner-login-final
-    call: 'POST /api/v1/auth/login { "email": "${owner}", "password": "${owner_pw}" }'
-    capture:
-      cookie: set-cookie
     expect: { status: 200 }
   - id: kb-member-remove
     call: DELETE /api/v1/kbs/${kb_id}/members/${viewer_id}
-    target: rust                # 写路径：成员矩阵（收尾还原）
     expect: { status: 200 }
+  # ---- 收尾 ----
   - id: ws-delete
     call: DELETE /api/v1/workspaces/${ws_id}
-    target: rust                # 写路径：删工作区收口（幂等闭环）
     expect: { status: 200 }

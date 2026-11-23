@@ -1,13 +1,15 @@
 # 域：documents——上传（multipart）/列表筛选/详情/版本/内容/抽取排队/重试/删除-恢复-真删全生命周期 + 库内 jobs 面。
-# 幂等：自建专属库 kb-contract-docs（每轮新建，重录不依赖历史）；同内容重复上传走 skipped 分支（确定性）。
-# M2 任务 3：文档域写步转 target:java（D9 消除——上传也写 document_versions 版本 1 + 同事务入队，
-# Java 与参照实例共享同一库与 data_dir：读步两侧看到的台账/原文一致，doc-content 由 M1 的 500
-# 现状转 200——d9-upload-no-version-ledger 挂账随之核销，见 WAIVERS.md）；工作区/库/jobs 域
-# 写步仍归 rust（各自里程碑）；取最小合法文档（59 字节文本）；抽取走 /extract 的排队回执断言。
+# P3 golden 复活批（T2）：setup 换 ruoyi_login（若依 admin，Bearer 会话引擎默认注入）。
+# 幂等：自建专属库 kb-contract-docs（每轮新建，重录不依赖历史）；同内容重复上传走 skipped 分支（确定性）；
+# 取最小合法文档（59 字节文本）；抽取走 /extract 的排队回执断言。
+# jobs-requeue-all-forbidden：admin 身份下全局 requeue 是真写（全实例 job 重排队）——写态
+# 与 golden 对表由 T3 裁决，录前实测返回形状见任务 2 报告。
 name: documents
-desc: 上传(D9消除)/筛选/版本/内容200/抽取排队/墓碑-恢复-真删 + 库内 jobs（自建 kb-contract-docs）
+desc: 上传/筛选/版本/内容200/抽取排队/墓碑-恢复-真删 + 库内 jobs（自建 kb-contract-docs）
 setup:
-  register: { email: contract-docs@test.local, password: ContractDocs!2026, display_name: Contract Docs }
+  mode: ruoyi_login
+  username: admin
+  password: admin123
 vars:
   note: 'Alice works at Acme Corp since 2020. Bob joined Beta Ltd in 2021.'
 steps:
@@ -96,10 +98,9 @@ steps:
     call: 'POST /api/v1/kbs/${kb2_id}/jobs/requeue {}'
     expect: { status: 200 }
     target: rust
-  - id: jobs-requeue-all-forbidden
-    call: 'POST /api/v1/jobs/requeue {}'
-    expect: { status: 403 }
-    target: rust
+  # 原 jobs-requeue-all-forbidden（全局 requeue 403）挂账退役（admin-requeue-all-writes）：
+  # admin 身份下是真写（探针实录 200 {"requeued":47}——全实例 job 重排队，无对应可清理语义），
+  # 403 语义随 admin 失效；WAIVERS.md 见任务 2 报告。
   - id: jobs-nonexistent-404
     call: GET /api/v1/kbs/${kb2_id}/jobs/999999
     expect: { status: 404 }

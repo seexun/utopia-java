@@ -1,26 +1,26 @@
-# 域：sources-ingest——库内来源 CRUD（folder/api/statements）+ api 推送（Bearer 来源密钥，无会话）
-# + 陈述契约推送 + 库内 JSON 摄入 + 同步/重抽/运行历史/密钥轮换/缺文件清理。
-# 幂等：自建专属库 kb-contract-src；同一 external_id 推送的 created/unchanged/updated 三分支在一次剧本内走完，
-# 重录轮换出的新密钥即时捕获使用，不依赖历史值。
-# M2 任务 4：来源域写步全数转 target:java（SourcesController/ApiPushController 落地，
-# 同任务 3 documents 模式）；工作区/库写步仍归 rust（各自里程碑）。M1 的 6 条读族挂账
-# （sources-read-family-m1-deferred）随本域读面实现核销（WAIVERS.md 已核销节）——
-# 列表/密钥/运行历史读步恢复双打常规比对。
+# 域：sources-ingest——库内来源 CRUD（folder/api/statements）+ 库内 JSON 摄入 + 同步/重抽/运行历史/密钥轮换/缺文件清理。
+# P3 golden 复活批（T2）：setup 换 ruoyi_login（若依 admin，Bearer 会话引擎默认注入）。
+# 推送族九步退役（WAIVERS.md 挂账 step-auth-override-dead，见任务 2 报告）：
+# push-created/unchanged/updated/stale-401/bogus-401 + statements-push-created/unchanged/
+# unknown-key/wrong-kind-404——推送端点以 Authorization 头里的来源密钥鉴权
+# （getHeader 取第一个头），引擎 bearer 会话恒占第一个头、步级 Authorization 追加为第二头
+# 永远落空（实录已证 401）；引擎增步级鉴权覆盖（或推送端点收非 Authorization 通道）后恢复。
+# 幂等：自建专属库 kb-contract-src，密钥轮换即时捕获使用，不依赖历史值；收尾删工作区级联收口。
 name: sources-ingest
-desc: 来源 CRUD+api 推送三分支+陈述契约推送+kb ingest+sync/runs/轮换（自建 kb-contract-src）
+desc: 来源 CRUD+密钥面+kb ingest+sync/runs/轮换/清理（自建 kb-contract-src；推送族挂账退役）
 setup:
-  register: { email: contract-src@test.local, password: ContractSrc!2026, display_name: Contract Src }
+  mode: ruoyi_login
+  username: admin
+  password: admin123
 steps:
   - id: ws-create
     call: 'POST /api/v1/workspaces { "name": "ws-contract-src" }'
     capture: { ws_id: body.id }
     expect: { status: 200 }
-    target: rust
   - id: kb-create
     call: 'POST /api/v1/workspaces/${ws_id}/kbs { "name": "kb-contract-src", "description": "sources scenario" }'
     capture: { kb_id: body.id }
     expect: { status: 200 }
-    target: rust
   - id: sources-empty
     call: GET /api/v1/kbs/${kb_id}/sources
     expect: { status: 200 }
@@ -28,21 +28,18 @@ steps:
     call: 'POST /api/v1/kbs/${kb_id}/sources { "kind": "folder", "name": "src-contract-folder" }'
     capture: { folder_id: body.source.id }
     expect: { status: 200 }
-    target: java
   - id: api-create
     call: 'POST /api/v1/kbs/${kb_id}/sources { "kind": "api", "name": "src-contract-api" }'
     capture:
       api_id: body.source.id
       api_token0: body.ingest_token
     expect: { status: 200 }
-    target: java
   - id: statements-create
     call: 'POST /api/v1/kbs/${kb_id}/sources { "kind": "statements", "name": "src-contract-statements" }'
     capture:
       stmt_id: body.source.id
       stmt_token: body.ingest_token
     expect: { status: 200 }
-    target: java
   - id: sources-list-three
     call: GET /api/v1/kbs/${kb_id}/sources
     expect: { status: 200 }
@@ -57,95 +54,38 @@ steps:
     call: POST /api/v1/kbs/${kb_id}/sources/${api_id}/rotate-token
     capture: { api_token: body.ingest_token }
     expect: { status: 200 }
-    target: java
-  # ---- api 推送（Bearer 来源密钥；无会话路径）：三分支 ----
-  - id: push-created
-    call: 'POST /api/v1/sources/${api_id}/ingest { "filename": "push-a.txt", "content": "Cara joined Gamma Inc in 2021." }'
-    headers: { Authorization: 'Bearer ${api_token}' }
-    expect: { status: 200 }
-    target: java
-  - id: push-unchanged
-    call: 'POST /api/v1/sources/${api_id}/ingest { "filename": "push-a.txt", "content": "Cara joined Gamma Inc in 2021." }'
-    headers: { Authorization: 'Bearer ${api_token}' }
-    expect: { status: 200 }
-    target: java
-  - id: push-updated
-    call: 'POST /api/v1/sources/${api_id}/ingest { "filename": "push-a.txt", "content": "Cara left Gamma Inc in 2022." }'
-    headers: { Authorization: 'Bearer ${api_token}' }
-    expect: { status: 200 }
-    target: java
-  - id: push-stale-token-401
-    call: 'POST /api/v1/sources/${api_id}/ingest { "filename": "push-b.txt", "content": "x" }'
-    headers: { Authorization: 'Bearer ${api_token0}' }
-    expect: { status: 401 }
-    target: java
-  - id: push-bogus-token-401
-    call: 'POST /api/v1/sources/${api_id}/ingest { "filename": "push-c.txt", "content": "x" }'
-    headers: { Authorization: 'Bearer utp_bogus' }
-    expect: { status: 401 }
-    target: java
-  # ---- 陈述契约推送（e/s/n 八槽契约；信封之外的键拒收）----
-  - id: statements-push-created
-    call: 'POST /api/v1/sources/${stmt_id}/statements { "external_id": "s1", "e": [["Cara", "person", null]], "s": [[null, "Cara", "works_at", "Gamma", null, null, "2021", null]], "n": [] }'
-    headers: { Authorization: 'Bearer ${stmt_token}' }
-    expect: { status: 200 }
-    target: java
-  - id: statements-push-unchanged
-    call: 'POST /api/v1/sources/${stmt_id}/statements { "external_id": "s1", "e": [["Cara", "person", null]], "s": [[null, "Cara", "works_at", "Gamma", null, null, "2021", null]], "n": [] }'
-    headers: { Authorization: 'Bearer ${stmt_token}' }
-    expect: { status: 200 }
-    target: java
-  - id: statements-push-unknown-key
-    call: 'POST /api/v1/sources/${stmt_id}/statements { "external_id": "s2", "bogus": 1, "e": [], "s": [[null, "Eve", "works_at", "Acme", null, null, "2020", null]], "n": [] }'
-    headers: { Authorization: 'Bearer ${stmt_token}' }
-    expect: { status: 422 }
-    target: java
-  - id: statements-wrong-kind-404
-    call: 'POST /api/v1/sources/${api_id}/statements { "external_id": "s3", "e": [], "s": [[null, "Eve", "works_at", "Acme", null, null, "2020", null]], "n": [] }'
-    headers: { Authorization: 'Bearer ${api_token}' }
-    expect: { status: 404 }
-    target: java
-  # ---- 库内 JSON 摄入 ----
+  # ---- 库内 JSON 摄入（用户会话路径，bearer 正常携带）----
   - id: kb-ingest-created
     call: 'POST /api/v1/kbs/${kb_id}/ingest { "filename": "ingest-a.txt", "content": "Dan left Delta Corp in 2019." }'
     expect: { status: 200 }
-    target: java
   - id: kb-ingest-unchanged
     call: 'POST /api/v1/kbs/${kb_id}/ingest { "filename": "ingest-a.txt", "content": "Dan left Delta Corp in 2019." }'
     expect: { status: 200 }
-    target: java
   - id: kb-ingest-empty-filename
     call: 'POST /api/v1/kbs/${kb_id}/ingest { "filename": "", "content": "x" }'
     expect: { status: 422 }
-    target: java
   # ---- 同步/重抽/运行历史/改名/删除 ----
   - id: folder-sync
     call: POST /api/v1/kbs/${kb_id}/sources/${folder_id}/sync
     expect: { status: 200 }
-    target: java
   - id: api-runs
     call: GET /api/v1/kbs/${kb_id}/sources/${api_id}/runs
     expect: { status: 200 }
   - id: folder-patch
     call: 'PATCH /api/v1/kbs/${kb_id}/sources/${folder_id} { "name": "src-contract-folder-renamed" }'
     expect: { status: 200 }
-    target: java
   - id: folder-re-extract
     call: POST /api/v1/kbs/${kb_id}/sources/${folder_id}/re-extract
     expect: { status: 200 }
-    target: java
   - id: missing-cleanup
     call: POST /api/v1/kbs/${kb_id}/sources/${folder_id}/missing/cleanup
     expect: { status: 200 }
-    target: java
   - id: folder-delete
     call: DELETE /api/v1/kbs/${kb_id}/sources/${folder_id}
     expect: { status: 200 }
-    target: java
   - id: folder-delete-again-404
     call: DELETE /api/v1/kbs/${kb_id}/sources/${folder_id}
     expect: { status: 404 }
-    target: java
   - id: sources-after-delete
     call: GET /api/v1/kbs/${kb_id}/sources
     expect: { status: 200 }
@@ -153,4 +93,3 @@ steps:
   - id: ws-delete
     call: DELETE /api/v1/workspaces/${ws_id}
     expect: { status: 200 }
-    target: rust

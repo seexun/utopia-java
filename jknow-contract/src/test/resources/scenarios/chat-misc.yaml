@@ -1,42 +1,30 @@
-# 域：chat-misc——SSE 未认证 401 段 + 对话（建会话级结构断言：无 chat 模型 → 422 no_chat_model 是合法黄金）
-# + 会话列表/改名/详情/删除/停止的形状 + MCP（Bearer PAT 的 JSON-RPC 三发）+ jobs/noop。
-# setup 只有 ensure：开局无会话，先打 SSE 端点的未认证 401（认证后的流式行为 deferred，见 COVERAGE.md），
-# 再 login 建会话。幂等：自建 ws-contract-chat / kb-contract-chat，PAT 现发现撤。
+# 域：chat-misc——对话（建会话级结构断言：无 chat 模型 → 422 no_chat_model 是合法黄金）
+# + 会话列表/改名/详情/删除/停止的形状 + jobs/noop。
+# P3 golden 复活批（T2）：setup 换 ruoyi_login（若依 admin，Bearer 会话引擎默认注入）。
+# 三段退役（WAIVERS.md 挂账，见任务 2 报告）：
+#   ①SSE 未认证 401 三步（kb-events/alerts-events/conversation-stream）——引擎无「去会话」机制，
+#     bearer 会话下打 SSE 端点会挂流到超时（认证后的流 deferred 原口径不变）；
+#   ②MCP JSON-RPC 三发 + PAT 现发/撤五步——步级 Authorization 永远是第二个头（服务端取第一个
+#     =setup token，实录已证 401），PAT 路径步级覆盖不可达；且 PAT 现发会往 admin 的
+#     personal_tokens 棘轮加行（打戳不删行），按 admin-pat-ratchet 同口径豁免；
+#   ③原首步 login（/api/v1/auth/login）随源仓 auth 域退役（jknow 无路由）。
+# 幂等：自建 ws-contract-chat / kb-contract-chat，收尾删除工作区级联收口。
 name: chat-misc
-desc: SSE 401 段+chat 422 现状+会话 CRUD 形状+MCP JSON-RPC+noop（contract-chat@test.local）
+desc: chat 422 现状+会话 CRUD 形状+noop（ruoyi admin；SSE/MCP/PAT 段挂账退役）
 setup:
-  ensure:
-    - { email: contract-chat@test.local, password: ContractChat!2026, display_name: Contract Chat }
-vars:
-  acct: contract-chat@test.local
-  pw: ContractChat!2026
+  mode: ruoyi_login
+  username: admin
+  password: admin123
 steps:
-  # ---- SSE 端点未认证形状（认证后的流 deferred）----
-  - id: kb-events-401
-    call: GET /api/v1/kbs/00000000-0000-0000-0000-000000000000/events
-    expect: { status: 401 }
-  - id: alerts-events-401
-    call: GET /api/v1/alerts/events
-    expect: { status: 401 }
-  - id: conversation-stream-401
-    call: GET /api/v1/kbs/00000000-0000-0000-0000-000000000000/conversations/00000000-0000-0000-0000-000000000000/stream
-    expect: { status: 401 }
-  # ---- 建会话级：登录→自建库→chat（无模型 422 是现状黄金）→会话面 ----
-  - id: login
-    call: 'POST /api/v1/auth/login { "email": "${acct}", "password": "${pw}" }'
-    capture:
-      cookie: set-cookie
-    expect: { status: 200 }
+  # ---- 建库 → chat（无模型 422 是现状黄金）→ 会话面 ----
   - id: ws-create
     call: 'POST /api/v1/workspaces { "name": "ws-contract-chat" }'
     capture: { ws_id: body.id }
     expect: { status: 200 }
-    target: rust
   - id: kb-create
     call: 'POST /api/v1/workspaces/${ws_id}/kbs { "name": "kb-contract-chat", "description": "chat scenario" }'
     capture: { kb_id: body.id }
     expect: { status: 200 }
-    target: rust
   - id: chat-no-model-422
     call: 'POST /api/v1/kbs/${kb_id}/chat { "message": "Which companies are mentioned?" }'
     expect: { status: 422 }
@@ -52,49 +40,17 @@ steps:
   - id: conversation-rename-unknown-404
     call: 'PATCH /api/v1/kbs/${kb_id}/conversations/00000000-0000-0000-0000-000000000000 { "title": "renamed" }'
     expect: { status: 404 }
-    target: java
   - id: conversation-delete-unknown-404
     call: DELETE /api/v1/kbs/${kb_id}/conversations/00000000-0000-0000-0000-000000000000
     expect: { status: 404 }
-    target: java
   - id: chat-stop-unknown-404
     call: 'POST /api/v1/kbs/${kb_id}/chat/00000000-0000-0000-0000-000000000000/stop { "generation_id": "00000000-0000-0000-0000-000000000000" }'
     expect: { status: 404 }
-    target: java
-  # ---- MCP：PAT 现发→JSON-RPC initialize/tools-list/坏方法→撤钥匙 ----
-  - id: pat-issue
-    call: 'POST /api/v1/me/tokens { "name": "contract-chat-mcp", "scope": "read", "expires_in_days": 1 }'
-    capture:
-      pat: body.token
-      pat_id: body.info.id
-    expect: { status: 200 }
-    target: rust
-  - id: mcp-initialize
-    call: 'POST /api/v1/kbs/${kb_id}/mcp { "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {} }'
-    headers: { Authorization: 'Bearer ${pat}' }
-    expect: { status: 200 }
-    target: rust
-  - id: mcp-tools-list
-    call: 'POST /api/v1/kbs/${kb_id}/mcp { "jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {} }'
-    headers: { Authorization: 'Bearer ${pat}' }
-    expect: { status: 200 }
-    target: rust
-  - id: mcp-unknown-method
-    call: 'POST /api/v1/kbs/${kb_id}/mcp { "jsonrpc": "2.0", "id": 3, "method": "contract/no-such-method", "params": {} }'
-    headers: { Authorization: 'Bearer ${pat}' }
-    expect: { status: 200 }
-    target: rust
-  - id: pat-revoke
-    call: DELETE /api/v1/me/tokens/${pat_id}
-    expect: { status: 200 }
-    target: rust
   # ---- 杂项：noop 入队（P0 队列验证端点）----
   - id: jobs-noop
     call: POST /api/v1/jobs/noop
     expect: { status: 200 }
-    target: rust
   # ---- 收尾 ----
   - id: ws-delete
     call: DELETE /api/v1/workspaces/${ws_id}
     expect: { status: 200 }
-    target: rust

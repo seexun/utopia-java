@@ -1,15 +1,13 @@
-# 域：search——库内检索（M1 任务 6：Java 侧 ES+IK 等价实现，语义等价集评审）。
-# M5 任务 6 重定位（fulltext-store-ownership 挂账核销）：两实现各持私有全文存储——
-# Rust 检索走进程内 Tantivy，Java 检索走共享 ES utopia-kb-{id}（M1 架构）。ingest 步
-# 与 search-known-term 步均 target:java 单侧验证：java 轮（Java worker 持写路径）
-# ES 索引自持建成、search 真命中（见 golden-java/search/search-known-term.json 的
-# 命中样本）；缺省双打轮 Java worker 关（共享 job 由 Rust 消费进 Tantivy 不进 ES），
-# 该步在 Java 侧为空集样本——单侧步不参与双打比对（语义等价的双空集步
-# search-no-match 仍正常比对）。无嵌入模型=纯 BM25 现状。
+# 域：search——库内检索（源仓 M1 任务 6：Java 侧 ES+IK 等价实现）。
+# P3 golden 复活批（T2）：setup 换 ruoyi_login（若依 admin，Bearer 会话引擎默认注入）；
+# 单打录制下 ingest/search 步按普通步执行（worker 在服务端消费 job，wait 步静默兜底）。
+# 无嵌入模型=纯 BM25 现状。
 name: search
 desc: POST search 命中/no-match/缺 q 422/未知库 404 + 实体检索空集（自建 kb-contract-search）
 setup:
-  register: { email: contract-search@test.local, password: ContractSearch!2026, display_name: Contract Search }
+  mode: ruoyi_login
+  username: admin
+  password: admin123
 steps:
   - id: ws-create
     call: 'POST /api/v1/workspaces { "name": "ws-contract-search" }'

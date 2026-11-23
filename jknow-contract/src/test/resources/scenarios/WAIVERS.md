@@ -1,17 +1,97 @@
-# 挂账清单（WAIVERS）
-
-> waiver 语义：命中的步骤在 Diff（`--dual` 双打比对 / `--left --right` 自比对）与 Replayer 中
-> **跳过比对并单列报告（[WAIVE]）——不算差异也不算通过**，显式挂账。
-> 键写法等价形都可（`admin-users/tokens-list` / `admin-users/tokens-list.json` /
-> `golden/admin-users/tokens-list.json`），装载器统一归一化。
-> 临时挂账可不走本清单：`--waive <键>#<原因码>` 可重复参数（与 `--waivers` 本清单叠加，命令行优先）。
-> 每条挂账必须有原因码与说明；核销（转回正常双打）时删行并在当期任务报告记录。
-
 ## 生效清单
+
+P3 golden 复活批 T2（2026-11-23）新增六组挂账——全部是「jknow 实录实测逐步定形」的产物，
+键为 golden 权威面（golden-rust）侧遗留步（剧本已删步，Diff 时按「仅左侧存在」命中）；
+装载器按键单行装载（Waivers.load 一行一键），同组多行共用原因码。
 
 | 步骤 | 原因码 | 说明 |
 |---|---|---|
-| （无——M5 任务 6 挂账清零：pat-ratchet 2 条与 fulltext-store-ownership 1 条均已核销，见下方已核销节） | | |
+| auth-login/login | auth-retired | /api/v1/auth/* 域 jknow 设计性退役（P1 源仓口径），路由不存在语义不可录；未认证探测的假 200 实形由 auth.yaml 保留扫描步承载。恢复路径=引擎/业务域实装后核销。 |
+| auth-login/me | auth-retired | /api/v1/auth/* 域 jknow 设计性退役（P1 源仓口径），路由不存在语义不可录；未认证探测的假 200 实形由 auth.yaml 保留扫描步承载。恢复路径=引擎/业务域实装后核销。 |
+| auth/oidc-status | auth-retired | /api/v1/auth/* 域 jknow 设计性退役（P1 源仓口径），路由不存在语义不可录；未认证探测的假 200 实形由 auth.yaml 保留扫描步承载。恢复路径=引擎/业务域实装后核销。 |
+| auth/oidc-start | auth-retired | /api/v1/auth/* 域 jknow 设计性退役（P1 源仓口径），路由不存在语义不可录；未认证探测的假 200 实形由 auth.yaml 保留扫描步承载。恢复路径=引擎/业务域实装后核销。 |
+| auth/oidc-callback | auth-retired | /api/v1/auth/* 域 jknow 设计性退役（P1 源仓口径），路由不存在语义不可录；未认证探测的假 200 实形由 auth.yaml 保留扫描步承载。恢复路径=引擎/业务域实装后核销。 |
+| auth/oidc-exchange | auth-retired | /api/v1/auth/* 域 jknow 设计性退役（P1 源仓口径），路由不存在语义不可录；未认证探测的假 200 实形由 auth.yaml 保留扫描步承载。恢复路径=引擎/业务域实装后核销。 |
+| auth/login-wrong-password | auth-retired | /api/v1/auth/* 域 jknow 设计性退役（P1 源仓口径），路由不存在语义不可录；未认证探测的假 200 实形由 auth.yaml 保留扫描步承载。恢复路径=引擎/业务域实装后核销。 |
+| auth/register-duplicate | auth-retired | /api/v1/auth/* 域 jknow 设计性退役（P1 源仓口径），路由不存在语义不可录；未认证探测的假 200 实形由 auth.yaml 保留扫描步承载。恢复路径=引擎/业务域实装后核销。 |
+| auth/register-bad-email | auth-retired | /api/v1/auth/* 域 jknow 设计性退役（P1 源仓口径），路由不存在语义不可录；未认证探测的假 200 实形由 auth.yaml 保留扫描步承载。恢复路径=引擎/业务域实装后核销。 |
+| auth/register-short-password | auth-retired | /api/v1/auth/* 域 jknow 设计性退役（P1 源仓口径），路由不存在语义不可录；未认证探测的假 200 实形由 auth.yaml 保留扫描步承载。恢复路径=引擎/业务域实装后核销。 |
+| auth/register-missing-display-name | auth-retired | /api/v1/auth/* 域 jknow 设计性退役（P1 源仓口径），路由不存在语义不可录；未认证探测的假 200 实形由 auth.yaml 保留扫描步承载。恢复路径=引擎/业务域实装后核销。 |
+| auth/login | auth-retired | /api/v1/auth/* 域 jknow 设计性退役（P1 源仓口径），路由不存在语义不可录；未认证探测的假 200 实形由 auth.yaml 保留扫描步承载。恢复路径=引擎/业务域实装后核销。 |
+| auth/me | auth-retired | /api/v1/auth/* 域 jknow 设计性退役（P1 源仓口径），路由不存在语义不可录；未认证探测的假 200 实形由 auth.yaml 保留扫描步承载。恢复路径=引擎/业务域实装后核销。 |
+| auth/me-patch | auth-retired | /api/v1/auth/* 域 jknow 设计性退役（P1 源仓口径），路由不存在语义不可录；未认证探测的假 200 实形由 auth.yaml 保留扫描步承载。恢复路径=引擎/业务域实装后核销。 |
+| auth/me-patch-empty-name | auth-retired | /api/v1/auth/* 域 jknow 设计性退役（P1 源仓口径），路由不存在语义不可录；未认证探测的假 200 实形由 auth.yaml 保留扫描步承载。恢复路径=引擎/业务域实装后核销。 |
+| auth/password-wrong-current | auth-retired | /api/v1/auth/* 域 jknow 设计性退役（P1 源仓口径），路由不存在语义不可录；未认证探测的假 200 实形由 auth.yaml 保留扫描步承载。恢复路径=引擎/业务域实装后核销。 |
+| auth/password-set-temp | auth-retired | /api/v1/auth/* 域 jknow 设计性退役（P1 源仓口径），路由不存在语义不可录；未认证探测的假 200 实形由 auth.yaml 保留扫描步承载。恢复路径=引擎/业务域实装后核销。 |
+| auth/password-revert | auth-retired | /api/v1/auth/* 域 jknow 设计性退役（P1 源仓口径），路由不存在语义不可录；未认证探测的假 200 实形由 auth.yaml 保留扫描步承载。恢复路径=引擎/业务域实装后核销。 |
+| auth/logout | auth-retired | /api/v1/auth/* 域 jknow 设计性退役（P1 源仓口径），路由不存在语义不可录；未认证探测的假 200 实形由 auth.yaml 保留扫描步承载。恢复路径=引擎/业务域实装后核销。 |
+| auth/me-after-logout | auth-retired | /api/v1/auth/* 域 jknow 设计性退役（P1 源仓口径），路由不存在语义不可录；未认证探测的假 200 实形由 auth.yaml 保留扫描步承载。恢复路径=引擎/业务域实装后核销。 |
+| auth/oidc-me | auth-retired | /api/v1/auth/* 域 jknow 设计性退役（P1 源仓口径），路由不存在语义不可录；未认证探测的假 200 实形由 auth.yaml 保留扫描步承载。恢复路径=引擎/业务域实装后核销。 |
+| auth/oidc-me-unlink | auth-retired | /api/v1/auth/* 域 jknow 设计性退役（P1 源仓口径），路由不存在语义不可录；未认证探测的假 200 实形由 auth.yaml 保留扫描步承载。恢复路径=引擎/业务域实装后核销。 |
+| graph/viewer-kb-hidden-404 | multi-user-single-token | 引擎单 token 模型：bearer 恒占第一个 Authorization 头（服务端 getHeader 取第一个，实录已证），步级覆盖落空，第二用户身份不可达；viewer 本体已由剧本 sql 步预建（contract_viewer 固定 utopia_uuid+admin bcrypt+role 2），成员矩阵步以 admin 身份保留。 |
+| graph/viewer-overview-ok | multi-user-single-token | 引擎单 token 模型：bearer 恒占第一个 Authorization 头（服务端 getHeader 取第一个，实录已证），步级覆盖落空，第二用户身份不可达；viewer 本体已由剧本 sql 步预建（contract_viewer 固定 utopia_uuid+admin bcrypt+role 2），成员矩阵步以 admin 身份保留。 |
+| graph/viewer-entity-type-write-403 | multi-user-single-token | 引擎单 token 模型：bearer 恒占第一个 Authorization 头（服务端 getHeader 取第一个，实录已证），步级覆盖落空，第二用户身份不可达；viewer 本体已由剧本 sql 步预建（contract_viewer 固定 utopia_uuid+admin bcrypt+role 2），成员矩阵步以 admin 身份保留。 |
+| graph/viewer-rebuild-403 | multi-user-single-token | 引擎单 token 模型：bearer 恒占第一个 Authorization 头（服务端 getHeader 取第一个，实录已证），步级覆盖落空，第二用户身份不可达；viewer 本体已由剧本 sql 步预建（contract_viewer 固定 utopia_uuid+admin bcrypt+role 2），成员矩阵步以 admin 身份保留。 |
+| workspace-kb/viewer-kb-hidden | multi-user-single-token | 引擎单 token 模型：bearer 恒占第一个 Authorization 头（服务端 getHeader 取第一个，实录已证），步级覆盖落空，第二用户身份不可达；viewer 本体已由剧本 sql 步预建（contract_viewer 固定 utopia_uuid+admin bcrypt+role 2），成员矩阵步以 admin 身份保留。 |
+| workspace-kb/viewer-read-ok | multi-user-single-token | 引擎单 token 模型：bearer 恒占第一个 Authorization 头（服务端 getHeader 取第一个，实录已证），步级覆盖落空，第二用户身份不可达；viewer 本体已由剧本 sql 步预建（contract_viewer 固定 utopia_uuid+admin bcrypt+role 2），成员矩阵步以 admin 身份保留。 |
+| workspace-kb/viewer-write-forbidden | multi-user-single-token | 引擎单 token 模型：bearer 恒占第一个 Authorization 头（服务端 getHeader 取第一个，实录已证），步级覆盖落空，第二用户身份不可达；viewer 本体已由剧本 sql 步预建（contract_viewer 固定 utopia_uuid+admin bcrypt+role 2），成员矩阵步以 admin 身份保留。 |
+| sources-ingest/push-created | step-auth-override-dead | 来源密钥/个人令牌走 Authorization 头（getHeader 取第一个），引擎 bearer 恒占第一个头、步级 token 落空（双头 401/单头 200 实录已证）；heart 推送的下游步因输入失供一并退役——heart 五剧本退化为装置+快照骨架。 |
+| sources-ingest/push-unchanged | step-auth-override-dead | 来源密钥/个人令牌走 Authorization 头（getHeader 取第一个），引擎 bearer 恒占第一个头、步级 token 落空（双头 401/单头 200 实录已证）；heart 推送的下游步因输入失供一并退役——heart 五剧本退化为装置+快照骨架。 |
+| sources-ingest/push-updated | step-auth-override-dead | 来源密钥/个人令牌走 Authorization 头（getHeader 取第一个），引擎 bearer 恒占第一个头、步级 token 落空（双头 401/单头 200 实录已证）；heart 推送的下游步因输入失供一并退役——heart 五剧本退化为装置+快照骨架。 |
+| sources-ingest/push-stale-token-401 | step-auth-override-dead | 来源密钥/个人令牌走 Authorization 头（getHeader 取第一个），引擎 bearer 恒占第一个头、步级 token 落空（双头 401/单头 200 实录已证）；heart 推送的下游步因输入失供一并退役——heart 五剧本退化为装置+快照骨架。 |
+| sources-ingest/push-bogus-token-401 | step-auth-override-dead | 来源密钥/个人令牌走 Authorization 头（getHeader 取第一个），引擎 bearer 恒占第一个头、步级 token 落空（双头 401/单头 200 实录已证）；heart 推送的下游步因输入失供一并退役——heart 五剧本退化为装置+快照骨架。 |
+| sources-ingest/statements-push-created | step-auth-override-dead | 来源密钥/个人令牌走 Authorization 头（getHeader 取第一个），引擎 bearer 恒占第一个头、步级 token 落空（双头 401/单头 200 实录已证）；heart 推送的下游步因输入失供一并退役——heart 五剧本退化为装置+快照骨架。 |
+| sources-ingest/statements-push-unchanged | step-auth-override-dead | 来源密钥/个人令牌走 Authorization 头（getHeader 取第一个），引擎 bearer 恒占第一个头、步级 token 落空（双头 401/单头 200 实录已证）；heart 推送的下游步因输入失供一并退役——heart 五剧本退化为装置+快照骨架。 |
+| sources-ingest/statements-push-unknown-key | step-auth-override-dead | 来源密钥/个人令牌走 Authorization 头（getHeader 取第一个），引擎 bearer 恒占第一个头、步级 token 落空（双头 401/单头 200 实录已证）；heart 推送的下游步因输入失供一并退役——heart 五剧本退化为装置+快照骨架。 |
+| sources-ingest/statements-wrong-kind-404 | step-auth-override-dead | 来源密钥/个人令牌走 Authorization 头（getHeader 取第一个），引擎 bearer 恒占第一个头、步级 token 落空（双头 401/单头 200 实录已证）；heart 推送的下游步因输入失供一并退役——heart 五剧本退化为装置+快照骨架。 |
+| chat-misc/mcp-initialize | step-auth-override-dead | 来源密钥/个人令牌走 Authorization 头（getHeader 取第一个），引擎 bearer 恒占第一个头、步级 token 落空（双头 401/单头 200 实录已证）；heart 推送的下游步因输入失供一并退役——heart 五剧本退化为装置+快照骨架。 |
+| chat-misc/mcp-tools-list | step-auth-override-dead | 来源密钥/个人令牌走 Authorization 头（getHeader 取第一个），引擎 bearer 恒占第一个头、步级 token 落空（双头 401/单头 200 实录已证）；heart 推送的下游步因输入失供一并退役——heart 五剧本退化为装置+快照骨架。 |
+| chat-misc/mcp-unknown-method | step-auth-override-dead | 来源密钥/个人令牌走 Authorization 头（getHeader 取第一个），引擎 bearer 恒占第一个头、步级 token 落空（双头 401/单头 200 实录已证）；heart 推送的下游步因输入失供一并退役——heart 五剧本退化为装置+快照骨架。 |
+| heart-ledger/push-statements | step-auth-override-dead | 来源密钥/个人令牌走 Authorization 头（getHeader 取第一个），引擎 bearer 恒占第一个头、步级 token 落空（双头 401/单头 200 实录已证）；heart 推送的下游步因输入失供一并退役——heart 五剧本退化为装置+快照骨架。 |
+| heart-axioms/push-obs-1 | step-auth-override-dead | 来源密钥/个人令牌走 Authorization 头（getHeader 取第一个），引擎 bearer 恒占第一个头、步级 token 落空（双头 401/单头 200 实录已证）；heart 推送的下游步因输入失供一并退役——heart 五剧本退化为装置+快照骨架。 |
+| heart-axioms/push-obs-2 | step-auth-override-dead | 来源密钥/个人令牌走 Authorization 头（getHeader 取第一个），引擎 bearer 恒占第一个头、步级 token 落空（双头 401/单头 200 实录已证）；heart 推送的下游步因输入失供一并退役——heart 五剧本退化为装置+快照骨架。 |
+| heart-errata/push-obs-1 | step-auth-override-dead | 来源密钥/个人令牌走 Authorization 头（getHeader 取第一个），引擎 bearer 恒占第一个头、步级 token 落空（双头 401/单头 200 实录已证）；heart 推送的下游步因输入失供一并退役——heart 五剧本退化为装置+快照骨架。 |
+| heart-errata/errata-retract-applied | step-auth-override-dead | 来源密钥/个人令牌走 Authorization 头（getHeader 取第一个），引擎 bearer 恒占第一个头、步级 token 落空（双头 401/单头 200 实录已证）；heart 推送的下游步因输入失供一并退役——heart 五剧本退化为装置+快照骨架。 |
+| heart-merge/push-obs-1 | step-auth-override-dead | 来源密钥/个人令牌走 Authorization 头（getHeader 取第一个），引擎 bearer 恒占第一个头、步级 token 落空（双头 401/单头 200 实录已证）；heart 推送的下游步因输入失供一并退役——heart 五剧本退化为装置+快照骨架。 |
+| heart-merge/review-fixture | step-auth-override-dead | 来源密钥/个人令牌走 Authorization 头（getHeader 取第一个），引擎 bearer 恒占第一个头、步级 token 落空（双头 401/单头 200 实录已证）；heart 推送的下游步因输入失供一并退役——heart 五剧本退化为装置+快照骨架。 |
+| heart-merge/review-decide-merge | step-auth-override-dead | 来源密钥/个人令牌走 Authorization 头（getHeader 取第一个），引擎 bearer 恒占第一个头、步级 token 落空（双头 401/单头 200 实录已证）；heart 推送的下游步因输入失供一并退役——heart 五剧本退化为装置+快照骨架。 |
+| heart-replay/push-obs-1 | step-auth-override-dead | 来源密钥/个人令牌走 Authorization 头（getHeader 取第一个），引擎 bearer 恒占第一个头、步级 token 落空（双头 401/单头 200 实录已证）；heart 推送的下游步因输入失供一并退役——heart 五剧本退化为装置+快照骨架。 |
+| heart-replay/push-obs-2 | step-auth-override-dead | 来源密钥/个人令牌走 Authorization 头（getHeader 取第一个），引擎 bearer 恒占第一个头、步级 token 落空（双头 401/单头 200 实录已证）；heart 推送的下游步因输入失供一并退役——heart 五剧本退化为装置+快照骨架。 |
+| heart-replay/push-obs-3 | step-auth-override-dead | 来源密钥/个人令牌走 Authorization 头（getHeader 取第一个），引擎 bearer 恒占第一个头、步级 token 落空（双头 401/单头 200 实录已证）；heart 推送的下游步因输入失供一并退役——heart 五剧本退化为装置+快照骨架。 |
+| heart-replay/find-obs-3-doc | step-auth-override-dead | 来源密钥/个人令牌走 Authorization 头（getHeader 取第一个），引擎 bearer 恒占第一个头、步级 token 落空（双头 401/单头 200 实录已证）；heart 推送的下游步因输入失供一并退役——heart 五剧本退化为装置+快照骨架。 |
+| heart-replay/delete-obs-3-doc | step-auth-override-dead | 来源密钥/个人令牌走 Authorization 头（getHeader 取第一个），引擎 bearer 恒占第一个头、步级 token 落空（双头 401/单头 200 实录已证）；heart 推送的下游步因输入失供一并退役——heart 五剧本退化为装置+快照骨架。 |
+| heart-replay/restore-obs-3-doc | step-auth-override-dead | 来源密钥/个人令牌走 Authorization 头（getHeader 取第一个），引擎 bearer 恒占第一个头、步级 token 落空（双头 401/单头 200 实录已证）；heart 推送的下游步因输入失供一并退役——heart 五剧本退化为装置+快照骨架。 |
+| chat-misc/kb-events-401 | sse-unauth-single-token | SSE 未认证 401 探测在 bearer 会话下不可录（引擎无去会话机制；认证态打 SSE 会挂流到超时）；认证后流 deferred 原口径不变（COVERAGE.md D1-D3）。 |
+| chat-misc/alerts-events-401 | sse-unauth-single-token | SSE 未认证 401 探测在 bearer 会话下不可录（引擎无去会话机制；认证态打 SSE 会挂流到超时）；认证后流 deferred 原口径不变（COVERAGE.md D1-D3）。 |
+| chat-misc/conversation-stream-401 | sse-unauth-single-token | SSE 未认证 401 探测在 bearer 会话下不可录（引擎无去会话机制；认证态打 SSE 会挂流到超时）；认证后流 deferred 原口径不变（COVERAGE.md D1-D3）。 |
+| admin-users/tokens-list | admin-pat-ratchet | ruoyi_login 后剧本身份是共享 admin：PAT 行只打戳不删行（源仓 pat-ratchet 同款棘轮），行数无法按剧本构造钉死；单 token 模型下不能以第二身份录。引擎身份扩展后以专用 PAT 用户恢复。 |
+| admin-users/token-issue | admin-pat-ratchet | ruoyi_login 后剧本身份是共享 admin：PAT 行只打戳不删行（源仓 pat-ratchet 同款棘轮），行数无法按剧本构造钉死；单 token 模型下不能以第二身份录。引擎身份扩展后以专用 PAT 用户恢复。 |
+| admin-users/tokens-list-after-issue | admin-pat-ratchet | ruoyi_login 后剧本身份是共享 admin：PAT 行只打戳不删行（源仓 pat-ratchet 同款棘轮），行数无法按剧本构造钉死；单 token 模型下不能以第二身份录。引擎身份扩展后以专用 PAT 用户恢复。 |
+| admin-users/token-revoke | admin-pat-ratchet | ruoyi_login 后剧本身份是共享 admin：PAT 行只打戳不删行（源仓 pat-ratchet 同款棘轮），行数无法按剧本构造钉死；单 token 模型下不能以第二身份录。引擎身份扩展后以专用 PAT 用户恢复。 |
+| admin-users/token-revoke-again-404 | admin-pat-ratchet | ruoyi_login 后剧本身份是共享 admin：PAT 行只打戳不删行（源仓 pat-ratchet 同款棘轮），行数无法按剧本构造钉死；单 token 模型下不能以第二身份录。引擎身份扩展后以专用 PAT 用户恢复。 |
+| admin-users/admin-ds-create-forbidden | admin-ds-create-writes | admin 身份下是真建源（200，每轮写一行 data_sources，剧本无清理步）——保录制幂等不录；建源/删源实形 200/{"ok":true} 已探针验证，挂载 happy 轮一并定形（COVERAGE.md D11 同源）。 |
+| graph/owner-login-back | auth-retired | 剧本内 /api/v1/auth/login|me 会话步随源仓 auth 域退役（jknow 无路由），setup 换 ruoyi_login 后由引擎承担登录；权威面遗留样本挂账。 |
+| graph/owner-login-final | auth-retired | 剧本内 /api/v1/auth/login|me 会话步随源仓 auth 域退役（jknow 无路由），setup 换 ruoyi_login 后由引擎承担登录；权威面遗留样本挂账。 |
+| graph/viewer-login | auth-retired | 剧本内 /api/v1/auth/login|me 会话步随源仓 auth 域退役（jknow 无路由），setup 换 ruoyi_login 后由引擎承担登录；权威面遗留样本挂账。 |
+| graph/viewer-login-again | auth-retired | 剧本内 /api/v1/auth/login|me 会话步随源仓 auth 域退役（jknow 无路由），setup 换 ruoyi_login 后由引擎承担登录；权威面遗留样本挂账。 |
+| graph/viewer-me | auth-retired | 剧本内 /api/v1/auth/login|me 会话步随源仓 auth 域退役（jknow 无路由），setup 换 ruoyi_login 后由引擎承担登录；权威面遗留样本挂账。 |
+| workspace-kb/viewer-login-first | auth-retired | 剧本内 /api/v1/auth/login|me 会话步随源仓 auth 域退役（jknow 无路由），setup 换 ruoyi_login 后由引擎承担登录；权威面遗留样本挂账。 |
+| workspace-kb/viewer-me | auth-retired | 剧本内 /api/v1/auth/login|me 会话步随源仓 auth 域退役（jknow 无路由），setup 换 ruoyi_login 后由引擎承担登录；权威面遗留样本挂账。 |
+| workspace-kb/owner-login-back | auth-retired | 剧本内 /api/v1/auth/login|me 会话步随源仓 auth 域退役（jknow 无路由），setup 换 ruoyi_login 后由引擎承担登录；权威面遗留样本挂账。 |
+| workspace-kb/viewer-login-second | auth-retired | 剧本内 /api/v1/auth/login|me 会话步随源仓 auth 域退役（jknow 无路由），setup 换 ruoyi_login 后由引擎承担登录；权威面遗留样本挂账。 |
+| workspace-kb/owner-login-back-second | auth-retired | 剧本内 /api/v1/auth/login|me 会话步随源仓 auth 域退役（jknow 无路由），setup 换 ruoyi_login 后由引擎承担登录；权威面遗留样本挂账。 |
+| chat-misc/login | auth-retired | 剧本内 /api/v1/auth/login|me 会话步随源仓 auth 域退役（jknow 无路由），setup 换 ruoyi_login 后由引擎承担登录；权威面遗留样本挂账。 |
+| heart-axioms/login | auth-retired | 剧本内 /api/v1/auth/login|me 会话步随源仓 auth 域退役（jknow 无路由），setup 换 ruoyi_login 后由引擎承担登录；权威面遗留样本挂账。 |
+| heart-errata/login | auth-retired | 剧本内 /api/v1/auth/login|me 会话步随源仓 auth 域退役（jknow 无路由），setup 换 ruoyi_login 后由引擎承担登录；权威面遗留样本挂账。 |
+| heart-ledger/login | auth-retired | 剧本内 /api/v1/auth/login|me 会话步随源仓 auth 域退役（jknow 无路由），setup 换 ruoyi_login 后由引擎承担登录；权威面遗留样本挂账。 |
+| heart-merge/login | auth-retired | 剧本内 /api/v1/auth/login|me 会话步随源仓 auth 域退役（jknow 无路由），setup 换 ruoyi_login 后由引擎承担登录；权威面遗留样本挂账。 |
+| heart-replay/login | auth-retired | 剧本内 /api/v1/auth/login|me 会话步随源仓 auth 域退役（jknow 无路由），setup 换 ruoyi_login 后由引擎承担登录；权威面遗留样本挂账。 |
+
+| documents/jobs-requeue-all-forbidden | admin-requeue-all-writes | admin 身份下 POST /api/v1/jobs/requeue 是真写（探针实录 200 {"requeued":47}——全实例 job 重排队），403 语义随 admin 失效；为保录制幂等与演示库态不录。 |
+| ontology/import-preview | authority-java-side-absent | 权威树（golden-rust）缺该步（源仓录制期它是 target:java 单侧样本，只进 golden-java 不进权威面）；jknow 侧实录 200（multipart 预览 plan），留作右侧新增。T3 若启用 golden-java 合并对照可核销。 |
+| ontology/import-apply | authority-java-side-absent | 同上（落库回执 200 {import_id,...}）。 |
+
+（历史：M5 任务 6 挂账清零——pat-ratchet 2 条与 fulltext-store-ownership 1 条均已核销，见下方已核销节。）
 
 ## 已核销
 

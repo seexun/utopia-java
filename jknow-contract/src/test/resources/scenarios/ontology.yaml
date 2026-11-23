@@ -1,15 +1,14 @@
 # 域：ontology——本体（实体类/关系类 CRUD、唯一性候选、类型消解三段、提案存取、本体代理排队、
 # OWL 导入预览/落库、回归用例）+ 能力问题 CRUD/报告 + 业务规则全生命周期 + 规则运行。
-# 幂等：自建专属库 kb-contract-onto，全部对象在剧本内自建自删；OWL 导入用 7 字节最小合法 turtle。
-# 现状注记：ontology/regressions 两端点在参照实例二进制上未装配（404 路由缺失），忠实记录，M5 升级参照后补录。
-# M1 双打定向（任务 4 起）：setup 块引擎整体视为 rust；CRUD/导入/类型消解/提案/问题/规则等一切写路径步
-# target: rust（写路径归 Rust 至 M2，m1-recon §5）。读步中任务 4 已实现两视图与实例列表（both 双打）；
-# 其余读族（uniqueness/proposals/questions/imports/rules 列表族）M4 任务 6 已实现——双打常规比对
-# （M4 任务 6 起九读步已实现并核销——见 WAIVERS.md 已核销节）；regressions 两步参照实例本就 404 路由缺失，Java 未配路由同形，both 直接双打。
+# P3 golden 复活批（T2）：setup 换 ruoyi_login（若依 admin，Bearer 会话引擎默认注入）；T1 已对
+# 五读步实录对表（graph/ontology spike 形态 5/5 一致）。 regressions 两步 jknow 同为 404 路由缺失，
+# 忠实记录。幂等：自建专属库 kb-contract-onto，全部对象在剧本内自建自删；OWL 导入用最小合法 turtle。
 name: ontology
 desc: 本体 CRUD+类型消解+提案+OWL 导入+问题 CRUD+规则全周期（自建 kb-contract-onto）
 setup:
-  register: { email: contract-onto@test.local, password: ContractOnto!2026, display_name: Contract Onto }
+  mode: ruoyi_login
+  username: admin
+  password: admin123
 vars:
   owl: |
     @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .

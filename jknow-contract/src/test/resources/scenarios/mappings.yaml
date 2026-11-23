@@ -1,14 +1,15 @@
 # 域：mappings——语义层口径：列表/筛选/相关口径/预览（未挂载数据源的两类 422）/改口径/修订史
 # + 库内数据源挂载面（未挂载现状）。
-# 幂等：自建专属库 kb-contract-map（空库形状确定）。管理员建数据源不可达（非 admin），
-# 挂载 happy path 仍 deferred（种子 admin 后建源挂载再补录，见 COVERAGE.md D7/D11——
-# M5 任务 3 已落 Java 写面（DatasourcesController/SchemaSync/六引擎），差的是 admin 种子）。
-# M5 任务 3：preview/revise 422 与挂载面五步转 target:java（query 包+写面落地）；
-# ws/kb 装置步与 workspace-kb.yaml 同口径（M4 任务 6 写步已 java）。
+# P3 golden 复活批（T2）：setup 换 ruoyi_login（若依 admin，Bearer 会话引擎默认注入）——
+# admin 身份下挂载面 happy（建源/授权）仍不在本剧本（写态留给 T3 对表后的定形轮），
+# 现状步（未授权 422/空集/404/500）维持原形。
+# 幂等：自建专属库 kb-contract-map（空库形状确定）。
 name: mappings
 desc: 口径列表/相关/预览 422 形状/修订 404 形状 + 库内数据源面（自建 kb-contract-map）
 setup:
-  register: { email: contract-map@test.local, password: ContractMap!2026, display_name: Contract Map }
+  mode: ruoyi_login
+  username: admin
+  password: admin123
 steps:
   - id: ws-create
     call: 'POST /api/v1/workspaces { "name": "ws-contract-map" }'

@@ -1,15 +1,13 @@
 # 域：review——审核中心全 12 队列 × 分页/类型筛 + batch/history/summary + 逐项裁决端点的 404/422 形状
 # + 一致性检查 + R1 推理（纯计算，无模型调用，同步返回）。
+# P3 golden 复活批（T2）：setup 换 ruoyi_login（若依 admin，Bearer 会话引擎默认注入）。
 # 幂等：自建专属库 kb-contract-review（空库——队列计数全零是确定形状）；裁决端点用不存在 id 打出 404/422 分支。
-# M1 双打定向（任务 4 起）：setup 块引擎整体视为 rust；写路径步 target: rust。
-# M4 任务 2 定向修订：**治理写步转 target: java**（ReviewWriteController 19 POST 落地——逐项裁决族/
-# 事实三态/合并回滚/冲突裁决/batch/一致性/推理/对齐三件/勘误答）；
-# M4 任务 6 修订：ws-create/kb-create/ws-delete 三步随 WorkspaceKbWriteController 落地转 target:java。读步（12 队列/分页/类型筛/summary/history/
-# pending-for-chunk/unknown-queue 422）缺省 both 双打（M1 任务 4 起）。
 name: review
 desc: 12 队列×分页+summary/history/batch+逐项裁决 404/422+一致性+推理（自建 kb-contract-review）
 setup:
-  register: { email: contract-review@test.local, password: ContractReview!2026, display_name: Contract Review }
+  mode: ruoyi_login
+  username: admin
+  password: admin123
 steps:
   - id: ws-create
     call: 'POST /api/v1/workspaces { "name": "ws-contract-review" }'
