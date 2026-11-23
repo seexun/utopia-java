@@ -1,8 +1,25 @@
+# 挂账清单（WAIVERS）
+
+> waiver 语义：命中的步骤在 Diff（`--left --right` 目录比对——jknow 对表为 golden-rust 权威面
+> vs jknow 实录；`--dual` 双打形态兼容保留）与 Replayer 中
+> **跳过比对并单列报告（[WAIVE]）——不算差异也不算通过**，显式挂账。
+> 键写法等价形都可（`admin-users/tokens-list` / `admin-users/tokens-list.json` /
+> `golden/admin-users/tokens-list.json`），装载器统一归一化；族目录单族比对时键无族前缀，
+> 全树比对时键含 `<族>/<步>`——装载器不做前缀裁剪，按比对形态给键。
+> 装载器（Waivers.load）一行一键：生效清单每行第一格=单个键，同组多键请拆多行共用原因码。
+> 临时挂账可不走本清单：`--waive <键>#<原因码>` 可重复参数（与 `--waivers` 本清单叠加，命令行优先）。
+> 每条挂账必须有原因码与说明；核销（转回正常比对）时删行并在当期任务报告记录。
+
 ## 生效清单
 
-P3 golden 复活批 T2（2026-11-23）新增六组挂账——全部是「jknow 实录实测逐步定形」的产物，
+P3 golden 复活批 T2（2026-11-23）新增八组挂账——全部是「jknow 实录实测逐步定形」的产物，
 键为 golden 权威面（golden-rust）侧遗留步（剧本已删步，Diff 时按「仅左侧存在」命中）；
 装载器按键单行装载（Waivers.load 一行一键），同组多行共用原因码。
+
+安全注记（T3/运维知会）：`multi-user-single-token` 组的预建用户 `contract_viewer`（sys_user 固定
+utopia_uuid `0190d3e0-0000-7d5a-8000-00000000cafe`，role 2，dept 103）口令串**复用 admin 的
+bcrypt**——即演示库第二个已知口令（admin123）的账号，仅作剧本 sql 步预建装置；viewer 登录面
+已挂账退役，改随机口令不影响现有保留步，如需收敛请改口令并同步 graph/workspace-kb 剧本模板。
 
 | 步骤 | 原因码 | 说明 |
 |---|---|---|

@@ -2,9 +2,9 @@
 
 ## §0 P3 golden 复活批（2026-11-23，T2 剧本适配与退役记录）
 
-jknow 对表形态下（对照面 `golden-rust/` 权威快照 vs jknow 实录，Recorder 单打），22 剧本全部
+jknow 对表形态下（对照面 `golden-rust/` 权威快照 vs jknow 实录，Recorder 单打），19 剧本全部
 适配引擎 `setup.mode: ruoyi_login`（若依 admin/admin123，Bearer 会话引擎默认注入；health 无
-setup 原样）。本节记录设计性退役与挂账（挂账明细见 WAIVERS.md 生效清单六组）：
+setup 原样）。本节记录设计性退役与挂账（挂账明细见 WAIVERS.md 生效清单八组）：
 
 - **auth 域退役（auth-retired）**：`/api/v1/auth/*` 在 jknow 无路由（P1 源仓设计性退役）。
   - auth-login：login/me 两步删除（退役定位：T1 报告 §4 + 本节）。
@@ -19,7 +19,9 @@ setup 原样）。本节记录设计性退役与挂账（挂账明细见 WAIVERS
     只是路由缺失痕迹。OIDC happy 恢复路径同 §4-D5/D6（jknow 域实装后）。
 - **多用户与令牌头挂账（multi-user-single-token / step-auth-override-dead）**：引擎单 token
   会话模型——bearer 恒占第一个 Authorization 头（服务端 getHeader 取第一个，实录已证），
-  步级 Authorization 覆盖落空。影响：graph/workspace-kb 的 viewer 身份步 7 步、来源/陈述推送
+  步级 Authorization 覆盖落空。安全注记（T3/运维知会）：预建用户 contract_viewer 口令串复用
+  admin bcrypt（=演示库第二个已知口令 admin123 的账号，仅剧本 sql 步装置；viewer 登录面已挂账
+  退役，改随机口令不影响保留步）。影响：graph/workspace-kb 的 viewer 身份步 7 步、来源/陈述推送
   与 MCP/PAT 头步（含 heart 五剧本的推送链）26 步挂账退役；第二用户本体由剧本 sql 步预建
   （contract_viewer，sys_user 固定 utopia_uuid + admin bcrypt 串 + role 2），成员矩阵步以
   admin 身份保留。规格开放点：引擎增步级会话切换后恢复（任务 2 报告）。
