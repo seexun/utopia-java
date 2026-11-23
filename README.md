@@ -125,6 +125,8 @@ cd jknow-web && pnpm test && pnpm typecheck && pnpm build:prod   # test 418 pass
 
 注：全仓 `mvn -q test` 的测试前提**已自足**（test-infra 批起三测试 fixture 自建 org 根行/General 库链），清卷空库起后端建 schema 后可直接 `mvn test`，无热身 SQL 前置（历史注记：手工热身 SQL 三行见 [p3-report §五-1](docs/superpowers/plans/p3-report.md)）。
 
+> 跑 `mvn test` 前先停常驻后端进程（taskkill :27401/:27499）——JOBS_WORKER 调度器会扫共享库并干扰测试的 scripted 模型计数（2026-11-22 实测：计数翻倍 3-5 例假失败）。
+
 ## 迁移四阶段索引
 
 | 阶段 | 主题 | 报告 |

@@ -10,6 +10,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import tech.seexun.jknow.common.AppException;
@@ -79,9 +80,11 @@ public class AppExceptionHandler {
         }
     }
 
-    /** 未配路由（对齐 axum api.fallback：404 {"error":"Not found"}，api/mod.rs:622）。 */
-    @ExceptionHandler(NoHandlerFoundException.class)
-    ResponseEntity<String> noRoute(NoHandlerFoundException e) {
+    /** 未配路由（对齐 axum api.fallback：404 {"error":"Not found"}，api/mod.rs:622）。
+     *  Spring Boot 4 实抛 NoResourceFoundException（Boot 3.2+ 弃用 NoHandlerFoundException 路径）——
+     *  两个都接，未知路由不再落 Exception 兜底变形 500/200。 */
+    @ExceptionHandler({NoHandlerFoundException.class, NoResourceFoundException.class})
+    ResponseEntity<String> noRoute(NoResourceFoundException e) {
         ObjectNode body = mapper.createObjectNode();
         body.put("error", "Not found");
         return respond(HttpStatus.NOT_FOUND, body);
@@ -143,6 +146,19 @@ public class AppExceptionHandler {
         ObjectNode body = mapper.createObjectNode();
         body.put("error", "Internal server error");
         return respond(HttpStatus.INTERNAL_SERVER_ERROR, body);
+    }
+
+    /**
+     * 若依用户异常族（BaseException：CaptchaExpire/UserPasswordNotMatch 等，登录链抛出）——
+     * 回若依 AjaxResult 惯例形状 HTTP 200 + {"msg":...,"code":500}；此前落 Exception 兜底
+     * 变形 {"error":"Internal server error"}，对外语义缺陷（2026-11-23 批，错误形状对齐）。
+     */
+    @ExceptionHandler(tech.seexun.jknow.common.exception.base.BaseException.class)
+    ResponseEntity<String> service(tech.seexun.jknow.common.exception.base.BaseException e) {
+        ObjectNode body = mapper.createObjectNode();
+        body.put("msg", e.getMessage());
+        body.put("code", 500);
+        return respond(HttpStatus.OK, body);
     }
 
     /**
