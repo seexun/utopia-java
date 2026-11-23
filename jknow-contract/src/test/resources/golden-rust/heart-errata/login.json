@@ -1,0 +1,22 @@
+{
+  "meta" : {
+    "scenario" : "heart-errata",
+    "step" : "login",
+    "method" : "POST",
+    "path" : "/api/v1/auth/login",
+    "target" : "rust",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "token" : "<masked>",
+    "user" : {
+      "created_at" : "<ts>",
+      "display_name" : "Heart Errata",
+      "email" : "errata-mwe09ur6-127j@test.local",
+      "id" : "<uuid>",
+      "is_admin" : false,
+      "org_id" : "<uuid>"
+    }
+  }
+}

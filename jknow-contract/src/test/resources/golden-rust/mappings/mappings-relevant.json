@@ -1,0 +1,15 @@
+{
+  "meta" : {
+    "scenario" : "mappings",
+    "step" : "mappings-relevant",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/mappings/relevant?q=total",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "items" : [ ],
+    "k" : 8
+  }
+}

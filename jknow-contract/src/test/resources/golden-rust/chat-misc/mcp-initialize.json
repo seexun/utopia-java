@@ -1,0 +1,27 @@
+{
+  "meta" : {
+    "scenario" : "chat-misc",
+    "step" : "mcp-initialize",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/mcp",
+    "target" : "rust",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "id" : 1,
+    "jsonrpc" : "2.0",
+    "result" : {
+      "capabilities" : {
+        "tools" : {
+          "listChanged" : false
+        }
+      },
+      "protocolVersion" : "2025-06-18",
+      "serverInfo" : {
+        "name" : "utopia",
+        "version" : "0.1.0"
+      }
+    }
+  }
+}

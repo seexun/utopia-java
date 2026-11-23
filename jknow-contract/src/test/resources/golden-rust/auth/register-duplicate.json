@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "auth",
+    "step" : "register-duplicate",
+    "method" : "POST",
+    "path" : "/api/v1/auth/register",
+    "target" : "both",
+    "expectedStatus" : 409,
+    "status" : 409
+  },
+  "normalized" : {
+    "error" : "This email is already registered"
+  }
+}

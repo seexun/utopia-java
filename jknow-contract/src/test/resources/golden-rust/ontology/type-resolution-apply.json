@@ -1,0 +1,17 @@
+{
+  "meta" : {
+    "scenario" : "ontology",
+    "step" : "type-resolution-apply",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/ontology/type-resolution",
+    "target" : "rust",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "batch" : null,
+    "for_review" : [ ],
+    "left_alone" : [ ],
+    "retyped" : 0
+  }
+}

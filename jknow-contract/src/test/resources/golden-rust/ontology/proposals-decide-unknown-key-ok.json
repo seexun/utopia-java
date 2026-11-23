@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "ontology",
+    "step" : "proposals-decide-unknown-key-ok",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/ontology/proposals",
+    "target" : "rust",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "ok" : true
+  }
+}

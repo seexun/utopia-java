@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "documents",
+    "step" : "jobs-requeue-all-forbidden",
+    "method" : "POST",
+    "path" : "/api/v1/jobs/requeue",
+    "target" : "rust",
+    "expectedStatus" : 403,
+    "status" : 403
+  },
+  "normalized" : {
+    "error" : "You don't have permission to do that"
+  }
+}

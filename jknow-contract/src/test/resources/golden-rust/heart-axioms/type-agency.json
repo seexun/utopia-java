@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "heart-axioms",
+    "step" : "type-agency",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/ontology/entity-types",
+    "target" : "rust",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "id" : "<uuid>"
+  }
+}

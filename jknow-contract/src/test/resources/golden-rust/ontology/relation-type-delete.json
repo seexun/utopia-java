@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "ontology",
+    "step" : "relation-type-delete",
+    "method" : "DELETE",
+    "path" : "/api/v1/kbs/${kb_id}/ontology/relation-types/${rt_id}",
+    "target" : "rust",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "ok" : true
+  }
+}

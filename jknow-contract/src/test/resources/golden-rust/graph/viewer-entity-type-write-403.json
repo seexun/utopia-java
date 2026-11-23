@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "graph",
+    "step" : "viewer-entity-type-write-403",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/ontology/entity-types",
+    "target" : "rust",
+    "expectedStatus" : 403,
+    "status" : 403
+  },
+  "normalized" : {
+    "error" : "You don't have permission to do that"
+  }
+}

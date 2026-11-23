@@ -1,0 +1,29 @@
+{
+  "meta" : {
+    "scenario" : "heart-axioms",
+    "step" : "statements-source",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/sources",
+    "target" : "rust",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "ingest_token" : "<masked>",
+    "source" : {
+      "config" : { },
+      "created_at" : "<ts>",
+      "icon" : null,
+      "id" : "<uuid>",
+      "kb_id" : "<uuid>",
+      "kind" : "statements",
+      "last_sync_added" : 0,
+      "last_sync_at" : null,
+      "last_sync_error" : null,
+      "last_sync_status" : "never",
+      "name" : "src-axioms",
+      "sync_cron" : null,
+      "sync_interval_minutes" : null
+    }
+  }
+}

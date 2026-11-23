@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "sources-ingest",
+    "step" : "folder-token-kind-mismatch-404",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/sources/${folder_id}/token",
+    "target" : "both",
+    "expectedStatus" : 404,
+    "status" : 404
+  },
+  "normalized" : {
+    "error" : "Not found"
+  }
+}

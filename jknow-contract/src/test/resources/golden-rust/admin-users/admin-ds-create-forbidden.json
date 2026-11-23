@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "admin-users",
+    "step" : "admin-ds-create-forbidden",
+    "method" : "POST",
+    "path" : "/api/v1/admin/data-sources",
+    "target" : "both",
+    "expectedStatus" : 403,
+    "status" : 403
+  },
+  "normalized" : {
+    "error" : "You don't have permission to do that"
+  }
+}

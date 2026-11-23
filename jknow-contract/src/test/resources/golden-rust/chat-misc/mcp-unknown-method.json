@@ -1,0 +1,19 @@
+{
+  "meta" : {
+    "scenario" : "chat-misc",
+    "step" : "mcp-unknown-method",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/mcp",
+    "target" : "rust",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "error" : {
+      "code" : -32601,
+      "message" : "Unknown method: contract/no-such-method"
+    },
+    "id" : 3,
+    "jsonrpc" : "2.0"
+  }
+}

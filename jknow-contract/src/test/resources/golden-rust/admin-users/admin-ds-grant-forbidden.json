@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "admin-users",
+    "step" : "admin-ds-grant-forbidden",
+    "method" : "PUT",
+    "path" : "/api/v1/admin/data-sources/00000000-0000-0000-0000-000000000000/grants/00000000-0000-0000-0000-000000000000",
+    "target" : "both",
+    "expectedStatus" : 403,
+    "status" : 403
+  },
+  "normalized" : {
+    "error" : "You don't have permission to do that"
+  }
+}

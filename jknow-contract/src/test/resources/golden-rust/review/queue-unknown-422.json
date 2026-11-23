@@ -1,0 +1,15 @@
+{
+  "meta" : {
+    "scenario" : "review",
+    "step" : "queue-unknown-422",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/review?queue=no-such-queue&limit=5&offset=0&types=any",
+    "target" : "both",
+    "expectedStatus" : 422,
+    "status" : 422
+  },
+  "normalized" : {
+    "code" : "unknown_queue",
+    "error" : "no review queue named no-such-queue"
+  }
+}

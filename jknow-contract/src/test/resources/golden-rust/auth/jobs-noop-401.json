@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "auth",
+    "step" : "jobs-noop-401",
+    "method" : "POST",
+    "path" : "/api/v1/jobs/noop",
+    "target" : "both",
+    "expectedStatus" : 401,
+    "status" : 401
+  },
+  "normalized" : {
+    "error" : "Not signed in or invalid credentials"
+  }
+}

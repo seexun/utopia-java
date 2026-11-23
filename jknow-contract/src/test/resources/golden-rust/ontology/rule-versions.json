@@ -1,0 +1,41 @@
+{
+  "meta" : {
+    "scenario" : "ontology",
+    "step" : "rule-versions",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/rules/${rule_id}/versions",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "versions" : [ {
+      "definition" : {
+        "conclude_expr" : null,
+        "conclude_predicate_id" : null,
+        "conclude_type_id" : "<uuid>",
+        "conclude_value" : null,
+        "conclusion" : "typing",
+        "conditions" : [ {
+          "group" : 0,
+          "op" : "present",
+          "operand" : null,
+          "predicate_id" : "<uuid>",
+          "seq" : 0,
+          "side" : "x"
+        } ],
+        "join_predicate_id" : null,
+        "subject_type_id" : "<uuid>"
+      },
+      "derived_count" : 0,
+      "id" : "<uuid>",
+      "labels" : {
+        "<uuid>" : "Firm",
+        "<uuid>#2" : "headcount"
+      },
+      "recorded_at" : "<ts>",
+      "seq" : 1,
+      "superseded_at" : null
+    } ]
+  }
+}

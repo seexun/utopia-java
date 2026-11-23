@@ -1,0 +1,284 @@
+{
+  "meta" : {
+    "scenario" : "admin-users",
+    "step" : "tokens-list-after-issue",
+    "method" : "GET",
+    "path" : "/api/v1/me/tokens",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "tokens" : [ {
+      "created_at" : "<ts>",
+      "expires_at" : "<ts>",
+      "id" : "<uuid>",
+      "kb_ids" : null,
+      "last_used_at" : null,
+      "name" : "contract-admin-pat",
+      "revoked_at" : "<ts>",
+      "scope" : "read",
+      "token_prefix" : "<masked>"
+    }, {
+      "created_at" : "<ts>",
+      "expires_at" : "<ts>",
+      "id" : "<uuid>",
+      "kb_ids" : null,
+      "last_used_at" : null,
+      "name" : "contract-admin-pat",
+      "revoked_at" : "<ts>",
+      "scope" : "read",
+      "token_prefix" : "<masked>"
+    }, {
+      "created_at" : "<ts>",
+      "expires_at" : "<ts>",
+      "id" : "<uuid>",
+      "kb_ids" : null,
+      "last_used_at" : null,
+      "name" : "contract-admin-pat",
+      "revoked_at" : "<ts>",
+      "scope" : "read",
+      "token_prefix" : "<masked>"
+    }, {
+      "created_at" : "<ts>",
+      "expires_at" : "<ts>",
+      "id" : "<uuid>",
+      "kb_ids" : null,
+      "last_used_at" : null,
+      "name" : "contract-admin-pat",
+      "revoked_at" : "<ts>",
+      "scope" : "read",
+      "token_prefix" : "<masked>"
+    }, {
+      "created_at" : "<ts>",
+      "expires_at" : "<ts>",
+      "id" : "<uuid>",
+      "kb_ids" : null,
+      "last_used_at" : null,
+      "name" : "contract-admin-pat",
+      "revoked_at" : "<ts>",
+      "scope" : "read",
+      "token_prefix" : "<masked>"
+    }, {
+      "created_at" : "<ts>",
+      "expires_at" : "<ts>",
+      "id" : "<uuid>",
+      "kb_ids" : null,
+      "last_used_at" : null,
+      "name" : "contract-admin-pat",
+      "revoked_at" : "<ts>",
+      "scope" : "read",
+      "token_prefix" : "<masked>"
+    }, {
+      "created_at" : "<ts>",
+      "expires_at" : "<ts>",
+      "id" : "<uuid>",
+      "kb_ids" : null,
+      "last_used_at" : null,
+      "name" : "contract-admin-pat",
+      "revoked_at" : "<ts>",
+      "scope" : "read",
+      "token_prefix" : "<masked>"
+    }, {
+      "created_at" : "<ts>",
+      "expires_at" : "<ts>",
+      "id" : "<uuid>",
+      "kb_ids" : null,
+      "last_used_at" : null,
+      "name" : "contract-admin-pat",
+      "revoked_at" : "<ts>",
+      "scope" : "read",
+      "token_prefix" : "<masked>"
+    }, {
+      "created_at" : "<ts>",
+      "expires_at" : "<ts>",
+      "id" : "<uuid>",
+      "kb_ids" : null,
+      "last_used_at" : null,
+      "name" : "contract-admin-pat",
+      "revoked_at" : "<ts>",
+      "scope" : "read",
+      "token_prefix" : "<masked>"
+    }, {
+      "created_at" : "<ts>",
+      "expires_at" : "<ts>",
+      "id" : "<uuid>",
+      "kb_ids" : null,
+      "last_used_at" : null,
+      "name" : "contract-admin-pat",
+      "revoked_at" : "<ts>",
+      "scope" : "read",
+      "token_prefix" : "<masked>"
+    }, {
+      "created_at" : "<ts>",
+      "expires_at" : "<ts>",
+      "id" : "<uuid>",
+      "kb_ids" : null,
+      "last_used_at" : null,
+      "name" : "contract-admin-pat",
+      "revoked_at" : "<ts>",
+      "scope" : "read",
+      "token_prefix" : "<masked>"
+    }, {
+      "created_at" : "<ts>",
+      "expires_at" : "<ts>",
+      "id" : "<uuid>",
+      "kb_ids" : null,
+      "last_used_at" : null,
+      "name" : "contract-admin-pat",
+      "revoked_at" : "<ts>",
+      "scope" : "read",
+      "token_prefix" : "<masked>"
+    }, {
+      "created_at" : "<ts>",
+      "expires_at" : "<ts>",
+      "id" : "<uuid>",
+      "kb_ids" : null,
+      "last_used_at" : null,
+      "name" : "contract-admin-pat",
+      "revoked_at" : "<ts>",
+      "scope" : "read",
+      "token_prefix" : "<masked>"
+    }, {
+      "created_at" : "<ts>",
+      "expires_at" : "<ts>",
+      "id" : "<uuid>",
+      "kb_ids" : null,
+      "last_used_at" : null,
+      "name" : "contract-admin-pat",
+      "revoked_at" : "<ts>",
+      "scope" : "read",
+      "token_prefix" : "<masked>"
+    }, {
+      "created_at" : "<ts>",
+      "expires_at" : "<ts>",
+      "id" : "<uuid>",
+      "kb_ids" : null,
+      "last_used_at" : null,
+      "name" : "contract-admin-pat",
+      "revoked_at" : "<ts>",
+      "scope" : "read",
+      "token_prefix" : "<masked>"
+    }, {
+      "created_at" : "<ts>",
+      "expires_at" : "<ts>",
+      "id" : "<uuid>",
+      "kb_ids" : null,
+      "last_used_at" : null,
+      "name" : "contract-admin-pat",
+      "revoked_at" : "<ts>",
+      "scope" : "read",
+      "token_prefix" : "<masked>"
+    }, {
+      "created_at" : "<ts>",
+      "expires_at" : "<ts>",
+      "id" : "<uuid>",
+      "kb_ids" : null,
+      "last_used_at" : null,
+      "name" : "contract-admin-pat",
+      "revoked_at" : "<ts>",
+      "scope" : "read",
+      "token_prefix" : "<masked>"
+    }, {
+      "created_at" : "<ts>",
+      "expires_at" : "<ts>",
+      "id" : "<uuid>",
+      "kb_ids" : null,
+      "last_used_at" : null,
+      "name" : "contract-admin-pat",
+      "revoked_at" : "<ts>",
+      "scope" : "read",
+      "token_prefix" : "<masked>"
+    }, {
+      "created_at" : "<ts>",
+      "expires_at" : "<ts>",
+      "id" : "<uuid>",
+      "kb_ids" : null,
+      "last_used_at" : null,
+      "name" : "contract-admin-pat",
+      "revoked_at" : "<ts>",
+      "scope" : "read",
+      "token_prefix" : "<masked>"
+    }, {
+      "created_at" : "<ts>",
+      "expires_at" : "<ts>",
+      "id" : "<uuid>",
+      "kb_ids" : null,
+      "last_used_at" : null,
+      "name" : "contract-admin-pat",
+      "revoked_at" : "<ts>",
+      "scope" : "read",
+      "token_prefix" : "<masked>"
+    }, {
+      "created_at" : "<ts>",
+      "expires_at" : "<ts>",
+      "id" : "<uuid>",
+      "kb_ids" : null,
+      "last_used_at" : null,
+      "name" : "contract-admin-pat",
+      "revoked_at" : "<ts>",
+      "scope" : "read",
+      "token_prefix" : "<masked>"
+    }, {
+      "created_at" : "<ts>",
+      "expires_at" : "<ts>",
+      "id" : "<uuid>",
+      "kb_ids" : null,
+      "last_used_at" : null,
+      "name" : "contract-admin-pat",
+      "revoked_at" : "<ts>",
+      "scope" : "read",
+      "token_prefix" : "<masked>"
+    }, {
+      "created_at" : "<ts>",
+      "expires_at" : "<ts>",
+      "id" : "<uuid>",
+      "kb_ids" : null,
+      "last_used_at" : null,
+      "name" : "contract-admin-pat",
+      "revoked_at" : "<ts>",
+      "scope" : "read",
+      "token_prefix" : "<masked>"
+    }, {
+      "created_at" : "<ts>",
+      "expires_at" : "<ts>",
+      "id" : "<uuid>",
+      "kb_ids" : null,
+      "last_used_at" : null,
+      "name" : "contract-admin-pat",
+      "revoked_at" : "<ts>",
+      "scope" : "read",
+      "token_prefix" : "<masked>"
+    }, {
+      "created_at" : "<ts>",
+      "expires_at" : "<ts>",
+      "id" : "<uuid>",
+      "kb_ids" : null,
+      "last_used_at" : null,
+      "name" : "contract-admin-pat",
+      "revoked_at" : "<ts>",
+      "scope" : "read",
+      "token_prefix" : "<masked>"
+    }, {
+      "created_at" : "<ts>",
+      "expires_at" : "<ts>",
+      "id" : "<uuid>",
+      "kb_ids" : null,
+      "last_used_at" : null,
+      "name" : "contract-admin-pat",
+      "revoked_at" : "<ts>",
+      "scope" : "read",
+      "token_prefix" : "<masked>"
+    }, {
+      "created_at" : "<ts>",
+      "expires_at" : "<ts>",
+      "id" : "<uuid>",
+      "kb_ids" : null,
+      "last_used_at" : null,
+      "name" : "contract-admin-pat",
+      "revoked_at" : null,
+      "scope" : "read",
+      "token_prefix" : "<masked>"
+    } ]
+  }
+}

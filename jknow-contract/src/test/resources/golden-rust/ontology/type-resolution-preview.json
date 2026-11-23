@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "ontology",
+    "step" : "type-resolution-preview",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/ontology/type-resolution/preview",
+    "target" : "rust",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "items" : [ ]
+  }
+}

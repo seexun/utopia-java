@@ -1,0 +1,50 @@
+{
+  "meta" : {
+    "scenario" : "workspace-kb",
+    "step" : "kb-audit",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/audit?limit=20&offset=0",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "actions" : [ "kb.member_removed", "kb.member_set", "kb.updated" ],
+    "events" : [ {
+      "action" : "kb.member_removed",
+      "actor_id" : "<uuid>",
+      "actor_name" : "Contract Wskb",
+      "created_at" : "<ts>",
+      "detail" : { },
+      "id" : "<uuid>",
+      "target_id" : "<uuid>",
+      "target_kind" : "user"
+    }, {
+      "action" : "kb.member_set",
+      "actor_id" : "<uuid>",
+      "actor_name" : "Contract Wskb",
+      "created_at" : "<ts>",
+      "detail" : {
+        "role" : "viewer"
+      },
+      "id" : "<uuid>",
+      "target_id" : "<uuid>",
+      "target_kind" : "user"
+    }, {
+      "action" : "kb.updated",
+      "actor_id" : "<uuid>",
+      "actor_name" : "Contract Wskb",
+      "created_at" : "<ts>",
+      "detail" : {
+        "data_conventions" : false,
+        "governance" : null,
+        "name" : null,
+        "visibility" : null
+      },
+      "id" : "<uuid>",
+      "target_id" : "<uuid>",
+      "target_kind" : "kb"
+    } ],
+    "total" : 3
+  }
+}

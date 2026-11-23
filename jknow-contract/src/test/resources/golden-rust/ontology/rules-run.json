@@ -1,0 +1,20 @@
+{
+  "meta" : {
+    "scenario" : "ontology",
+    "step" : "rules-run",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/rules/run",
+    "target" : "rust",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "capped" : 0,
+    "hits" : 0,
+    "inserted" : 0,
+    "invalidated" : 0,
+    "rounds" : 1,
+    "rounds_capped" : false,
+    "rules" : 1
+  }
+}

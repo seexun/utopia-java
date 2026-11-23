@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "ontology",
+    "step" : "relation-type-delete-again-409",
+    "method" : "DELETE",
+    "path" : "/api/v1/kbs/${kb_id}/ontology/relation-types/${rt_id}",
+    "target" : "rust",
+    "expectedStatus" : 409,
+    "status" : 409
+  },
+  "normalized" : {
+    "error" : "Built-in relations cannot be deleted"
+  }
+}

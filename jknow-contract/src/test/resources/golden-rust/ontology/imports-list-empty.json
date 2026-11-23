@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "ontology",
+    "step" : "imports-list-empty",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/ontology/imports",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "imports" : [ ]
+  }
+}

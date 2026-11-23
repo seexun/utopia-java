@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "auth",
+    "step" : "logout",
+    "method" : "POST",
+    "path" : "/api/v1/auth/logout",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "ok" : true
+  }
+}

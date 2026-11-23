@@ -1,0 +1,16 @@
+{
+  "meta" : {
+    "scenario" : "heart-replay",
+    "step" : "delete-obs-3-doc",
+    "method" : "DELETE",
+    "path" : "/api/v1/documents/${doc3_id}",
+    "target" : "rust",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "deletion_id" : "<uuid>",
+    "invalidated_facts" : 2,
+    "ok" : true
+  }
+}

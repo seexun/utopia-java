@@ -1,0 +1,44 @@
+{
+  "meta" : {
+    "scenario" : "workspace-kb",
+    "step" : "ontology-packs",
+    "method" : "GET",
+    "path" : "/api/v1/ontology-packs",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "packs" : [ {
+      "classes" : 1010,
+      "id" : "schema-org",
+      "name" : "schema.org",
+      "properties" : 1676,
+      "summary" : "People, organizations, products, events, creative works"
+    }, {
+      "classes" : 12,
+      "id" : "foaf",
+      "name" : "FOAF",
+      "properties" : 62,
+      "summary" : "People and social relations"
+    }, {
+      "classes" : 13,
+      "id" : "w3c-org",
+      "name" : "W3C Org",
+      "properties" : 34,
+      "summary" : "Departments, posts, memberships, reporting lines"
+    }, {
+      "classes" : 294,
+      "id" : "iof-core",
+      "name" : "IOF Core",
+      "properties" : 75,
+      "summary" : "Industrial manufacturing"
+    }, {
+      "classes" : 49,
+      "id" : "prov-o",
+      "name" : "PROV-O",
+      "properties" : 69,
+      "summary" : "Provenance: who produced what, when, from which source"
+    } ]
+  }
+}

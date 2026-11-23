@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "documents",
+    "step" : "jobs-failed-empty-kb",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb2_id}/jobs/failed",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "failed" : 0
+  }
+}

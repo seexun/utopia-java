@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "graph",
+    "step" : "relation-type-create",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/ontology/relation-types",
+    "target" : "rust",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "id" : "<uuid>"
+  }
+}

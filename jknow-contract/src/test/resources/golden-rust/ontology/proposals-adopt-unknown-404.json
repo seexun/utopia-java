@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "ontology",
+    "step" : "proposals-adopt-unknown-404",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/ontology/proposals/adopt",
+    "target" : "rust",
+    "expectedStatus" : 404,
+    "status" : 404
+  },
+  "normalized" : {
+    "error" : "Not found"
+  }
+}

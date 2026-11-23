@@ -1,0 +1,15 @@
+{
+  "meta" : {
+    "scenario" : "ontology",
+    "step" : "rule-create-empty-conditions-422",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/rules",
+    "target" : "rust",
+    "expectedStatus" : 422,
+    "status" : 422
+  },
+  "normalized" : {
+    "code" : "no_conditions",
+    "error" : "A rule needs at least one condition; without one it would conclude for every entity of the class."
+  }
+}

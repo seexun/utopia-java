@@ -1,0 +1,22 @@
+{
+  "meta" : {
+    "scenario" : "graph",
+    "step" : "owner-login-back",
+    "method" : "POST",
+    "path" : "/api/v1/auth/login",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "token" : "<masked>",
+    "user" : {
+      "created_at" : "<ts>",
+      "display_name" : "Contract Graph",
+      "email" : "contract-graph@test.local",
+      "id" : "<uuid>",
+      "is_admin" : false,
+      "org_id" : "<uuid>"
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "documents",
+    "step" : "ws-delete",
+    "method" : "DELETE",
+    "path" : "/api/v1/workspaces/${ws_id}",
+    "target" : "rust",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "ok" : true
+  }
+}

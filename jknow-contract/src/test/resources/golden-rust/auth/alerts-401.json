@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "auth",
+    "step" : "alerts-401",
+    "method" : "GET",
+    "path" : "/api/v1/alerts?limit=5&offset=0",
+    "target" : "both",
+    "expectedStatus" : 401,
+    "status" : 401
+  },
+  "normalized" : {
+    "error" : "Not signed in or invalid credentials"
+  }
+}

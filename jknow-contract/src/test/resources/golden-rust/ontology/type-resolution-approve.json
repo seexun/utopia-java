@@ -1,0 +1,15 @@
+{
+  "meta" : {
+    "scenario" : "ontology",
+    "step" : "type-resolution-approve",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/ontology/type-resolution/approve",
+    "target" : "rust",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "batch" : null,
+    "moved" : 0
+  }
+}

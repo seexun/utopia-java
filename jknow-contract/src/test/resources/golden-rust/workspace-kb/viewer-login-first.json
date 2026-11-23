@@ -1,0 +1,22 @@
+{
+  "meta" : {
+    "scenario" : "workspace-kb",
+    "step" : "viewer-login-first",
+    "method" : "POST",
+    "path" : "/api/v1/auth/login",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "token" : "<masked>",
+    "user" : {
+      "created_at" : "<ts>",
+      "display_name" : "Contract Wskb Viewer",
+      "email" : "contract-wskb-viewer@test.local",
+      "id" : "<uuid>",
+      "is_admin" : false,
+      "org_id" : "<uuid>"
+    }
+  }
+}

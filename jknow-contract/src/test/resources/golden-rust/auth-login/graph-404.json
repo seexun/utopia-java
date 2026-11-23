@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "auth-login",
+    "step" : "graph-404",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/00000000-0000-0000-0000-000000000000/graph/overview",
+    "target" : "both",
+    "expectedStatus" : 404,
+    "status" : 404
+  },
+  "normalized" : {
+    "error" : "Not found"
+  }
+}

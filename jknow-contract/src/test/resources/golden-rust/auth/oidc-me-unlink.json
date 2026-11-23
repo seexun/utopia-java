@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "auth",
+    "step" : "oidc-me-unlink",
+    "method" : "DELETE",
+    "path" : "/api/v1/auth/oidc/me",
+    "target" : "both",
+    "expectedStatus" : 422,
+    "status" : 422
+  },
+  "normalized" : {
+    "error" : "SSO is not configured"
+  }
+}

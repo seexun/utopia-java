@@ -1,0 +1,15 @@
+{
+  "meta" : {
+    "scenario" : "workspace-kb",
+    "step" : "ws-settings-transcribe-put",
+    "method" : "PUT",
+    "path" : "/api/v1/workspaces/${ws_id}/settings/transcribe",
+    "target" : "rust",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "ok" : true,
+    "requeued" : 0
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "admin-users",
+    "step" : "token-revoke-again-404",
+    "method" : "DELETE",
+    "path" : "/api/v1/me/tokens/${token_id}",
+    "target" : "rust",
+    "expectedStatus" : 404,
+    "status" : 404
+  },
+  "normalized" : {
+    "error" : "Not found"
+  }
+}

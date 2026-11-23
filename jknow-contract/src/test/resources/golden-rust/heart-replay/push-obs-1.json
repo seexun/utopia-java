@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "heart-replay",
+    "step" : "push-obs-1",
+    "method" : "POST",
+    "path" : "/api/v1/sources/${src_id}/statements",
+    "target" : "rust",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "action" : "created"
+  }
+}

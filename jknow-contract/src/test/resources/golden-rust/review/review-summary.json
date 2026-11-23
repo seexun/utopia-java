@@ -1,0 +1,133 @@
+{
+  "meta" : {
+    "scenario" : "review",
+    "step" : "review-summary",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/review/summary",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "agent" : {
+      "last_30d" : {
+        "accepted" : 0,
+        "applied" : 0,
+        "overridden" : 0,
+        "proposed" : 0,
+        "reverted" : 0
+      },
+      "last_7d" : {
+        "accepted" : 0,
+        "applied" : 0,
+        "overridden" : 0,
+        "proposed" : 0,
+        "reverted" : 0
+      },
+      "open" : 0,
+      "queue" : 0,
+      "running" : false
+    },
+    "decided" : {
+      "daily" : [ {
+        "count" : 0,
+        "day" : "2026-10-30"
+      }, {
+        "count" : 0,
+        "day" : "2026-10-31"
+      }, {
+        "count" : 0,
+        "day" : "2026-11-01"
+      }, {
+        "count" : 0,
+        "day" : "2026-11-02"
+      }, {
+        "count" : 0,
+        "day" : "2026-11-03"
+      }, {
+        "count" : 0,
+        "day" : "2026-11-04"
+      }, {
+        "count" : 0,
+        "day" : "2026-11-05"
+      }, {
+        "count" : 0,
+        "day" : "2026-11-06"
+      }, {
+        "count" : 0,
+        "day" : "2026-11-07"
+      }, {
+        "count" : 0,
+        "day" : "2026-11-08"
+      }, {
+        "count" : 0,
+        "day" : "2026-11-09"
+      }, {
+        "count" : 0,
+        "day" : "2026-11-10"
+      }, {
+        "count" : 0,
+        "day" : "2026-11-11"
+      }, {
+        "count" : 0,
+        "day" : "2026-11-12"
+      } ],
+      "last_30d" : {
+        "automatic" : 0,
+        "by_action" : [ ],
+        "by_actor" : [ ],
+        "total" : 0
+      },
+      "last_7d" : {
+        "automatic" : 0,
+        "by_action" : [ ],
+        "by_actor" : [ ],
+        "total" : 0
+      }
+    },
+    "health" : {
+      "contested" : 0,
+      "facts" : 0,
+      "low_confidence" : 0,
+      "unconfirmed" : 0
+    },
+    "waiting" : {
+      "alignment" : {
+        "count" : 0,
+        "oldest_at" : null
+      },
+      "conflicts" : {
+        "count" : 0,
+        "oldest_at" : null
+      },
+      "defects" : {
+        "count" : 0,
+        "oldest_at" : null
+      },
+      "duplicates" : {
+        "count" : 0,
+        "oldest_at" : null
+      },
+      "errata" : {
+        "count" : 0,
+        "oldest_at" : null
+      },
+      "lowconf" : {
+        "count" : 0,
+        "oldest_at" : null
+      },
+      "pending" : {
+        "count" : 0,
+        "oldest_at" : null
+      },
+      "unconfirmed" : {
+        "count" : 0,
+        "oldest_at" : null
+      },
+      "violations" : {
+        "count" : 0,
+        "oldest_at" : null
+      }
+    }
+  }
+}

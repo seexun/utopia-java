@@ -1,0 +1,46 @@
+{
+  "meta" : {
+    "scenario" : "heart-replay",
+    "step" : "find-obs-3-doc",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/documents?q=replay-3&limit=5&offset=0",
+    "target" : "rust",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "deleted" : 0,
+    "docs" : [ {
+      "chunk_count" : 1,
+      "created_at" : "<ts>",
+      "deleted_at" : null,
+      "doc_time" : null,
+      "doc_time_source" : "none",
+      "error" : null,
+      "external_key" : "statements:replay-3",
+      "filename" : "replay-3.json",
+      "graph_error" : null,
+      "graph_status" : "done",
+      "id" : "<uuid>",
+      "kb_id" : "<uuid>",
+      "mime" : "application/json",
+      "missing_since" : null,
+      "purged_at" : null,
+      "reader_needed" : null,
+      "sha256" : "f2dc2d6efb10f8b48be43c4ee9983a2458e2da09c841815485c579742e2dbb45",
+      "size_bytes" : 310,
+      "source_id" : "<uuid>",
+      "status" : "ready",
+      "tags" : [ ],
+      "text_len" : 311,
+      "time_context" : null,
+      "time_context_at" : null,
+      "updated_at" : "<ts>"
+    } ],
+    "done" : 3,
+    "extracting" : 0,
+    "failed" : 0,
+    "ready" : 3,
+    "total" : 1
+  }
+}

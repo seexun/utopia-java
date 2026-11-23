@@ -1,0 +1,15 @@
+{
+  "meta" : {
+    "scenario" : "mappings",
+    "step" : "mapping-preview-unmounted-422",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/mappings/preview",
+    "target" : "rust",
+    "expectedStatus" : 422,
+    "status" : 422
+  },
+  "normalized" : {
+    "code" : "source_not_mounted",
+    "error" : "That data source is not mounted on this knowledge base"
+  }
+}

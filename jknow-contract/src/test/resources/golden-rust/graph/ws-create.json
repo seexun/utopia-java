@@ -1,0 +1,17 @@
+{
+  "meta" : {
+    "scenario" : "graph",
+    "step" : "ws-create",
+    "method" : "POST",
+    "path" : "/api/v1/workspaces",
+    "target" : "rust",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "created_at" : "<ts>",
+    "id" : "<uuid>",
+    "name" : "ws-contract-graph",
+    "org_id" : "<uuid>"
+  }
+}

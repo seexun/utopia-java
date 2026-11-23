@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "heart-merge",
+    "step" : "review-decide-merge",
+    "method" : "STORE",
+    "path" : "decide_review",
+    "target" : "rust",
+    "expectedStatus" : null,
+    "status" : 200
+  },
+  "normalized" : {
+    "ok" : true
+  }
+}

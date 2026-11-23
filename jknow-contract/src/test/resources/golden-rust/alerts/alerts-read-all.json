@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "alerts",
+    "step" : "alerts-read-all",
+    "method" : "POST",
+    "path" : "/api/v1/alerts/read-all",
+    "target" : "rust",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "marked" : 0
+  }
+}

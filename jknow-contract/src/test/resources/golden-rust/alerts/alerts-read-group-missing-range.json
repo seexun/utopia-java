@@ -1,0 +1,12 @@
+{
+  "meta" : {
+    "scenario" : "alerts",
+    "step" : "alerts-read-group-missing-range",
+    "method" : "POST",
+    "path" : "/api/v1/alerts/read-group",
+    "target" : "rust",
+    "expectedStatus" : 422,
+    "status" : 422
+  },
+  "normalized" : "Failed to deserialize the JSON body into the target type: missing field `from` at line 1 column 40"
+}

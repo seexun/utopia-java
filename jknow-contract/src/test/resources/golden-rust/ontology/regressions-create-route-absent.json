@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "ontology",
+    "step" : "regressions-create-route-absent",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/ontology/regressions",
+    "target" : "both",
+    "expectedStatus" : 404,
+    "status" : 404
+  },
+  "normalized" : {
+    "error" : "Not found"
+  }
+}

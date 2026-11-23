@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "ontology",
+    "step" : "rule-patch",
+    "method" : "PATCH",
+    "path" : "/api/v1/kbs/${kb_id}/rules/${rule_id}",
+    "target" : "rust",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "ok" : true
+  }
+}

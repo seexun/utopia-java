@@ -1,0 +1,29 @@
+{
+  "meta" : {
+    "scenario" : "workspace-kb",
+    "step" : "ws-settings-test",
+    "method" : "POST",
+    "path" : "/api/v1/workspaces/${ws_id}/settings/test",
+    "target" : "rust",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "chat" : {
+      "error" : "Not configured",
+      "ok" : false
+    },
+    "embed" : {
+      "error" : "Not configured",
+      "ok" : false
+    },
+    "ocr" : {
+      "error" : "the OCR service is unreachable: error sending request for url (http://127.0.0.1:1/health): client error (Connect): tcp connect error: Connection refused (os error 111)",
+      "ok" : false
+    },
+    "transcribe" : {
+      "error" : "the transcription model is unreachable: error sending request for url (http://127.0.0.1:1/audio/transcriptions): client error (Connect): tcp connect error: Connection refused (os error 111)",
+      "ok" : false
+    }
+  }
+}

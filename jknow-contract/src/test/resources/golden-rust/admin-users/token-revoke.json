@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "admin-users",
+    "step" : "token-revoke",
+    "method" : "DELETE",
+    "path" : "/api/v1/me/tokens/${token_id}",
+    "target" : "rust",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "ok" : true
+  }
+}

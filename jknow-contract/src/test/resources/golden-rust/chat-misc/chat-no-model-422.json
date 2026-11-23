@@ -1,0 +1,15 @@
+{
+  "meta" : {
+    "scenario" : "chat-misc",
+    "step" : "chat-no-model-422",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/chat",
+    "target" : "both",
+    "expectedStatus" : 422,
+    "status" : 422
+  },
+  "normalized" : {
+    "code" : "no_chat_model",
+    "error" : "Chat model not configured. Go to Settings → Models."
+  }
+}

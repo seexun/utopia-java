@@ -1,0 +1,19 @@
+{
+  "meta" : {
+    "scenario" : "workspace-kb",
+    "step" : "kb-members-after-remove",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/members",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "members" : [ {
+      "display_name" : "Contract Wskb",
+      "email" : "contract-wskb@test.local",
+      "role" : "admin",
+      "user_id" : "<uuid>"
+    } ]
+  }
+}

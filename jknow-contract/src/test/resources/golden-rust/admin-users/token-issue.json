@@ -1,0 +1,25 @@
+{
+  "meta" : {
+    "scenario" : "admin-users",
+    "step" : "token-issue",
+    "method" : "POST",
+    "path" : "/api/v1/me/tokens",
+    "target" : "rust",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "info" : {
+      "created_at" : "<ts>",
+      "expires_at" : "<ts>",
+      "id" : "<uuid>",
+      "kb_ids" : null,
+      "last_used_at" : null,
+      "name" : "contract-admin-pat",
+      "revoked_at" : null,
+      "scope" : "read",
+      "token_prefix" : "<masked>"
+    },
+    "token" : "<masked>"
+  }
+}

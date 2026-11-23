@@ -1,0 +1,15 @@
+{
+  "meta" : {
+    "scenario" : "ontology",
+    "step" : "relation-type-reconcile-without-uniqueness-422",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/ontology/relation-types/${rt_id}/reconcile",
+    "target" : "rust",
+    "expectedStatus" : 422,
+    "status" : 422
+  },
+  "normalized" : {
+    "code" : "not_unique",
+    "error" : "declare the relation functional or inverse-functional first; the engine does not infer it"
+  }
+}

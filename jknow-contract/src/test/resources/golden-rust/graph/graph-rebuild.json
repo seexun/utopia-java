@@ -1,0 +1,16 @@
+{
+  "meta" : {
+    "scenario" : "graph",
+    "step" : "graph-rebuild",
+    "method" : "POST",
+    "path" : "/api/v1/kbs/${kb_id}/graph/rebuild",
+    "target" : "rust",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "entities_removed" : 0,
+    "facts_removed" : 0,
+    "queued" : 0
+  }
+}

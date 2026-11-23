@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "chat-misc",
+    "step" : "pat-revoke",
+    "method" : "DELETE",
+    "path" : "/api/v1/me/tokens/${pat_id}",
+    "target" : "rust",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "ok" : true
+  }
+}

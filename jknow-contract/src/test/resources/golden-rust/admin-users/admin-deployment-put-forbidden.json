@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "admin-users",
+    "step" : "admin-deployment-put-forbidden",
+    "method" : "PUT",
+    "path" : "/api/v1/admin/deployment",
+    "target" : "both",
+    "expectedStatus" : 403,
+    "status" : 403
+  },
+  "normalized" : {
+    "error" : "You don't have permission to do that"
+  }
+}

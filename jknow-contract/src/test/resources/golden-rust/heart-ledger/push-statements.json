@@ -1,0 +1,14 @@
+{
+  "meta" : {
+    "scenario" : "heart-ledger",
+    "step" : "push-statements",
+    "method" : "POST",
+    "path" : "/api/v1/sources/${src_id}/statements",
+    "target" : "rust",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "action" : "created"
+  }
+}

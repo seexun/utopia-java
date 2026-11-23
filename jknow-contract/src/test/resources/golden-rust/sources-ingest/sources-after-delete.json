@@ -1,0 +1,44 @@
+{
+  "meta" : {
+    "scenario" : "sources-ingest",
+    "step" : "sources-after-delete",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/sources",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "sources" : [ {
+      "config" : { },
+      "doc_count" : 1,
+      "icon" : null,
+      "id" : "<uuid>",
+      "kind" : "api",
+      "last_sync_added" : 0,
+      "last_sync_at" : "<ts>",
+      "last_sync_error" : null,
+      "last_sync_status" : "ok",
+      "missing_count" : 0,
+      "name" : "src-contract-api",
+      "rss_full_content" : null,
+      "sync_cron" : null,
+      "sync_interval_minutes" : null
+    }, {
+      "config" : { },
+      "doc_count" : 1,
+      "icon" : null,
+      "id" : "<uuid>",
+      "kind" : "statements",
+      "last_sync_added" : 0,
+      "last_sync_at" : "<ts>",
+      "last_sync_error" : null,
+      "last_sync_status" : "ok",
+      "missing_count" : 0,
+      "name" : "src-contract-statements",
+      "rss_full_content" : null,
+      "sync_cron" : null,
+      "sync_interval_minutes" : null
+    } ]
+  }
+}

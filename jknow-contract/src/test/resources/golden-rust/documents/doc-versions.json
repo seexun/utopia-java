@@ -1,0 +1,19 @@
+{
+  "meta" : {
+    "scenario" : "documents",
+    "step" : "doc-versions",
+    "method" : "GET",
+    "path" : "/api/v1/documents/${doc_id}/versions",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "versions" : [ {
+      "ingested_at" : "<ts>",
+      "sha256" : "e9cba56e4c0095baad5adbc66c4a215121f52b05f7228fa9d14b5879e9e81af9",
+      "size_bytes" : 65,
+      "version" : 1
+    } ]
+  }
+}

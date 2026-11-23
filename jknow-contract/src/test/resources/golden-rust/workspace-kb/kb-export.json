@@ -1,0 +1,12 @@
+{
+  "meta" : {
+    "scenario" : "workspace-kb",
+    "step" : "kb-export",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/export",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : null
+}

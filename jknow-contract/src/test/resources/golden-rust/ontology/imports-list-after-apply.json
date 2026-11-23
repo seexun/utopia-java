@@ -1,0 +1,39 @@
+{
+  "meta" : {
+    "scenario" : "ontology",
+    "step" : "imports-list-after-apply",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/ontology/imports",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : {
+    "imports" : [ {
+      "byte_size" : 99,
+      "filename" : "contract-mini.ttl",
+      "format" : "turtle",
+      "id" : "<uuid>",
+      "imported_at" : "<ts>",
+      "imported_by_name" : "Contract Onto",
+      "summary" : {
+        "attributes_created" : 0,
+        "attributes_seen" : 0,
+        "attributes_skipped" : { },
+        "classes_created" : 0,
+        "classes_key_taken" : 0,
+        "classes_updated" : 1,
+        "classes_without_description" : 1,
+        "functional_relations" : 0,
+        "inverse_linked" : 0,
+        "relations_created" : 0,
+        "relations_seen" : 0,
+        "relations_superseded" : 0,
+        "relations_updated" : 0,
+        "sub_property_linked" : 0,
+        "triples" : 1,
+        "unprojected" : [ ]
+      }
+    } ]
+  }
+}

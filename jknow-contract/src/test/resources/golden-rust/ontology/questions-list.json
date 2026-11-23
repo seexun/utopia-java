@@ -1,0 +1,25 @@
+{
+  "meta" : {
+    "scenario" : "ontology",
+    "step" : "questions-list",
+    "method" : "GET",
+    "path" : "/api/v1/kbs/${kb_id}/questions",
+    "target" : "both",
+    "expectedStatus" : 200,
+    "status" : 200
+  },
+  "normalized" : [ {
+    "created_at" : "<ts>",
+    "created_by" : "<uuid>",
+    "expected_answer" : null,
+    "id" : "<uuid>",
+    "kb_id" : "<uuid>",
+    "last_checked_at" : null,
+    "last_result" : null,
+    "needs" : null,
+    "origin" : "person",
+    "question" : "Who works at Acme?",
+    "status" : "accepted",
+    "updated_at" : "<ts>"
+  } ]
+}
