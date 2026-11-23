@@ -165,6 +165,9 @@ alerts 2、search 5（BM25 命中路径）、chat-misc 4、auth 1（source-push-
 - **双 smoke**（`JKNOW_APP_BASE=http://localhost:27401`）：`smoke-p0.sh` **20/20 ALL PASS**；
   `smoke-p1.sh` **PASS=67 SKIP=1**（LLM chat 面条件断言，同基线）。smoke 后按 README 口径
   重灌 seed（smoke-p1 自足段跑毕会 teardown 演示数据）。
+  **运维发现（本轮实录后新增）**：smoke-p0/p1 脚本开头即关 captcha（UPDATE false + flushdb）
+  且跑毕**不复位**——回归收尾后已手动复位 true + DEL redis 并实测强制（无验证码 /login →
+  `{"msg":"验证码已失效","code":500}`）；smoke 脚本族的 captcha 复位留作后续小改（不入本批）。
 - **前端**：`cd jknow-web && pnpm test` → **425 passed**（test-infra 批基线 425 零漂移）。
 
 ## §6 Deviation 清单（与计划文本的差异）
@@ -187,6 +190,9 @@ alerts 2、search 5（BM25 命中路径）、chat-misc 4、auth 1（source-push-
    并非「失配超预期」的触发）。
 6. **smoke 双跑后重灌 seed**：README 口径（smoke-p1 自足段跑毕 teardown 演示数据），为留
    演示态补一次 `seed-demo.sql`（计划未列，属演示环境收尾）。
+7. **smoke 脚本不复位 captcha**（运维发现）：smoke-p0/p1 开头关 captcha（脚本内置序列）跑毕
+   不复位——与契约实录的 captcha 纪律不同源，回归收尾后手动复位 true 并实测强制（§5）；
+   脚本复位逻辑留作后续小改。
 
 ## §7 Commit 与产物
 
