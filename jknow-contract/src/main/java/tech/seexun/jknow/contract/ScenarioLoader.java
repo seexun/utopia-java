@@ -13,6 +13,7 @@ import java.util.Map;
 import org.yaml.snakeyaml.Yaml;
 import tech.seexun.jknow.contract.model.RegisterSetup;
 import tech.seexun.jknow.contract.model.Scenario;
+import tech.seexun.jknow.contract.model.Setup;
 import tech.seexun.jknow.contract.model.SnapshotSpec;
 import tech.seexun.jknow.contract.model.SqlSpec;
 import tech.seexun.jknow.contract.model.Step;
@@ -45,10 +46,8 @@ public final class ScenarioLoader {
     private static Scenario fromMap(String src, Map<?, ?> root) {
         String name = requireString(root, "name", src);
         String desc = optString(root, "desc");
-        RegisterSetup setup = optMap(root, "setup") == null ? null
-                : optRegister(src, "setup.register", optMap(root, "setup"), "register");
-        List<RegisterSetup> ensure = new ArrayList<>();
         Map<?, ?> setupNode = optMap(root, "setup");
+        List<RegisterSetup> ensure = new ArrayList<>();
         Object ensureNode = setupNode == null ? null : setupNode.get("ensure");
         if (ensureNode != null) {
             if (!(ensureNode instanceof List<?> list)) {
@@ -58,9 +57,7 @@ public final class ScenarioLoader {
                 ensure.add(parseRegisterBody(src, "setup.ensure[]", asMap(item, src + ": setup.ensure[]")));
             }
         }
-        if (setupNode != null && setup == null && ensure.isEmpty()) {
-            throw new IllegalArgumentException(src + ": setup 至少需要 register 或 ensure 之一");
-        }
+        Setup setup = setupNode == null ? null : parseSetup(src, setupNode, ensure);
         Map<String, String> vars = new LinkedHashMap<>();
         Map<?, ?> varsNode = optMap(root, "vars");
         if (varsNode != null) {
@@ -68,6 +65,33 @@ public final class ScenarioLoader {
         }
         List<Step> steps = parseSteps(src, root.get("steps"));
         return new Scenario(name, desc, setup, ensure, vars, steps);
+    }
+
+    /**
+     * setup 块解析（P3 复活批两模式）：mode 缺省 register（源仓注册流，register 或 ensure
+     * 至少其一——旧校验口径不变）；ruoyi_login 需 username/password 且不接受 register/ensure
+     * （那是源仓注册流装置，混写是剧本错误）。ensure-only 时返回 null（无会话开局，旧语义：
+     * Scenario.setup() 为 null）。
+     */
+    private static Setup parseSetup(String src, Map<?, ?> setupNode, List<RegisterSetup> ensure) {
+        Setup.Mode mode = Setup.parseMode(optString(setupNode, "mode"), src);
+        RegisterSetup register = optRegister(src, "setup.register", setupNode, "register");
+        String username = optString(setupNode, "username");
+        String password = optString(setupNode, "password");
+        if (mode == Setup.Mode.RUOYI_LOGIN) {
+            if (username == null || username.isBlank() || password == null || password.isBlank()) {
+                throw new IllegalArgumentException(src + ": setup.mode=ruoyi_login 需要 username 与 password");
+            }
+            if (register != null || !ensure.isEmpty()) {
+                throw new IllegalArgumentException(src
+                        + ": setup.mode=ruoyi_login 不接受 register/ensure（那是源仓注册流装置）");
+            }
+            return new Setup(mode, null, username, password);
+        }
+        if (register == null && ensure.isEmpty()) {
+            throw new IllegalArgumentException(src + ": setup 至少需要 register 或 ensure 之一");
+        }
+        return register == null ? null : new Setup(mode, register, null, null);
     }
 
     /** setup.register / setup.ensure[] 共用的单账号体解析。 */

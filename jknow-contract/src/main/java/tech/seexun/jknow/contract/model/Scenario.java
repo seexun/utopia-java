@@ -20,7 +20,11 @@ import java.util.Map;
  *
  * <p>M1 双打裁定（m1-recon §5）：setup 块整体视为 {@code target: rust}——账号注册/登录是
  * 写路径，归 Rust（两服务共享同一 PostgreSQL）；步骤级定向见 {@link Step#target()}。
+ *
+ * <p>P3 golden 复活批：setup 块升级为 {@link Setup}（mode 缺省 register，向后兼容）——
+ * {@code mode: ruoyi_login} 时以若依 {@code POST /login} 捕 token 建 Bearer 会话
+ * （utopia 注册流在 jknow 已随 auth 域退役）。
  */
-public record Scenario(String name, String desc, RegisterSetup setup,
+public record Scenario(String name, String desc, Setup setup,
                        List<RegisterSetup> ensure, Map<String, String> vars, List<Step> steps) {
 }

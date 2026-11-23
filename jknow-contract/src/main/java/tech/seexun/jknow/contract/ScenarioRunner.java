@@ -22,6 +22,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import tech.seexun.jknow.contract.model.RegisterSetup;
 import tech.seexun.jknow.contract.model.Scenario;
+import tech.seexun.jknow.contract.model.Setup;
 import tech.seexun.jknow.contract.model.Step;
 import tech.seexun.jknow.contract.model.Target;
 
@@ -67,11 +68,18 @@ import tech.seexun.jknow.contract.model.Target;
  * ——rust 轮映射 Rust HTTP 等价端点；java 轮经 {@link StoreBridge} 直调 utopia-store
  * 的 Spring bean（M4 前 Java 侧唯一通道）。落常量样本，真实对错由快照裁决。</li>
  * </ul>
+ *
+ * <p>P3 golden 复活批（jknow 对表）：setup 增 ruoyi_login 模式（{@code setup.mode: ruoyi_login}
+ * ——POST /login 捕 token，会话标识 {@code "bearer:<token>"} 走 Authorization 默认注入，
+ * cookie 路径零触碰）；ruoyi_login 剧本的 owner 侧普通步增假 200 识别（若依 renderString
+ * 恒 HTTP 200，body code ∉ {200,0} 判步失败）。
  */
 public final class ScenarioRunner {
 
     private static final Pattern VAR = Pattern.compile("\\$\\{([^}]+)}");
     private static final String JSON = "application/json";
+    /** ruoyi_login 会话标识前缀（区别于 cookie 会话；applyHeaders 据此注入 Authorization）。 */
+    private static final String BEARER_PREFIX = "bearer:";
 
     private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     /** 单打目标；双打时为 null。 */
@@ -423,9 +431,16 @@ public final class ScenarioRunner {
      * 不建立会话。只有 ensure 时剧本以无 cookie 开跑（401 无会话用例段），login 步骤再建立会话。
      * 双打下 setup 整体打写路径侧（默认 Rust；--writes java 时打 Java——注册/登录是写路径，
      * 且会话须与后续重定向写步同侧）。register 体支持 ${var}（如 ${run_id} 唯一后缀）。
+     *
+     * <p>P3 golden 复活批增 ruoyi_login 分支：{@code setup.mode: ruoyi_login} 时 POST /login
+     * 捕 token，返回 {@code bearer:<token>} 会话标识（见 {@link #ruoyiLoginSetup}）——cookie 路径零触碰。
      */
     private String setup(Scenario scenario, Map<String, String> vars) {
-        RegisterSetup reg = scenario.setup();
+        Setup block = scenario.setup();
+        if (block != null && block.ruoyiLogin()) {
+            return ruoyiLoginSetup(scenario, block, vars);
+        }
+        RegisterSetup reg = block == null ? null : block.register();
         if (reg != null) {
             vars.put("register.email", substitute(scenario, "setup.register", reg.email(), vars));
             vars.put("register.password", substitute(scenario, "setup.register", reg.password(), vars));
@@ -458,6 +473,46 @@ public final class ScenarioRunner {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new ScenarioFailure("剧本 " + scenario.name() + ": setup 被中断", e);
+        }
+    }
+
+    /**
+     * ruoyi_login setup（P3 golden 复活批）：POST /login 捕 token 建 Bearer 会话。
+     * 若依 AjaxResult 恒 HTTP 200（renderString 包装），业务成败只在 body code——
+     * code ∉ {200, 0} 即 setup 失败（假 200 识别的 setup 侧）。token 在顶层
+     * （实测 27401：{@code {"msg","code","token"}}；data.token 作兼容变体兜底）。
+     * 返回 {@code "bearer:<token>"}：与 cookie 会话标识区分，后续步由 {@link #applyHeaders}
+     * 默认注入 {@code Authorization: Bearer}（步级 headers 仍可覆盖）。token 同时进
+     * vars（{@code ${token}}），步级 capture 亦可见。
+     */
+    private String ruoyiLoginSetup(Scenario scenario, Setup block, Map<String, String> vars) {
+        String base = dual() ? ("java".equals(writesSide) ? java : rust) : single;
+        String user = substitute(scenario, "setup.username", block.username(), vars);
+        String pass = substitute(scenario, "setup.password", block.password(), vars);
+        try {
+            Resp login = send(base, "POST", "/login",
+                    "{\"username\":\"" + user + "\",\"password\":\"" + pass + "\"}", null, null);
+            JsonNode body = new com.fasterxml.jackson.databind.ObjectMapper().readTree(login.body());
+            int code = body.path("code").asInt(-1);
+            if (login.status() != 200 || (code != 200 && code != 0)) {
+                throw new ScenarioFailure("剧本 " + scenario.name() + ": ruoyi setup 失败 HTTP "
+                        + login.status() + " code=" + code + " " + preview(login.body()));
+            }
+            String token = body.path("token").asText("");
+            if (token.isBlank()) {
+                token = body.path("data").path("token").asText("");
+            }
+            if (token.isBlank()) {
+                throw new ScenarioFailure("剧本 " + scenario.name() + ": ruoyi setup 响应无 token "
+                        + preview(login.body()));
+            }
+            vars.put("token", token);
+            return BEARER_PREFIX + token;
+        } catch (IOException e) {
+            throw new ScenarioFailure("剧本 " + scenario.name() + ": ruoyi setup 请求异常 " + base, e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ScenarioFailure("剧本 " + scenario.name() + ": ruoyi setup 被中断", e);
         }
     }
 
@@ -537,6 +592,9 @@ public final class ScenarioRunner {
                 resp = send(base, call.method(), path, body, headers, cookie[0]);
             }
             if (owner) {
+                if (scenario.setup() != null && scenario.setup().ruoyiLogin()) {
+                    assertBusinessOk(scenario, step, resp);
+                }
                 applyCaptures(scenario, step, resp, vars, cookie);
                 if (step.expectStatus() != null && resp.status() != step.expectStatus()) {
                     throw new ScenarioFailure("剧本 " + scenario.name() + " 步骤 " + step.id()
@@ -648,12 +706,38 @@ public final class ScenarioRunner {
         return new Resp(resp.statusCode(), resp.body(), resp.headers().map());
     }
 
+    /** 会话头注入：bearer: 前缀（ruoyi_login 会话）→ Authorization，否则按 cookie 携带。 */
     private static void applyHeaders(HttpRequest.Builder builder, Map<String, String> headers, String cookie) {
         if (cookie != null) {
-            builder.header("Cookie", cookie);
+            if (cookie.startsWith(BEARER_PREFIX)) {
+                builder.header("Authorization", "Bearer " + cookie.substring(BEARER_PREFIX.length()));
+            } else {
+                builder.header("Cookie", cookie);
+            }
         }
         if (headers != null) {
             headers.forEach(builder::header);
+        }
+    }
+
+    /**
+     * 假 200 识别（P3 golden 复活批，仅 ruoyi_login 剧本的 owner 侧普通步）：若依
+     * renderString 把业务错误也写成 HTTP 200，body code ∉ {200, 0} 即步失败（错误带 msg）。
+     * expect/capture 前先过这道——业务失败时捕获与 expect 的报错都不如 msg 直接。
+     * 无 code 字段的响应（utopia 形状如 404 的 {"error":...}、空集形状、非 JSON 体）不受影响。
+     */
+    private static void assertBusinessOk(Scenario scenario, Step step, Resp resp) {
+        JsonNode body;
+        try {
+            body = new com.fasterxml.jackson.databind.ObjectMapper().readTree(resp.body());
+        } catch (IOException e) {
+            return; // 非 JSON 体不适用 AjaxResult 约定
+        }
+        JsonNode code = body.path("code");
+        if (code.isNumber() && code.asInt() != 200 && code.asInt() != 0) {
+            throw new ScenarioFailure("剧本 " + scenario.name() + " 步骤 " + step.id()
+                    + ": 业务失败（HTTP " + resp.status() + " code=" + code.asInt()
+                    + "）msg=" + preview(body.path("msg").asText("")));
         }
     }
 

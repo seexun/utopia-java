@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import tech.seexun.jknow.contract.model.Scenario;
+import tech.seexun.jknow.contract.model.Setup;
 import tech.seexun.jknow.contract.model.Step;
 import tech.seexun.jknow.contract.model.Target;
 
@@ -37,8 +38,9 @@ class ScenarioLoaderTests {
     @Test void 装载YAML到模型() {
         Scenario scenario = ScenarioLoader.fromYamlString(YAML);
         assertEquals("kbs-core", scenario.name());
-        assertEquals("contract0@test.local", scenario.setup().email());
-        assertEquals("Contract", scenario.setup().displayNameOrDefault());
+        assertEquals("contract0@test.local", scenario.setup().register().email());
+        assertEquals("Contract", scenario.setup().register().displayNameOrDefault());
+        assertEquals(Setup.Mode.REGISTER, scenario.setup().modeOrDefault());
         assertEquals("01a1b4dc-b012-78e2-b4ff-22d91f94ea2b", scenario.vars().get("ws_id"));
         assertEquals(3, scenario.steps().size());
         assertNotNull(scenario.steps().get(0).capture());
@@ -272,6 +274,82 @@ class ScenarioLoaderTests {
                             wait: { kb_id: '${kb_id}' }
                             store: { op: decide_review }
                         """));
-        assertEquals("<string>: steps[0] wait/store 互斥（一步只能是其一）", twoPayloads.getMessage());
+            assertEquals("<string>: steps[0] wait/store 互斥（一步只能是其一）", twoPayloads.getMessage());
+    }
+
+    /** P3 golden 复活批：ruoyi_login setup 模式（若依 /login 捕 token，Bearer 会话）。 */
+    @Test void 装载ruoyiLoginSetup模式() {
+        Scenario scenario = ScenarioLoader.fromYamlString("""
+                name: ruoyi
+                setup:
+                  mode: ruoyi_login
+                  username: admin
+                  password: admin123
+                steps:
+                  - id: graph-404
+                    call: GET /api/v1/kbs/00000000-0000-0000-0000-000000000000/graph/overview
+                    expect: { status: 404 }
+                """);
+        assertEquals(Setup.Mode.RUOYI_LOGIN, scenario.setup().modeOrDefault());
+        assertEquals(true, scenario.setup().ruoyiLogin());
+        assertEquals("admin", scenario.setup().username());
+        assertEquals("admin123", scenario.setup().password());
+        assertEquals(null, scenario.setup().register());
+    }
+
+    /** mode 缺省 REGISTER：旧剧本无 mode 键即源仓注册流，向后兼容。 */
+    @Test void setup无mode键缺省register() {
+        Scenario scenario = ScenarioLoader.fromYamlString(YAML);
+        assertEquals(Setup.Mode.REGISTER, scenario.setup().modeOrDefault());
+        assertEquals(false, scenario.setup().ruoyiLogin());
+    }
+
+    /** ruoyi_login 缺 username/password 是剧本写错，早暴露。 */
+    @Test void ruoyiLogin缺username或password报错() {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> ScenarioLoader.fromYamlString("""
+                        name: x
+                        setup:
+                          mode: ruoyi_login
+                          username: admin
+                        steps:
+                          - id: a
+                            call: GET /health
+                        """));
+        assertEquals("<string>: setup.mode=ruoyi_login 需要 username 与 password", e.getMessage());
+    }
+
+    /** ruoyi_login 混写 register/ensure（源仓注册流装置）是剧本写错，早暴露。 */
+    @Test void ruoyiLogin混写register与ensure报错() {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> ScenarioLoader.fromYamlString("""
+                        name: x
+                        setup:
+                          mode: ruoyi_login
+                          username: admin
+                          password: admin123
+                          register: { email: a@test.local, password: Bb!20260101 }
+                        steps:
+                          - id: a
+                            call: GET /health
+                        """));
+        assertEquals("<string>: setup.mode=ruoyi_login 不接受 register/ensure（那是源仓注册流装置）",
+                e.getMessage());
+    }
+
+    /** setup.mode 非法值可定位报错。 */
+    @Test void setupMode非法值报可定位错误() {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> ScenarioLoader.fromYamlString("""
+                        name: x
+                        setup:
+                          mode: login
+                          username: admin
+                          password: admin123
+                        steps:
+                          - id: a
+                            call: GET /health
+                        """));
+        assertEquals("<string>: setup.mode 必须是 register|ruoyi_login，实际是: login", e.getMessage());
     }
 }
