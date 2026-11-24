@@ -972,6 +972,7 @@ export const en = {
     /* 边语义图例（规格 graph-edge-legend.md）：粗细/颜色是边的语言，
        这一行把它说破。常显，不藏弹层 */
     edgeLegend: "Edge styles",
+    showAllEdgeLabels: "Show all edge labels",
     edgeFact: "Fact",
     edgeInferred: "Inferred",
     edgeDerived: "Derived",

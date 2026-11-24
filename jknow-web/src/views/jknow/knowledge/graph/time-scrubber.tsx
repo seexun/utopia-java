@@ -353,9 +353,14 @@ export const TimeScrubber = defineComponent({
             />
           </div>
 
-          <span class="shrink-0 tabular-nums text-aux text-ink-2">
-            {maxYear.value}
-          </span>
+          {/* 轴端年份与当前值同文本时只显示一个（国内风收口走查 A7：
+              2026/2026 双标签重复——注意 maxYear 是 number、label 是 string，
+              必须先归一再比较） */}
+          {String(maxYear.value) !== label.value && (
+            <span class="shrink-0 tabular-nums text-aux text-ink-2">
+              {maxYear.value}
+            </span>
+          )}
 
           <div class="w-[5.6rem] shrink-0 text-center tabular-nums text-sub text-ink">
             {label.value}

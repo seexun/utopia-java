@@ -27,6 +27,7 @@ import CircleDashedIcon from "~icons/lucide/circle-dashed";
 import GrapeIcon from "~icons/lucide/grape";
 import ZoomInIcon from "~icons/lucide/zoom-in";
 import ZoomOutIcon from "~icons/lucide/zoom-out";
+import Loader2Icon from "~icons/lucide/loader-2";
 import Maximize2Icon from "~icons/lucide/maximize-2";
 import WaypointsIcon from "~icons/lucide/waypoints";
 import GitCompareIcon from "~icons/lucide/git-compare";
@@ -41,8 +42,10 @@ import type { GraphEdge, GraphNode } from "@/api/knowledge/types";
 import { S } from "@/i18n";
 import { nextStep } from "@/domain/nextStep";
 import { highlightSegments } from "@/utils/highlightSegments";
+import { zhEdge } from "./predicate-zh";
 import { useKbContextHook } from "@/store/knowledge/modules/kb";
 import { useKbScope } from "@/composables/useKbScope";
+import useSettingsStore from "@/store/modules/settings";
 import {
   EDGE,
   EDGE_CONTEST,
@@ -348,8 +351,59 @@ const fadeMap = new Map<string, number>();
 const derivedRevealed = ref(false);
 /** 开关/入场的渐变：{ 起始时刻, 朝哪个方向 }；null = 没有过渡在飞 */
 const derivedToggle = ref<{ at: number; on: boolean } | null>(null);
-/** 近到什么程度算「贴脸看」：到了就每条边都写字 */
-const deepZoom = ref(false);
+/** 国内风收口（走查 A3）：边标签显示开关——默认隐藏（off），开=全量显示中文
+ *  标签。hover/钉住单条边的显示走 edgeChip 浮层，与本开关互斥（开关开着时
+ *  浮层不出现，避免重复）。renderEdgeLabels 由它作为唯一事实源驱动 */
+const showAllEdgeLabels = ref(false);
+/** 相机变动记号：边标签浮层（edgeChip）按它重算视口坐标 */
+const camTick = ref(0);
+
+/* 开关是 renderEdgeLabels 的唯一事实源（zoom 联动已移除，国内风收口走查 A3） */
+watch(showAllEdgeLabels, v => {
+  sigmaRef.value?.setSetting("renderEdgeLabels", v);
+});
+
+/* 主题切换时画布整套重上妆（国内风收口走查 A1 暗色档）：refreshPalette 读
+   令牌（computed style 随 html.dark 翻转）→ sigma 重画节点/边 → 网格层重铺
+   底色与点阵。此前主题切换画布不重绘（pill/边沿用旧主题妆），底色填充会
+   把这一点放大成暗色下刺眼的亮灰，故补齐 */
+const settingsStore = useSettingsStore();
+watch(
+  () => settingsStore.isDark,
+  () => {
+    /* 先等一拍：useDark 的 html.dark 类是 post-flush 才落 DOM，本回调
+       （pre-flush）跑在它之前——立刻取令牌会拿到旧主题值（走查实证：
+       暗色下画布被画成亮灰）。nextTick 在整条 flush 队列之后，类已落好 */
+    nextTick(() => {
+      refreshPalette();
+      sigmaRef.value?.refresh();
+      if (gridRef.value && sigmaRef.value)
+        drawWorldGrid(gridRef.value, sigmaRef.value);
+    });
+  }
+);
+
+/* 悬停/钉住那条边的中文标签浮层：开关关闭时在边中点显示（开关开着全量已显，
+   浮层退场避免重复）。坐标随相机变动（camTick 在 sigma init 的 updated 钩子里
+   自增）重算；钉住（panelEdgeFocus）优先级低于悬停（正在悬停哪条看哪条） */
+const edgeChip = computed(() => {
+  const sigma = sigmaRef.value;
+  if (!sigma || showAllEdgeLabels.value) return null;
+  const id = hoverEdgeId.value ?? panelEdgeFocus.value;
+  const gg = sigma.getGraph();
+  if (!id || !gg.hasEdge(id)) return null;
+  const s = gg.source(id);
+  const t = gg.target(id);
+  if (!gg.hasNode(s) || !gg.hasNode(t)) return null;
+  void camTick.value;
+  const sx = gg.getNodeAttribute(s, "x") as number;
+  const sy = gg.getNodeAttribute(s, "y") as number;
+  const tx = gg.getNodeAttribute(t, "x") as number;
+  const ty = gg.getNodeAttribute(t, "y") as number;
+  const v = sigma.graphToViewport({ x: (sx + tx) / 2, y: (sy + ty) / 2 });
+  const raw = String(gg.getEdgeAttribute(id, "label") ?? "");
+  return { x: v.x, y: v.y - 16, label: zhEdge(raw) };
+});
 /** 幽灵边点进来：面板停在「推出来的」那一档、展开那一行（读一次就清） */
 const panelIntentHolder: { current: { view: "derived"; open: string } | null } = {
   current: null
@@ -613,7 +667,9 @@ function buildCanvas() {
   );
   for (const { edge: e, curvature, alsoLabels } of placed.edges) {
     g.addEdgeWithKey(e.id, e.source, e.target, {
-      label: (e.contested ? "⚠ " : "") + (e.label ?? ""),
+      // 国内风收口（走查 A3）：谓词键/逆说法中文化（未知键 fallback 原文）
+      label: (e.contested ? "⚠ " : "") + zhEdge(e.label ?? ""),
+      alsoLabels: alsoLabels?.map(zhEdge),
       // 方向 A（规格 §3）：普通/推断 2.5、禁用 1.5、派生/争议 3
       size: e.blocked ? 1.5 : e.derived || e.contested ? 3 : 2.5,
       color: e.blocked
@@ -629,7 +685,6 @@ function buildCanvas() {
       blocked: e.blocked,
       type: curvature === 0 ? "line" : "curved",
       curvature,
-      alsoLabels,
       derived: e.derived
     });
   }
@@ -772,8 +827,9 @@ function buildCanvas() {
         line: EdgeRectangleProgram,
         curved: EdgeCurveProgram
       }),
-      // 边上写的是谓词，近距离下每条画得出来的边都写
-      renderEdgeLabels: true,
+      // 边上写的是谓词（已中文化）：**默认隐藏**（国内风收口走查 A3）——
+      // 显示由 showAllEdgeLabels 开关作唯一事实源；hover/钉住单边走 edgeChip 浮层
+      renderEdgeLabels: false,
       minEdgeThickness: 2,
       // 上千个节点，得缩得比本体页更远才看得见全貌
       minCameraRatio: 0.04,
@@ -875,8 +931,8 @@ function buildCanvas() {
       const res = { ...attrs };
       const s = g.source(edge);
       const t = g.target(edge);
-      // 近距离下每条画得出来的边都写字（updateEdgeLabels）
-      if (deepZoom.value) res.forceLabel = true;
+      // 近距离写字的 zoom 联动已移除（国内风收口走查 A3）：renderEdgeLabels
+      // 由 showAllEdgeLabels 开关作唯一事实源；hover/钉住单边显示走 edgeChip 浮层
       /* 并进这条边的逆关系说法，接在本名后面（`PART OF ⁻¹ CONTAINS`）。
          两个触发点：鼠标压在这条边上，或压在它两端任一个节点上——
          后者才是实际用得上的那个（边只有一像素宽，精确悬停很难命中） */
@@ -1081,18 +1137,12 @@ function buildCanvas() {
     sigma.refresh();
   });
 
-  /* 边标签只在放大后出现（≤40 条边的图常写）；再近一档改成"看得见的线都写字" */
-  const updateEdgeLabels = () => {
-    const ratio = sigma.getCamera().ratio;
-    sigma.setSetting("renderEdgeLabels", ratio < 0.7 || g.size <= 40);
-    const deep = ratio < 0.35;
-    if (deep !== deepZoom.value) {
-      deepZoom.value = deep;
-      sigma.refresh({ skipIndexation: true });
-    }
-  };
-  sigma.getCamera().on("updated", updateEdgeLabels);
-  updateEdgeLabels();
+  /* 国内风收口（走查 A3）：zoom 驱动的边标签联动移除——renderEdgeLabels 由
+     showAllEdgeLabels 开关（卡头行2 弹层内）作唯一事实源；hover/钉住单边
+     显示走 edgeChipView 浮层（相机变动时 camTick 触发重算） */
+  sigma.getCamera().on("updated", () => {
+    camTick.value++;
+  });
   // 世界坐标网格：相机变动/容器尺寸变动时重绘
   const renderGrid = () => {
     if (gridRef.value) drawWorldGrid(gridRef.value, sigma);
@@ -1269,13 +1319,15 @@ const statsText = computed(() => {
             {{ kb?.name }}
           </span>
           <div class="ml-auto flex items-center gap-2">
-            <!-- 稳定提示（原右上浮组迁入：选行1 stats 旁，见任务报告偏差记录） -->
-            <div
+            <!-- 稳定提示 tag 化（国内风收口走查 A5）：裸文本改浅色 tag+spinner，
+                 完成即消失（v-if 语义不变） -->
+            <span
               v-if="stabilizing"
-              class="flex items-center gap-2 text-aux text-ink-2"
+              class="flex items-center gap-1 rounded-full bg-primary-soft px-2 py-0.5 text-aux text-primary"
             >
+              <Loader2Icon width="11" height="11" class="animate-spin" />
               {{ S.graph.stabilizing }}
-            </div>
+            </span>
             <!-- 节点档位 ± 步进器：控制画多少节点的档位（功能控件，非缩放）原样迁入 -->
             <div
               class="flex items-center overflow-hidden rounded-ctl border border-line"
@@ -1589,6 +1641,12 @@ const statsText = computed(() => {
                 />
                 {{ S.graph.edgeBlocked }}
               </span>
+              <!-- 国内风收口（走查 A3）：边标签显示开关——默认隐藏，开=全量
+                   显示中文标签（renderEdgeLabels 唯一事实源） -->
+              <el-divider style="margin: 4px 0" />
+              <el-checkbox v-model="showAllEdgeLabels" size="small">
+                {{ S.graph.showAllEdgeLabels }}
+              </el-checkbox>
             </div>
           </el-popover>
         </div>
@@ -1612,6 +1670,16 @@ const statsText = computed(() => {
         </p>
 
         <CanvasLoading v-if="data.isPending.value" />
+
+        <!-- 悬停/钉住边的中文标签浮层（国内风收口走查 A3）：开关关闭时在边
+             中点显示该边中文标签；开关开着全量已显，浮层退场避免重复 -->
+        <div
+          v-if="edgeChip"
+          class="pointer-events-none absolute z-20 max-w-40 -translate-x-1/2 -translate-y-1/2 truncate rounded-ctl border border-line bg-card px-2 py-0.5 text-aux text-ink shadow-pop"
+          :style="{ left: edgeChip.x + 'px', top: edgeChip.y + 'px' }"
+        >
+          {{ edgeChip.label }}
+        </div>
 
         <!-- 空状态：readiness 统一判定（#313），步骤话术 + 至多一个动作 -->
         <div
@@ -1655,8 +1723,7 @@ const statsText = computed(() => {
               />
             </template>
           </ToolButton>
-        </ToolTower>
-        <ToolTower>
+          <ToolDivider />
           <ToolButton
             :active="layoutMode === 'force'"
             :label="S.graph.layoutForce"
@@ -1699,8 +1766,7 @@ const statsText = computed(() => {
               <GrapeIcon width="15" height="15" />
             </template>
           </ToolButton>
-        </ToolTower>
-        <ToolTower>
+          <ToolDivider />
           <ToolButton
             :label="S.graph.zoomIn"
             @click="sigmaRef?.getCamera().animatedZoom({ duration: 220 })"

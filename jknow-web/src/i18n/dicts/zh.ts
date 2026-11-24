@@ -861,6 +861,7 @@ export const zh: Strings = {
     /* 边语义图例（规格 graph-edge-legend.md）：粗细/颜色是边的语言，
        这一行把它说破。常显，不藏弹层 */
     edgeLegend: "边样式",
+    showAllEdgeLabels: "显示全部标签",
     edgeFact: "事实",
     edgeInferred: "推断",
     edgeDerived: "推导",

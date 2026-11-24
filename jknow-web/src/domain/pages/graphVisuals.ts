@@ -49,6 +49,9 @@ export const CANVAS_FONT =
   '"Plus Jakarta Sans", "PingFang SC", "Microsoft YaHei", "HarmonyOS Sans SC", sans-serif';
 export let CANVAS_TEXT = "#ededed"; // --color-ink
 export let CANVAS_TEXT_2 = "#a8a8a8"; // --color-ink-2
+/** 画布底（国内风收口 2026-11-24）：亮 #f5f7fa/暗 #1a1a1a 随 --color-bg 翻转。
+ *  网格层（drawWorldGrid）先铺它再撒点阵——sigma WebGL 层透明，底色从这层透出 */
+export let CANVAS_BG = "#f5f7fa";
 /* 画在节点与连线之间的字比界面的正文小一档（12，规格 §2 提档）。**画布不是
    界面**：这些字压在一片线和点上，与它们比邻的是 9–18px 的节点，不是页面
    上的正文；旧档的 11 是跟着旧的小点一起定的。浮在画布之上的悬浮卡不算
@@ -191,21 +194,42 @@ export function drawNodeLabel(
      胶囊因此自带类型辨识；压暗/淡入时 typeColor 退灰，染白底与灰边随 mix
      公式自动成立 */
   const typeColor = data.typeColor || NODE_CORE_BASE;
-  const tint = mix(typeColor, "#ffffff", 0.15); // mix 在本文件：c1 向 c2 按 t 入白（签名 mix(c1,c2,t)）
-  /* 边：labelInvert(选中) → 主色 2px；labelLift(悬停) → 主色 1.5px；默认类型
-     色 1px。selectedNode 本就同时落 labelLift+labelInvert——invert 优先不是
-     兜底而是常态路径：选中正是靠它从悬停的 1.5px 顶到 2px 重档（「选中压过
-     指到」由 reducer 的 deferToHoverLayer 保证，同一节点不会同时画 hover 与
-     selected 两副胶囊）。状态记号全在描边上，节点本体底色不被状态改写 */
+  /* 国内风收口（2026-11-24 批走查 A2）：底从 15% 染白提档到 88% 染白——
+     老配方 85% 类型色近乎实心，是"旧徽章感"的来源；新配方白/深底+彩描边
+     +彩字（对比度 4.5:1 档），悬停/选中反转实心（fill=typeColor、字翻底色）。
+     暗色主题底走深灰档、彩字提亮——主题从 html.dark 现读（画布读不到 var()） */
+  const isDark =
+    typeof document !== "undefined" &&
+    document.documentElement.classList.contains("dark");
+  const tint = mix(
+    typeColor,
+    isDark ? "#1f1f1f" : "#ffffff",
+    isDark ? 0.82 : 0.88,
+  ); // mix 在本文件：c1 向 c2 按 t 渐（签名 mix(c1,c2,t)）
+  const pillText = mix(
+    typeColor,
+    isDark ? "#ffffff" : "#111111",
+    isDark ? 0.55 : 0.4,
+  );
+  /* 边：labelInvert(选中) → 主色 2px；labelLift(悬停)/常态 → 1.5px（收口提档：
+     白底配方下 1px 发丝边太弱）。selectedNode 本就同时落 labelLift+labelInvert
+     ——invert 优先是常态路径。状态记号在描边+反转变换上 */
   const ring = !!data.labelInvert || !!data.labelLift;
-  ctx.lineWidth = data.labelInvert ? 2 : data.labelLift ? 1.5 : 1;
+  ctx.lineWidth = data.labelInvert ? 2 : 1.5;
   ctx.strokeStyle = ring ? RING_SELECT : typeColor;
   ctx.beginPath();
   ctx.roundRect(x - w / 2, y - h / 2, w, h, r);
-  ctx.fillStyle = tint;
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = CANVAS_TEXT; // 统一墨字（--color-ink），废除亮度分支（微调 9）
+  if (ring) {
+    ctx.fillStyle = typeColor;
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = isDark ? CANVAS_TEXT : "#ffffff";
+  } else {
+    ctx.fillStyle = tint;
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = pillText;
+  }
   ctx.fillText(text, x, y);
   ctx.restore();
 }
@@ -251,6 +275,12 @@ export function drawWorldGrid(canvas: HTMLCanvasElement, sigma: Sigma): void {
   }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, width, height);
+  /* 国内风收口（走查 A1）：画布底铺 --color-bg 档灰——**绘制时现读令牌**
+     （token 走 computed style，html.dark 自动翻转；refreshPalette 不在主题
+     切换钩子上，模块 let 会滞留旧主题值——darkBg 回归即此因）。sigma WebGL
+     层透明，底色从这层透出 */
+  ctx.fillStyle = token("--color-bg", CANVAS_BG);
+  ctx.fillRect(0, 0, width, height);
   if (width <= 0 || height <= 0) return;
 
   // 世界→屏幕：两个探针点求每世界单位像素数与原点位置（无相机旋转场景）
@@ -264,30 +294,30 @@ export function drawWorldGrid(canvas: HTMLCanvasElement, sigma: Sigma): void {
   while (spacing * ppw < GRID_FADE_IN_PX) spacing *= 4;
   while (spacing * ppw >= GRID_FADE_IN_PX * 4) spacing /= 4;
 
-  for (let sp = spacing; sp * ppw < GRID_MAX_LEVEL_PX; sp *= 4) {
-    const ss = sp * ppw;
-    const t = Math.min(
-      1,
-      (ss - GRID_FADE_IN_PX) / (GRID_FULL_PX - GRID_FADE_IN_PX),
-    );
-    if (t <= 0) continue;
-    // 网格是墨色不是白色：暗底上是白，纸底上是近黑（0038）。透明度不变
-    ctx.strokeStyle = `rgba(${INK_RGB},${(GRID_MAX_ALPHA * t).toFixed(4)})`;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    const startX = ((p0.x % ss) + ss) % ss;
-    for (let x = startX; x <= width; x += ss) {
-      const px = Math.round(x) + 0.5;
-      ctx.moveTo(px, 0);
-      ctx.lineTo(px, height);
-    }
-    const startY = ((p0.y % ss) + ss) % ss;
+  /* 国内风收口（走查 A1）：线制网格改**点阵**——只在最细可见层级的交点撒点
+     （Figma 式），随缩放换档；点的半径/透明度随层级淡入因子 t 走 */
+  const ss = spacing * ppw;
+  const t = Math.min(
+    1,
+    (ss - GRID_FADE_IN_PX) / (GRID_FULL_PX - GRID_FADE_IN_PX),
+  );
+  if (t <= 0) return;
+  // 网格点是墨色不是白色：暗底上是白，纸底上是近黑（0038）——绘制时现读令牌
+  // （同底色理由：主题切换不经过 refreshPalette，模块 let 会滞留），比线制略提透明度
+  const inkTriplet = (() => {
+    const [r, g, b] = parseRgba(token("--color-ink", "#1f2937"));
+    return `${r},${g},${b}`;
+  })();
+  ctx.fillStyle = `rgba(${inkTriplet},${(GRID_MAX_ALPHA * 3 * t).toFixed(4)})`;
+  const startX = ((p0.x % ss) + ss) % ss;
+  const startY = ((p0.y % ss) + ss) % ss;
+  const r = 0.9 + t * 0.6;
+  for (let x = startX; x <= width; x += ss) {
     for (let y = startY; y <= height; y += ss) {
-      const py = Math.round(y) + 0.5;
-      ctx.moveTo(0, py);
-      ctx.lineTo(width, py);
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
     }
-    ctx.stroke();
   }
 }
 
@@ -439,6 +469,7 @@ export function refreshPalette() {
   EDGE_RULE = rgbOf(violet, 0.5);
   EDGE_RULE_FOCUS = rgbOf(violet, 0.95);
   // 画布上的边：浅色下按底色摊平（见 flattenOnLight）
+  CANVAS_BG = token("--color-bg", CANVAS_BG); // 国内风收口：亮 f5f7fa/暗 1a1a1a 随主题
   EDGE = flattenOnLight(EDGE);
   EDGE_INFERRED = flattenOnLight(EDGE_INFERRED);
   EDGE_FOCUS = flattenOnLight(EDGE_FOCUS);
