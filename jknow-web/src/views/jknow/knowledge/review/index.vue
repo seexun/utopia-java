@@ -1,4 +1,4 @@
-<!-- 审核页（对照旧仓 pages/Review.tsx，W2 裁决流全量迁入）：页头 + 队列过滤条 +
+<!-- 审核页（对照旧仓 pages/Review.tsx，W2 裁决流全量迁入）：队列过滤卡 +
      单档列表 + 单一分页。写动作（W2）：decide 单条（理由 0026）/batch 多选一批
      一个动作（#428）/agent 建议回答（merge/keep/revert）/各档裁决（待确认点头
      0015/低置信/时态冲突三出路/未再提及闭合/公理违规三出路/本体缺陷两出路/
@@ -6,8 +6,9 @@
      错误文案：agent 正在裁的 409 走 reviewErrors 的 Ⅰ类映射；权限闸
      canManage（editor+，与服务端 require_kb(Role::Editor) 同口径）。
      reskin-b4 模板层重造（script 逻辑零动，仅 import 换装）：左栏 rail 改
-     PageHeader（审查·库名）+ 14 档队列过滤条（UPill，计数徽章 badge-soft），
-     行卡列表与概览统计的结构/接线原样。 -->
+     队列过滤卡（UPill，计数徽章 badge-soft），行卡列表与概览统计的结构/接线
+     原样。页头合一（2026-11-24 留档清偿批）：独立页头带删除，标题+kb chip
+     收进过滤卡卡头首行。 -->
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { useRoute, useRouter, RouterLink } from "vue-router";
@@ -76,8 +77,6 @@ import {
   DecisionRow
 } from "./rows";
 import { UPill, UPager, Loading } from "@/components/knowledge/kit";
-/* PageHeader（reskin-b1 自 gvdata 零改写迁入）：22/800 标题 + 库名副题 */
-import PageHeader from "@/components/PageHeader/index.vue";
 
 const DUP_PAGE = 6;
 const FACT_PAGE = 10;
@@ -550,20 +549,31 @@ function setPicked(on: boolean, id?: string) {
 
 <template>
   <!-- reskin-b4：整页单列滚动（检索/文库同款根）；rail 左栏退役，档位选择
-       上移为页头下的队列过滤条。kb 页在若依 Layout 的 AppMain 内渲染
+       上移为队列过滤卡。kb 页在若依 Layout 的 AppMain 内渲染
        （h-full 即内容窗口高，与批次 1-3 六页同根）。 -->
   <div class="knowledge-page h-full overflow-y-auto overscroll-contain px-8 py-6">
     <div>
-      <!-- 页头（重造要素一）：标题=审查，副题=库名；页级唯一主行动留空
-           （各档的裁决/检查是档内动作，不是页级动作） -->
-      <PageHeader :title="S.review.title" :subtitle="kb?.name ?? ''" />
+      <!-- 队列过滤卡：页头合一（2026-11-24 留档清偿批，图谱/本体页同家族）——
+           独立页头带删除，标题=审核 + kb chip=库名收进卡头首行（border-b 分隔，
+           单 h1 补位；页内无现成队列总计数变量，右段按 YAGNI 不加）；
+           14 档药丸原样入卡身。 -->
+      <div class="card mb-6">
+        <!-- 卡头首行：标题 + kb chip -->
+        <div class="flex items-center gap-2 border-b border-line pb-2">
+          <h1 class="text-title font-semibold text-ink">{{ S.review.title }}</h1>
+          <span
+            class="truncate rounded-full border border-line bg-fill px-2 py-0.5 text-aux text-ink-2"
+          >
+            {{ kb?.name }}
+          </span>
+        </div>
 
-      <!-- 队列过滤条（重造要素二）：14 档一排药丸——总览 / 九队列 + agent /
-           历史（台账 + 合并史）/ 数据映射（外链）。计数徽章 badge-soft 读
-           服务端 COUNT（SSE 推动刷新）；agent 跑动中的琥珀脉冲点保留。
-           选中 primary-soft（scoped 补皮），bg-primary-soft 类同时留在
-           元素上——w1-review spec 以它为选中锚 -->
-      <div class="mb-6 flex flex-wrap items-center gap-1.5">
+        <!-- 队列过滤条（重造要素二）：14 档一排药丸——总览 / 九队列 + agent /
+             历史（台账 + 合并史）/ 数据映射（外链）。计数徽章 badge-soft 读
+             服务端 COUNT（SSE 推动刷新）；agent 跑动中的琥珀脉冲点保留。
+             选中 primary-soft（scoped 补皮），bg-primary-soft 类同时留在
+             元素上——w1-review spec 以它为选中锚 -->
+        <div class="flex flex-wrap items-center gap-1.5 pt-3">
         <UPill
           :active="active === 'overview'"
           :class="['queue-pill', active === 'overview' && 'bg-primary-soft']"
@@ -647,6 +657,7 @@ function setPicked(on: boolean, id?: string) {
             {{ counts.mappings }}
           </span>
         </RouterLink>
+        </div>
       </div>
 
       <!-- 一次只显示选中的一类，单一分页 -->

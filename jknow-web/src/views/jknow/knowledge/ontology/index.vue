@@ -1,7 +1,9 @@
 <!-- 本体页（对照旧仓 pages/Ontology.tsx，W1 读面；reskin-b3 双视图重造）：
-     PageHeader（本体·库名，extra=图/表 segmented）+ 左栏清单卡（filter +
+     工作区型页头合一（2026-11-24 留档清偿批，与图谱页同家族）：独立页头带删除，
+     标题+kb chip 收进左栏清单卡卡头；图/表 segmented 迁右侧主区卡头右段
+     （表格卡=既有头行右段，图示卡=slim 卡头右段）+ 左栏清单卡（filter +
      Classes/Properties 两小节 + 底部六个入口）+ 右侧主区卡——图示=画布卡
-     （批次 2 手法：卡壳 padding 归零、sigma 全幅）/ 表格=三张表卡；
+     （批次 2 手法：卡壳 padding 归零、sigma 随卡头之下满铺）/ 表格=三张表卡；
      选中类/关系停靠右侧详情面板（absolute 浮层位随包壳）；
      Rules/Uniqueness/Cases/Misses 是接管主区的整页视图。
      建/改/删/导入/类型消解属任务 6-7——入口行不渲染或降为读面。 -->
@@ -53,8 +55,6 @@ import {
   SkeletonRows,
   USegmented
 } from "@/components/knowledge/kit";
-/* 重造新增 import（reskin-b3）：页头组件（对话/检索/图谱页同款范式） */
-import PageHeader from "@/components/PageHeader/index.vue";
 
 /** 左栏行高（py-2 + 13px 文字 + space-y 间隙）与底部预留（分页器） */
 const RAIL_ROW_H = 34;
@@ -321,26 +321,24 @@ function afterOntologyChange(created?: {
 
 <template>
   <div class="knowledge-page flex h-full flex-col p-6">
-    <!-- 页头（reskin-b3 六要素之一）：标题=本体、副题=库名；extra=图/表视图切换
-         （segmented；switchView 原函数原语义：localStorage 持久化 + 非 onPanel
-         选中时回到 schema——workflow 几页也能借它一键回主视图） -->
-    <PageHeader :title="S.ontology.title" :subtitle="kbName">
-      <template #extra>
-        <USegmented
-          :value="view"
-          :options="[
-            { value: 'diagram', label: S.ontology.viewDiagram },
-            { value: 'table', label: S.ontology.viewTable }
-          ]"
-          @change="(v: string) => switchView(v as 'table' | 'diagram')"
-        />
-      </template>
-    </PageHeader>
-
     <div class="flex min-h-0 flex-1 gap-4">
-      <!-- 左栏清单卡（reskin-b3）：filter + 两小节 + 底部入口；视图切换升页头后
-           只剩清单本体（内距由 .onto-rail 收到 12px，行/树/分页零动） -->
+      <!-- 左栏清单卡（reskin-b3）：卡头标题行 + filter + 两小节 + 底部入口。
+           页头合一（2026-11-24）：标题=本体、kb chip=库名收进卡头首行（单 h1
+           补位）；图/表视图切换不在此行（w-64 三件放不下，segmented 迁右侧
+           主区卡头右段，见下方两视图卡）——switchView 原函数原语义：
+           localStorage 持久化 + 非 onPanel 选中时回到 schema。内距由
+           .onto-rail 收到 12px（标题行不再加 px/pt，分隔线为栏内既有的
+           内缩式，同底部入口 border-t），行/树/分页零动 -->
       <aside class="card onto-rail flex w-64 shrink-0 flex-col">
+      <!-- 卡头：标题 + kb chip（图谱页卡头行1 同款家族形态） -->
+      <div class="flex items-center gap-2 border-b border-line pb-2">
+        <h1 class="text-title font-semibold text-ink">{{ S.ontology.title }}</h1>
+        <span
+          class="truncate rounded-full border border-line bg-fill px-2 py-0.5 text-aux text-ink-2"
+        >
+          {{ kbName }}
+        </span>
+      </div>
       <!-- 筛选框、两档、清单只属于图那一档——换档时折起来而不是瞬间消失 -->
       <div class="rail-fold" :class="view === 'table' && 'is-folded'">
         <div class="pb-2 pt-1">
@@ -572,12 +570,13 @@ function afterOntologyChange(created?: {
     </template>
     <template v-else>
       <div class="relative min-h-0 min-w-0 flex-1">
-        <!-- 表格视图：主区卡（reskin-b3）——三张表切换 + 表体 -->
+        <!-- 表格视图：主区卡（reskin-b3）——三张表切换 + 表体；页头合一后
+             图/表 segmented 落本头行右段（ml-auto，"行右段"语义） -->
         <div
           v-if="view === 'table'"
           class="card onto-table-card absolute inset-0 flex flex-col"
         >
-          <div class="shrink-0 pb-3">
+          <div class="flex shrink-0 items-center gap-2 pb-3">
             <USegmented
               size="sm"
               :value="tableTab"
@@ -587,6 +586,16 @@ function afterOntologyChange(created?: {
                 { value: 'attributes', label: S.ontology.schemaTabAttributes }
               ]"
               @change="(v: string) => (tableTab = v as TableTab)"
+            />
+            <!-- 视图切换（原页头 extra 原样迁用：value/options/@change 零动） -->
+            <USegmented
+              class="ml-auto"
+              :value="view"
+              :options="[
+                { value: 'diagram', label: S.ontology.viewDiagram },
+                { value: 'table', label: S.ontology.viewTable }
+              ]"
+              @change="(v: string) => switchView(v as 'table' | 'diagram')"
             />
           </div>
           <OntologyTables
@@ -610,22 +619,40 @@ function afterOntologyChange(created?: {
           />
         </div>
         <!-- 图示视图：画布卡（reskin-b3，批次 2 手法）——卡壳内距归零、sigma
-             WebGL 全幅填充，圆角由卡 overflow 收口；浮件（图例/取景/缩放塔）
-             随卡定位锚整体迁移，schema-graph 数据流零动 -->
-        <div v-else class="card onto-canvas-card absolute inset-0">
-          <SchemaGraphCanvas
-            class="absolute inset-0"
-            :loading="loading"
-            :entity-types="entity_types"
-            :relation-types="relation_types"
-            :rules="rules.data.value?.rules ?? []"
-            :selected="schemaSelected"
-            :hidden-count="0"
-            :budget="schemaBudget"
-            :capped="false"
-            @select="selectFromSchema"
-            @budget="(b: number) => (schemaBudget = b)"
-          />
+             WebGL 在卡头之下满铺，圆角由卡 overflow 收口；页头合一后本卡新增
+             slim 卡头（视图 segmented 居右段，与表格卡头右段同位，两视图切换
+             控件位置恒定）；浮件（图例/取景/缩放塔）随卡定位锚整体迁移，
+             schema-graph 数据流零动 -->
+        <div v-else class="card onto-canvas-card absolute inset-0 flex flex-col">
+          <div class="shrink-0 border-b border-line px-3 pb-2 pt-2">
+            <div class="flex items-center gap-2">
+              <!-- 视图切换（原页头 extra 原样迁用：value/options/@change 零动） -->
+              <USegmented
+                class="ml-auto"
+                :value="view"
+                :options="[
+                  { value: 'diagram', label: S.ontology.viewDiagram },
+                  { value: 'table', label: S.ontology.viewTable }
+                ]"
+                @change="(v: string) => switchView(v as 'table' | 'diagram')"
+              />
+            </div>
+          </div>
+          <div class="relative min-h-0 flex-1">
+            <SchemaGraphCanvas
+              class="absolute inset-0"
+              :loading="loading"
+              :entity-types="entity_types"
+              :relation-types="relation_types"
+              :rules="rules.data.value?.rules ?? []"
+              :selected="schemaSelected"
+              :hidden-count="0"
+              :budget="schemaBudget"
+              :capped="false"
+              @select="selectFromSchema"
+              @budget="(b: number) => (schemaBudget = b)"
+            />
+          </div>
         </div>
 
         <!-- 类详情面板 -->
@@ -898,8 +925,9 @@ function afterOntologyChange(created?: {
   padding: 12px;
 }
 
-/* 图示画布卡（批次 2 手法照抄）：sigma 画布全幅无内距（.card 的 20px 内距
-   归零），圆角由 overflow 收口——WebGL 层随容器矩形，超出圆角部分由卡裁掉 */
+/* 图示画布卡（批次 2 手法照抄）：sigma 画布无内距（.card 的 20px 内距归零），
+   卡头（视图 segmented 行）之下由包裹层满铺余高，圆角由 overflow 收口——
+   WebGL 层随容器矩形，超出圆角部分由卡裁掉 */
 .onto-canvas-card {
   padding: 0;
   overflow: hidden;
