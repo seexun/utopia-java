@@ -1260,7 +1260,7 @@ const statsText = computed(() => {
       <div class="border-b border-line px-3 pb-2 pt-2">
         <!-- 行1：标题 + kb chip / 稳定提示 + 节点档位步进器 + 统计 -->
         <div class="flex items-center gap-2">
-          <h1 class="text-body font-semibold text-ink">{{ S.nav.graph }}</h1>
+          <h1 class="text-title font-semibold text-ink">{{ S.nav.graph }}</h1>
           <span
             class="rounded-full border border-line bg-fill px-2 py-0.5 text-aux text-ink-2"
           >
@@ -1578,10 +1578,42 @@ const statsText = computed(() => {
       </div>
 
       <!-- 画布：世界坐标网格层垫在 sigma WebGL 层下；卡头下方 in-flow 满铺
-           （flex-1 min-h-0），其余浮层仍以卡为定位锚 -->
+           （flex-1 min-h-0）。错误行/Loading/空态也锚进本画布层（相对画布定位）
+           ——卡头 static 化后不能再以整卡为锚，否则错误文案叠卡头行2、空态/
+           Loading 视觉中心偏移约半个卡头高（T1 审查修正） -->
       <div class="relative min-h-0 flex-1">
         <canvas ref="gridRef" class="absolute inset-0 h-full w-full" />
         <div ref="containerRef" class="absolute inset-0" />
+
+        <!-- 取数失败给一行错误（与 Search 的错误行同构）：空画布会读成“库是空的”，
+            那是另一回事（旧仓 KbScope 注释的同一条判断）；top-6 按画布参照 -->
+        <p
+          v-if="data.isError.value"
+          class="pointer-events-none absolute left-1/2 top-6 z-10 -translate-x-1/2 text-body text-danger"
+        >
+          {{ String(data.error.value) }}
+        </p>
+
+        <CanvasLoading v-if="data.isPending.value" />
+
+        <!-- 空状态：readiness 统一判定（#313），步骤话术 + 至多一个动作 -->
+        <div
+          v-if="empty"
+          class="pointer-events-none absolute inset-0 grid place-items-center pb-20"
+        >
+          <div class="pointer-events-auto">
+            <div class="max-w-xs text-center text-body text-ink-2">
+              {{ step?.line ?? (S.steps.nothingExtracted as string) }}
+              <RouterLink
+                v-if="step?.action"
+                class="link-inline mt-3 block"
+                :to="{ path: step.action.to, query: step.action.search as never }"
+              >
+                {{ step.action.label }}
+              </RouterLink>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- 左下控件塔：推出来的边 + 布局切换 + 相机 -->
@@ -1678,36 +1710,6 @@ const statsText = computed(() => {
             </template>
           </ToolButton>
         </ToolTower>
-      </div>
-
-      <!-- 取数失败给一行错误（与 Search 的错误行同构）：空画布会读成“库是空的”，
-          那是另一回事（旧仓 KbScope 注释的同一条判断） -->
-      <p
-        v-if="data.isError.value"
-        class="pointer-events-none absolute left-1/2 top-20 z-10 -translate-x-1/2 text-body text-danger"
-      >
-        {{ String(data.error.value) }}
-      </p>
-
-      <CanvasLoading v-if="data.isPending.value" />
-
-      <!-- 空状态：readiness 统一判定（#313），步骤话术 + 至多一个动作 -->
-      <div
-        v-if="empty"
-        class="pointer-events-none absolute inset-0 grid place-items-center pb-20"
-      >
-        <div class="pointer-events-auto">
-          <div class="max-w-xs text-center text-body text-ink-2">
-            {{ step?.line ?? (S.steps.nothingExtracted as string) }}
-            <RouterLink
-              v-if="step?.action"
-              class="link-inline mt-3 block"
-              :to="{ path: step.action.to, query: step.action.search as never }"
-            >
-              {{ step.action.label }}
-            </RouterLink>
-          </div>
-        </div>
       </div>
 
       <!-- 底部居中悬浮时间岛（双时间轴过滤） -->
