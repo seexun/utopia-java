@@ -101,9 +101,6 @@ import {
   URow,
   CanvasLoading
 } from "@/components/knowledge/kit";
-/* 重造新增 import（reskin-b2）：页头组件（首批 search/library 同款范式） */
-import PageHeader from "@/components/PageHeader/index.vue";
-
 defineOptions({ name: "UtopiaGraphPage" });
 
 const LEGEND_MAX = 6;
@@ -1255,238 +1252,31 @@ const statsText = computed(() => {
 
 <template>
   <div class="knowledge-page flex h-full flex-col p-6">
-    <!-- 页头（reskin-b2 六要素之一）：主行动在画布工具条内（每页唯一），页头不放 extra -->
-    <PageHeader :title="S.nav.graph" :subtitle="kb?.name ?? ''" />
-
-    <!-- 画布主卡：全幅画布 + 浮动 UI 骨架原样收进卡内——卡形态只在外框/圆角，
-         画布无边距全填充（内距归零见 scoped .graph-canvas-card） -->
-    <div class="card graph-canvas-card relative min-h-0 flex-1">
-      <!-- 顶部悬浮条：搜索 + 图例 + 状态 -->
-      <div
-        class="pointer-events-none absolute left-3 right-3 top-3 z-10 flex items-start gap-2"
-      >
-        <div class="relative pointer-events-auto">
-          <div class="relative">
-            <SearchIcon
-              class="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-ink-2"
-              width="12"
-              height="12"
-            />
-            <el-input
-              v-model="searchInput"
-              class="graph-search w-58"
-              :placeholder="
-                inSubgraph ? S.graph.searchInSubgraph : S.graph.searchEntity
-              "
-            />
-          </div>
-          <!-- 搜索建议框（reskin-b3：max-height 防极短视口溢出 + 实体名命中词
-               <mark> 高亮——形态与检索结果卡统一，见 scoped .graph-suggest） -->
-          <div
-            v-if="searchQ && searchHits.length > 0"
-            class="graph-suggest absolute mt-1 w-full overflow-hidden rounded-card border border-line bg-card shadow-pop"
+    <!-- 画布主卡：全幅画布 + 工作区型两行卡头（2026-11-24 合一批，方案 A）——独立页头带
+         删除，标题/kb chip/节点档位/统计/搜索/图例全部收进卡头，画布上移满铺；卡形态
+         只在外框/圆角，画布无边距全填充（内距归零见 scoped .graph-canvas-card） -->
+    <div class="card graph-canvas-card relative flex min-h-0 flex-1 flex-col">
+      <!-- 卡头（两行）：行1 标题+kb chip / 节点档位+统计；行2 搜索+类型图例 / 边语义图例 -->
+      <div class="border-b border-line px-3 pb-2 pt-2">
+        <!-- 行1：标题 + kb chip / 稳定提示 + 节点档位步进器 + 统计 -->
+        <div class="flex items-center gap-2">
+          <h1 class="text-body font-semibold text-ink">{{ S.nav.graph }}</h1>
+          <span
+            class="rounded-full border border-line bg-fill px-2 py-0.5 text-aux text-ink-2"
           >
-            <URow
-              v-for="c in searchHits"
-              :key="c.id"
-              density="menu"
-              @click="
-                () => {
-                  if (!inSubgraph) focusEntity = c.id;
-                  selected = c.id;
-                  searchInput = '';
-                  searchQ = '';
-                  syncUrl();
-                }
-              "
-            >
-              <span class="flex min-w-0 items-center gap-2">
-                <span
-                  class="h-2.5 w-2.5 shrink-0 rounded-full"
-                  :style="{ background: c.color }"
-                />
-                <span class="truncate">
-                  <template
-                    v-for="(seg, i) in highlightSegments(c.name, [searchQ.trim()])"
-                    :key="i"
-                  >
-                    <mark v-if="seg.hit">{{ seg.text }}</mark>
-                    <template v-else>{{ seg.text }}</template>
-                  </template>
-                </span>
-                <span
-                  v-if="c.disambiguator && c.disambiguator !== c.type_label"
-                  class="min-w-0 max-w-[40%] truncate text-sub text-ink-2"
-                >
-                  · {{ c.disambiguator }}
-                </span>
-              </span>
-              <template #trailing>{{ c.type_label }}</template>
-            </URow>
-            <!-- 还有更多没显示。说清剩多少 -->
-            <el-button
-              v-if="
-                !inSubgraph &&
-                (candidates.data.value?.total ?? 0) > searchHits.length
-              "
-              class="w-full justify-start rounded-none border-t border-line"
-              size="small"
-              text
-              @click="searchLimit += 20"
-            >
-              {{
-                S.graph.searchMore(
-                  candidates.data.value!.total - searchHits.length
-                )
-              }}
-            </el-button>
-          </div>
-        </div>
-        <el-button
-          v-if="focusEntity"
-          class="pointer-events-auto graph-shadow"
-          @click="
-            () => {
-              focusEntity = null;
-              syncUrl();
-            }
-          "
-        >
-          {{ S.graph.backToOverview }}
-        </el-button>
-
-        <!-- 图例（点击切换类型显隐）。只摆前 LEGEND_MAX 个 -->
-        <div class="pointer-events-auto flex flex-wrap gap-2">
-          <UPill
-            v-for="[key, t] in legendShown"
-            :key="key"
-            :dim="hiddenTypes.has(key)"
-            @click="toggleHidden(key)"
-          >
-            <span
-              :class="[
-                'h-2 w-2',
-                t.shape === 'square' ? 'scale-90' : 'rounded-full'
-              ]"
-              :style="{ background: t.color }"
-            />
-            <span>{{ t.label }}</span>
-          </UPill>
-
-          <!-- +N 个类：弹层里全列表（查找 / 全开 / 全关 / 只看这个） -->
-          <el-popover v-if="legendRest.length > 0" width="288" trigger="click">
-            <template #reference>
-              <UPill :title="S.graph.legendAllHint">
-                {{ S.graph.legendMore(types.length) }}
-                <span
-                  v-if="legendRest.some(([k]) => hiddenTypes.has(k))"
-                  class="h-1.5 w-1.5 rounded-full bg-ink-2"
-                />
-              </UPill>
-            </template>
+            {{ kb?.name }}
+          </span>
+          <div class="ml-auto flex items-center gap-2">
+            <!-- 稳定提示（原右上浮组迁入：选行1 stats 旁，见任务报告偏差记录） -->
             <div
-              class="border-b border-line px-3 py-2 text-body font-medium text-ink"
+              v-if="stabilizing"
+              class="flex items-center gap-2 text-aux text-ink-2"
             >
-              {{ S.graph.legendMore(types.length) }}
+              {{ S.graph.stabilizing }}
             </div>
-            <div class="flex items-center gap-2 border-b border-line px-3 py-2">
-              <button
-                type="button"
-                class="link-inline text-sub"
-                :disabled="hiddenTypes.size === 0"
-                @click="
-                  () => {
-                    hiddenTypes = new Set();
-                    sigmaRef?.refresh();
-                  }
-                "
-              >
-                {{ S.graph.legendShowAll(hiddenTypes.size) }}
-              </button>
-              <button
-                type="button"
-                class="link-inline ml-auto text-sub"
-                :disabled="hiddenTypes.size === types.length"
-                @click="
-                  () => {
-                    hiddenTypes = new Set(types.map(([k]) => k));
-                    sigmaRef?.refresh();
-                  }
-                "
-              >
-                {{ S.graph.legendHideAll }}
-              </button>
-            </div>
-            <div class="border-b border-line px-3 py-2">
-              <el-input
-                v-model="legendQ"
-                :placeholder="S.graph.legendSearch"
-                size="small"
-              />
-            </div>
-            <div class="max-h-64 overflow-y-auto overscroll-contain px-2 py-1">
-              <div
-                v-for="[key, t] in legendRestFiltered"
-                :key="key"
-                class="group flex items-center gap-2"
-              >
-                <button
-                  type="button"
-                  class="flex min-w-0 flex-1 items-center justify-start rounded-none px-0"
-                  @click="toggleHidden(key)"
-                >
-                  <span
-                    class="h-2 w-2 shrink-0"
-                    :class="t.shape === 'square' ? 'scale-90' : 'rounded-full'"
-                    :style="{
-                      background: t.color,
-                      opacity: hiddenTypes.has(key) ? 0.35 : 1
-                    }"
-                  />
-                  <span
-                    :class="[
-                      'truncate text-sub',
-                      hiddenTypes.has(key)
-                        ? 'text-ink-2 line-through'
-                        : 'text-ink'
-                    ]"
-                  >
-                    {{ t.label }}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  class="reveal shrink-0 text-sub text-ink-2 hover:text-ink"
-                  @click="
-                    () => {
-                      hiddenTypes = new Set(
-                        types.map(([k]) => k).filter(k => k !== key)
-                      );
-                      sigmaRef?.refresh();
-                    }
-                  "
-                >
-                  {{ S.graph.legendOnly }}
-                </button>
-                <span class="shrink-0 tabular-nums text-aux text-ink-2">
-                  {{ t.count }}
-                </span>
-              </div>
-              <div
-                v-if="legendRestFiltered.length === 0"
-                class="px-2 py-2 text-sub text-ink-2"
-              >
-                {{ S.graph.legendNone }}
-              </div>
-            </div>
-          </el-popover>
-        </div>
-
-        <!-- 右上：能调「画多少个」+ 统计 + 边语义图例 -->
-        <div class="ml-auto flex flex-col items-end gap-1">
-          <div class="flex items-start gap-2">
+            <!-- 节点档位 ± 步进器：控制画多少节点的档位（功能控件，非缩放）原样迁入 -->
             <div
-              class="pointer-events-auto flex items-center overflow-hidden rounded-ctl border border-line"
+              class="flex items-center overflow-hidden rounded-ctl border border-line"
             >
               <button
                 type="button"
@@ -1520,21 +1310,232 @@ const statsText = computed(() => {
                 +
               </button>
             </div>
+            <span class="tabular-nums text-aux text-ink-2">{{ statsText }}</span>
+          </div>
+        </div>
+        <!-- 行2：搜索（建议框 absolute 以本行为参照）+ 返回全图 + 类型图例 / 边语义图例 -->
+        <div class="mt-2 flex items-start gap-2">
+          <div class="relative">
+            <div class="relative">
+              <SearchIcon
+                class="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-ink-2"
+                width="12"
+                height="12"
+              />
+              <el-input
+                v-model="searchInput"
+                class="graph-search w-58"
+                :placeholder="
+                  inSubgraph ? S.graph.searchInSubgraph : S.graph.searchEntity
+                "
+              />
+            </div>
+            <!-- 搜索建议框（reskin-b3：max-height 防极短视口溢出 + 实体名命中词
+                 <mark> 高亮——形态与检索结果卡统一，见 scoped .graph-suggest） -->
             <div
-              class="pointer-events-none pt-1 tabular-nums text-aux text-ink-2"
+              v-if="searchQ && searchHits.length > 0"
+              class="graph-suggest absolute mt-1 w-full overflow-hidden rounded-card border border-line bg-card shadow-pop"
             >
-              {{ statsText }}
+              <URow
+                v-for="c in searchHits"
+                :key="c.id"
+                density="menu"
+                @click="
+                  () => {
+                    if (!inSubgraph) focusEntity = c.id;
+                    selected = c.id;
+                    searchInput = '';
+                    searchQ = '';
+                    syncUrl();
+                  }
+                "
+              >
+                <span class="flex min-w-0 items-center gap-2">
+                  <span
+                    class="h-2.5 w-2.5 shrink-0 rounded-full"
+                    :style="{ background: c.color }"
+                  />
+                  <span class="truncate">
+                    <template
+                      v-for="(seg, i) in highlightSegments(c.name, [searchQ.trim()])"
+                      :key="i"
+                    >
+                      <mark v-if="seg.hit">{{ seg.text }}</mark>
+                      <template v-else>{{ seg.text }}</template>
+                    </template>
+                  </span>
+                  <span
+                    v-if="c.disambiguator && c.disambiguator !== c.type_label"
+                    class="min-w-0 max-w-[40%] truncate text-sub text-ink-2"
+                  >
+                    · {{ c.disambiguator }}
+                  </span>
+                </span>
+                <template #trailing>{{ c.type_label }}</template>
+              </URow>
+              <!-- 还有更多没显示。说清剩多少 -->
+              <el-button
+                v-if="
+                  !inSubgraph &&
+                  (candidates.data.value?.total ?? 0) > searchHits.length
+                "
+                class="w-full justify-start rounded-none border-t border-line"
+                size="small"
+                text
+                @click="searchLimit += 20"
+              >
+                {{
+                  S.graph.searchMore(
+                    candidates.data.value!.total - searchHits.length
+                  )
+                }}
+              </el-button>
             </div>
           </div>
-          <div
-            v-if="stabilizing"
-            class="flex items-center gap-2 text-aux text-ink-2"
+          <el-button
+            v-if="focusEntity"
+            class="graph-shadow"
+            @click="
+              () => {
+                focusEntity = null;
+                syncUrl();
+              }
+            "
           >
-            {{ S.graph.stabilizing }}
+            {{ S.graph.backToOverview }}
+          </el-button>
+
+          <!-- 图例（点击切换类型显隐）。只摆前 LEGEND_MAX 个；卡头内允许折行 -->
+          <div class="flex min-w-0 flex-wrap gap-2">
+            <UPill
+              v-for="[key, t] in legendShown"
+              :key="key"
+              :dim="hiddenTypes.has(key)"
+              @click="toggleHidden(key)"
+            >
+              <span
+                :class="[
+                  'h-2 w-2',
+                  t.shape === 'square' ? 'scale-90' : 'rounded-full'
+                ]"
+                :style="{ background: t.color }"
+              />
+              <span>{{ t.label }}</span>
+            </UPill>
+
+            <!-- +N 个类：弹层里全列表（查找 / 全开 / 全关 / 只看这个） -->
+            <el-popover v-if="legendRest.length > 0" width="288" trigger="click">
+              <template #reference>
+                <UPill :title="S.graph.legendAllHint">
+                  {{ S.graph.legendMore(types.length) }}
+                  <span
+                    v-if="legendRest.some(([k]) => hiddenTypes.has(k))"
+                    class="h-1.5 w-1.5 rounded-full bg-ink-2"
+                  />
+                </UPill>
+              </template>
+              <div
+                class="border-b border-line px-3 py-2 text-body font-medium text-ink"
+              >
+                {{ S.graph.legendMore(types.length) }}
+              </div>
+              <div class="flex items-center gap-2 border-b border-line px-3 py-2">
+                <button
+                  type="button"
+                  class="link-inline text-sub"
+                  :disabled="hiddenTypes.size === 0"
+                  @click="
+                    () => {
+                      hiddenTypes = new Set();
+                      sigmaRef?.refresh();
+                    }
+                  "
+                >
+                  {{ S.graph.legendShowAll(hiddenTypes.size) }}
+                </button>
+                <button
+                  type="button"
+                  class="link-inline ml-auto text-sub"
+                  :disabled="hiddenTypes.size === types.length"
+                  @click="
+                    () => {
+                      hiddenTypes = new Set(types.map(([k]) => k));
+                      sigmaRef?.refresh();
+                    }
+                  "
+                >
+                  {{ S.graph.legendHideAll }}
+                </button>
+              </div>
+              <div class="border-b border-line px-3 py-2">
+                <el-input
+                  v-model="legendQ"
+                  :placeholder="S.graph.legendSearch"
+                  size="small"
+                />
+              </div>
+              <div class="max-h-64 overflow-y-auto overscroll-contain px-2 py-1">
+                <div
+                  v-for="[key, t] in legendRestFiltered"
+                  :key="key"
+                  class="group flex items-center gap-2"
+                >
+                  <button
+                    type="button"
+                    class="flex min-w-0 flex-1 items-center justify-start rounded-none px-0"
+                    @click="toggleHidden(key)"
+                  >
+                    <span
+                      class="h-2 w-2 shrink-0"
+                      :class="t.shape === 'square' ? 'scale-90' : 'rounded-full'"
+                      :style="{
+                        background: t.color,
+                        opacity: hiddenTypes.has(key) ? 0.35 : 1
+                      }"
+                    />
+                    <span
+                      :class="[
+                        'truncate text-sub',
+                        hiddenTypes.has(key)
+                          ? 'text-ink-2 line-through'
+                          : 'text-ink'
+                      ]"
+                    >
+                      {{ t.label }}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    class="reveal shrink-0 text-sub text-ink-2 hover:text-ink"
+                    @click="
+                      () => {
+                        hiddenTypes = new Set(
+                          types.map(([k]) => k).filter(k => k !== key)
+                        );
+                        sigmaRef?.refresh();
+                      }
+                    "
+                  >
+                    {{ S.graph.legendOnly }}
+                  </button>
+                  <span class="shrink-0 tabular-nums text-aux text-ink-2">
+                    {{ t.count }}
+                  </span>
+                </div>
+                <div
+                  v-if="legendRestFiltered.length === 0"
+                  class="px-2 py-2 text-sub text-ink-2"
+                >
+                  {{ S.graph.legendNone }}
+                </div>
+              </div>
+            </el-popover>
           </div>
-          <!-- 边语义图例：常显（规格 graph-edge-legend.md §1） -->
+
+          <!-- 边语义图例：常显（规格 graph-edge-legend.md §1）——已入卡头，
+               不再叠画布，去浮卡外框/半透明底改无底 inline -->
           <div
-            class="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-ctl border border-line bg-card/90 px-2.5 py-1 text-aux text-ink-3"
+            class="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-4 gap-y-1 text-aux text-ink-3"
           >
             <span class="font-semibold">{{ S.graph.edgeLegend }}</span>
             <span class="flex items-center gap-1.5">
@@ -1576,8 +1577,9 @@ const statsText = computed(() => {
         </div>
       </div>
 
-      <!-- 画布：世界坐标网格层垫在 sigma WebGL 层下 -->
-      <div class="absolute inset-0">
+      <!-- 画布：世界坐标网格层垫在 sigma WebGL 层下；卡头下方 in-flow 满铺
+           （flex-1 min-h-0），其余浮层仍以卡为定位锚 -->
+      <div class="relative min-h-0 flex-1">
         <canvas ref="gridRef" class="absolute inset-0 h-full w-full" />
         <div ref="containerRef" class="absolute inset-0" />
       </div>
