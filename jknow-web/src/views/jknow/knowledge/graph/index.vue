@@ -1308,8 +1308,9 @@ const statsText = computed(() => {
          只在外框/圆角，画布无边距全填充（内距归零见 scoped .graph-canvas-card） -->
     <div class="card graph-canvas-card relative flex min-h-0 flex-1 flex-col">
       <!-- 卡头（两行）：行1 标题+kb chip / 节点档位+统计；行2 搜索+类型图例 /
-           边语义图例弹层触发钮（2026-11-24 留档清偿批：图例收弹层，行2 单行） -->
-      <div class="border-b border-line px-3 pb-2 pt-2">
+           边语义图例弹层触发钮（2026-11-24 留档清偿批：图例收弹层，行2 单行）。
+           bg-card 显式白底：外层卡已收敛为细框（背景透明），白/灰两段式靠它分界 -->
+      <div class="border-b border-line bg-card px-3 pb-2 pt-2">
         <!-- 行1：标题 + kb chip / 稳定提示 + 节点档位步进器 + 统计 -->
         <div class="flex items-center gap-2">
           <h1 class="text-title font-semibold text-ink">{{ S.nav.graph }}</h1>
@@ -1840,10 +1841,15 @@ const statsText = computed(() => {
    禁硬编码色值；卡容器形态来自全局 .card（theme.scss） */
 
 /* 画布主卡：sigma 画布全幅无内距（.card 的 20px 内距归零），圆角由
-   overflow 收口（WebGL 层随容器矩形，超出圆角部分由卡裁掉） */
+   overflow 收口（WebGL 层随容器矩形，超出圆角部分由卡裁掉）。
+   容器层次修正（2026-11-24）：不再整卡白底——收敛为细框（边框+圆角），
+   卡头显式 bg-card、画布铺 --color-canvas，「白卡头→细线→灰画布」两段式
+   消「页灰→白卡→画布灰」三层套娃。投影去掉：透明卡上的阴影会露出空框感 */
 .graph-canvas-card {
   padding: 0;
   overflow: hidden;
+  background-color: transparent;
+  box-shadow: none;
 }
 
 /* 浮动搜索卡（anivia 查询卡语言，对齐首批 search 查询卡）：圆角 --radius-card、

@@ -57,15 +57,16 @@ describe("flattenOnLight", () => {
 
   it("flattens rgba against the paper", () => {
     stub();
-    // 176,120,20 @0.6 摊在 245,247,250 的纸底上：204,171,112
-    expect(flattenOnLight("rgba(176,120,20,0.6)")).toBe("rgb(204,171,112)");
+    // 176,120,20 @0.6 摊在 250,251,252 的纸底上：206,172,113
+    // （纸底 = --color-canvas #fafbfc；容器层次修正前是页灰 245,247,250 → 204,171,112）
+    expect(flattenOnLight("rgba(176,120,20,0.6)")).toBe("rgb(206,172,113)");
   });
 
   /* **压缩之后的写法也要认。**令牌写的是 rgba(176,120,20,0.6)，打包器压成
      #b0781499；只认 rgba(...) 的话它整个漏过去，那条派生边就被加成一道亮黄。 */
   it("flattens the hex-with-alpha a minifier leaves behind", () => {
     stub();
-    expect(flattenOnLight("#b0781499")).toBe("rgb(204,171,112)");
+    expect(flattenOnLight("#b0781499")).toBe("rgb(206,172,113)");
     expect(flattenOnLight("#1717175c")).not.toContain("#");
   });
 

@@ -49,9 +49,10 @@ export const CANVAS_FONT =
   '"Plus Jakarta Sans", "PingFang SC", "Microsoft YaHei", "HarmonyOS Sans SC", sans-serif';
 export let CANVAS_TEXT = "#ededed"; // --color-ink
 export let CANVAS_TEXT_2 = "#a8a8a8"; // --color-ink-2
-/** 画布底（国内风收口 2026-11-24）：亮 #f5f7fa/暗 #1a1a1a 随 --color-bg 翻转。
+/** 画布底（容器层次修正 2026-11-24）：独立令牌 --color-canvas——亮 #fafbfc/暗 #161616，
+ *  夹在白卡头与页面灰之间（与页面灰不同色：同色会读成"白卡开了个洞"）。
  *  网格层（drawWorldGrid）先铺它再撒点阵——sigma WebGL 层透明，底色从这层透出 */
-export let CANVAS_BG = "#f5f7fa";
+export let CANVAS_BG = "#fafbfc";
 /* 画在节点与连线之间的字比界面的正文小一档（12，规格 §2 提档）。**画布不是
    界面**：这些字压在一片线和点上，与它们比邻的是 9–18px 的节点，不是页面
    上的正文；旧档的 11 是跟着旧的小点一起定的。浮在画布之上的悬浮卡不算
@@ -275,11 +276,10 @@ export function drawWorldGrid(canvas: HTMLCanvasElement, sigma: Sigma): void {
   }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, width, height);
-  /* 国内风收口（走查 A1）：画布底铺 --color-bg 档灰——**绘制时现读令牌**
-     （token 走 computed style，html.dark 自动翻转；refreshPalette 不在主题
-     切换钩子上，模块 let 会滞留旧主题值——darkBg 回归即此因）。sigma WebGL
-     层透明，底色从这层透出 */
-  ctx.fillStyle = token("--color-bg", CANVAS_BG);
+  /* 画布底铺 --color-canvas（容器层次修正：独立令牌，亮比页灰亮一档）——
+     **绘制时现读令牌**（token 走 computed style，html.dark 自动翻转；refreshPalette
+     不在主题切换钩子上，模块 let 会滞留旧主题值）。sigma WebGL 层透明，底色从这层透出 */
+  ctx.fillStyle = token("--color-canvas", CANVAS_BG);
   ctx.fillRect(0, 0, width, height);
   if (width <= 0 || height <= 0) return;
 
@@ -366,7 +366,7 @@ export let INK_RGB = "255,255,255";
  * 没被 utility 用到就不进产物，getComputedStyle 读不到。于是按垫片 B 段
  * 的亮色字面量定为常量（原变量名去前缀逐条注明），**只换读法不换色**——
  * 画布色值仍是第 2 波已走查过的那一份。 */
-const LIGHT_GROUND_RGB = "245,247,250"; // 原 ground-rgb（= --color-bg #f5f7fa 的三元组；摊平边色用的纸底）
+const LIGHT_GROUND_RGB = "250,251,252"; // 摊平边色用的纸底（= --color-canvas #fafbfc 的三元组；容器层次修正后随画布底走，灰边才不比底更暗）
 const LIGHT_INK_RGB = "31,41,55"; // 原 ink-rgb（= --color-ink #1f2937）
 const LIGHT_CONTEST_RGB = "180,83,9"; // 原 contest-rgb（= #b45309，与 --color-warning-text 同值）
 /* 原 violet-rgb（= #6d28d9）。**不等于 --color-violet #7c3aed**：图例那档
@@ -469,7 +469,7 @@ export function refreshPalette() {
   EDGE_RULE = rgbOf(violet, 0.5);
   EDGE_RULE_FOCUS = rgbOf(violet, 0.95);
   // 画布上的边：浅色下按底色摊平（见 flattenOnLight）
-  CANVAS_BG = token("--color-bg", CANVAS_BG); // 国内风收口：亮 f5f7fa/暗 1a1a1a 随主题
+  CANVAS_BG = token("--color-canvas", CANVAS_BG); // 容器层次修正：亮 fafbfc/暗 161616 随主题（独立画布令牌）
   EDGE = flattenOnLight(EDGE);
   EDGE_INFERRED = flattenOnLight(EDGE_INFERRED);
   EDGE_FOCUS = flattenOnLight(EDGE_FOCUS);

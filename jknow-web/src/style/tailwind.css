@@ -78,6 +78,7 @@
 
   /* 中性：card/fill/line 是工具别名 */
   --color-bg: #f5f7fa;
+  --color-canvas: #fafbfc; /* 画布底：亮比页灰亮一档（与 tokens.scss 同值双源） */
   --color-border: #e5eaf0;
   --color-neutral-soft: #f1f5f9;
   --color-ink: #1f2937;
@@ -128,6 +129,7 @@
    ============================================================ */
 html.dark {
   --color-card: #212121;
+  --color-canvas: #161616; /* 画布底暗档：比卡深、比页底深一档（tokens.scss 同值） */
   /* 别名镜像豁免（亮定义同引用，随 neutral-soft 翻暗）——本块唯一嵌套 var */
   --color-fill: var(--color-neutral-soft);
   --color-line-strong: #525252;
