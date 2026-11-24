@@ -121,7 +121,7 @@ mvn -q test                                            # 全仓 1339 run / 0 fai
 cd jknow-web && pnpm test && pnpm typecheck && pnpm build:prod   # test 425 passed；typecheck 与 build 均零错零告警退出 0
 ```
 
-可选演示：灌 nodeBudget 档位压测库 —— `docker exec -i jknow-pg-1 psql -U postgres -d jknow < scripts/seed-nodebudget-demo.sql`（独立于 seed-demo，幂等；图谱页节点档位 ± 生效需 >150 实体）
+可选演示：灌 nodeBudget 档位压测库 —— `docker exec -i jknow-pg-1 psql -U postgres -d jknow < scripts/seed-nodebudget-demo.sql`（独立于 seed-demo，幂等；图谱页节点档位 ± 生效需 >150 实体）；跑 smoke-p1 或重跑 seed-demo/teardown 后须复跑上命令复种
 
 ### golden 契约对表（人工验证面，非 CI 门）
 

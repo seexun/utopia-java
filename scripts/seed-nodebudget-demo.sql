@@ -4,6 +4,8 @@
 -- 库挂既有「演示工作区」(…0000000000f5，seed-demo.sql 建)：kb-switcher 下拉只列
 -- 当前工作区的库（useKbContext 的 kbsQuery 以 workspace.id 为缓存键），独立工作区
 -- 里的库在切换器不可见——故不建新 org/ws（简报骨架的 org/ws 段按实测链路裁撤）。
+-- 注意：重跑 seed-demo.sql / teardown-demo.sql 或 smoke-p1.sh 会经工作区 f5 的
+-- ON DELETE CASCADE 连带清掉本库（演示：档位压测）——跑毕复跑本脚本即可复种。
 -- visibility CHECK 只收 open/restricted（\d 实测，无 'public' 取值）。
 -- uuid 段式 0190d3e0-0000-7d5a-8000-00000000a0f2（kb）/ -0000000a1ggg（实体，
 -- 尾段 12 hex 全 hex 合法），与 seed-demo.sql 的 0000000000xx 段不撞（实测两前缀

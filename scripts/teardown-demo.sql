@@ -14,7 +14,10 @@
 --     V0000 造，非本脚本资产）；演示访客（user_id=9999）ON CONFLICT 幂等保留，
 --     seed 重跑 DO NOTHING 复用同一行，不累积。
 --
--- 影响：p1-smoke/走查 等既有库与测试残留零影响（只按固定 uuid 删）。
+-- 影响：p1-smoke/走查 等既有库与测试残留零影响（只按固定 uuid 删）；例外：挂演示
+-- 工作区 f5 的压测库 a0f2（演示：档位压测，scripts/seed-nodebudget-demo.sql 建，
+-- 2026-11-24 起）会被本脚本第 1 步的 ON DELETE CASCADE 连带清掉——跑毕按 README
+-- 「可选演示」节复跑该命令复种。
 --
 -- 执行：docker compose -f docker-compose.dev.yml exec -T pg psql -U postgres -d jknow \
 --         -v ON_ERROR_STOP=1 -f - < scripts/teardown-demo.sql
