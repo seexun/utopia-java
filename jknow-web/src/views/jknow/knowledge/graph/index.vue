@@ -29,6 +29,7 @@ import ZoomInIcon from "~icons/lucide/zoom-in";
 import ZoomOutIcon from "~icons/lucide/zoom-out";
 import Maximize2Icon from "~icons/lucide/maximize-2";
 import WaypointsIcon from "~icons/lucide/waypoints";
+import GitCompareIcon from "~icons/lucide/git-compare";
 import {
   graphOverview,
   graphNeighborhood,
@@ -1256,7 +1257,8 @@ const statsText = computed(() => {
          删除，标题/kb chip/节点档位/统计/搜索/图例全部收进卡头，画布上移满铺；卡形态
          只在外框/圆角，画布无边距全填充（内距归零见 scoped .graph-canvas-card） -->
     <div class="card graph-canvas-card relative flex min-h-0 flex-1 flex-col">
-      <!-- 卡头（两行）：行1 标题+kb chip / 节点档位+统计；行2 搜索+类型图例 / 边语义图例 -->
+      <!-- 卡头（两行）：行1 标题+kb chip / 节点档位+统计；行2 搜索+类型图例 /
+           边语义图例弹层触发钮（2026-11-24 留档清偿批：图例收弹层，行2 单行） -->
       <div class="border-b border-line px-3 pb-2 pt-2">
         <!-- 行1：标题 + kb chip / 稳定提示 + 节点档位步进器 + 统计 -->
         <div class="flex items-center gap-2">
@@ -1313,7 +1315,8 @@ const statsText = computed(() => {
             <span class="tabular-nums text-aux text-ink-2">{{ statsText }}</span>
           </div>
         </div>
-        <!-- 行2：搜索（建议框 absolute 以本行为参照）+ 返回全图 + 类型图例 / 边语义图例 -->
+        <!-- 行2：搜索（建议框 absolute 以本行为参照）+ 返回全图 + 类型图例 /
+             边语义图例触发钮（五项在弹层里，行2 单行不折行） -->
         <div class="mt-2 flex items-start gap-2">
           <div class="relative">
             <div class="relative">
@@ -1532,48 +1535,62 @@ const statsText = computed(() => {
             </el-popover>
           </div>
 
-          <!-- 边语义图例：常显（规格 graph-edge-legend.md §1）——已入卡头，
-               不再叠画布，去浮卡外框/半透明底改无底 inline -->
-          <div
-            class="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-4 gap-y-1 text-aux text-ink-3"
-          >
-            <span class="font-semibold">{{ S.graph.edgeLegend }}</span>
-            <span class="flex items-center gap-1.5">
-              <span
-                class="inline-block h-[3px] w-4 rounded-full"
-                :style="{ background: EDGE }"
-              />
-              {{ S.graph.edgeFact }}
-            </span>
-            <span class="flex items-center gap-1.5">
-              <span
-                class="inline-block h-[3px] w-4 rounded-full"
-                :style="{ background: EDGE_INFERRED }"
-              />
-              {{ S.graph.edgeInferred }}
-            </span>
-            <span class="flex items-center gap-1.5">
-              <span
-                class="inline-block h-[4px] w-4 rounded-full"
-                :style="{ background: EDGE_DERIVED }"
-              />
-              {{ S.graph.edgeDerived }}
-            </span>
-            <span class="flex items-center gap-1.5">
-              <span
-                class="inline-block h-[4px] w-4 rounded-full"
-                :style="{ background: EDGE_CONTEST }"
-              />
-              ⚠ {{ S.graph.edgeContested }}
-            </span>
-            <span class="flex items-center gap-1.5">
-              <span
-                class="inline-block h-[2px] w-4 rounded-full"
-                :style="{ background: edgeGhost() }"
-              />
-              {{ S.graph.edgeBlocked }}
-            </span>
-          </div>
+          <!-- 边语义图例（规格 graph-edge-legend.md §1）：卡头行2 单行化（2026-11-24
+               留档清偿批）——inline 五项收进 el-popover，行2 只留触发钮（暗色随 EP
+               令牌自动） -->
+          <el-popover placement="bottom-end" :width="300" trigger="click">
+            <template #reference>
+              <button
+                type="button"
+                class="ml-auto flex shrink-0 items-center gap-1.5 rounded-ctl border border-line px-2 py-1 text-aux text-ink-2 hover:bg-fill"
+                :title="S.graph.edgeLegend"
+              >
+                <GitCompareIcon width="12" height="12" />
+                {{ S.graph.edgeLegend }}
+              </button>
+            </template>
+            <!-- 原标题+五项整体移入（保留原 flex 排版，容器改 flex-col gap-1.5） -->
+            <div
+              class="flex flex-col items-start gap-1.5 text-aux text-ink-3"
+            >
+              <span class="font-semibold">{{ S.graph.edgeLegend }}</span>
+              <span class="flex items-center gap-1.5">
+                <span
+                  class="inline-block h-[3px] w-4 rounded-full"
+                  :style="{ background: EDGE }"
+                />
+                {{ S.graph.edgeFact }}
+              </span>
+              <span class="flex items-center gap-1.5">
+                <span
+                  class="inline-block h-[3px] w-4 rounded-full"
+                  :style="{ background: EDGE_INFERRED }"
+                />
+                {{ S.graph.edgeInferred }}
+              </span>
+              <span class="flex items-center gap-1.5">
+                <span
+                  class="inline-block h-[4px] w-4 rounded-full"
+                  :style="{ background: EDGE_DERIVED }"
+                />
+                {{ S.graph.edgeDerived }}
+              </span>
+              <span class="flex items-center gap-1.5">
+                <span
+                  class="inline-block h-[4px] w-4 rounded-full"
+                  :style="{ background: EDGE_CONTEST }"
+                />
+                ⚠ {{ S.graph.edgeContested }}
+              </span>
+              <span class="flex items-center gap-1.5">
+                <span
+                  class="inline-block h-[2px] w-4 rounded-full"
+                  :style="{ background: edgeGhost() }"
+                />
+                {{ S.graph.edgeBlocked }}
+              </span>
+            </div>
+          </el-popover>
         </div>
       </div>
 
