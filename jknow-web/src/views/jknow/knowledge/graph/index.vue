@@ -1842,14 +1842,12 @@ const statsText = computed(() => {
 
 /* 画布主卡：sigma 画布全幅无内距（.card 的 20px 内距归零），圆角由
    overflow 收口（WebGL 层随容器矩形，超出圆角部分由卡裁掉）。
-   容器层次修正（2026-11-24）：不再整卡白底——收敛为细框（边框+圆角），
-   卡头显式 bg-card、画布铺 --color-canvas，「白卡头→细线→灰画布」两段式
-   消「页灰→白卡→画布灰」三层套娃。投影去掉：透明卡上的阴影会露出空框感 */
+   画布底与卡面同白（2026-11-25 回归纯白，方案 A）：曾试过「透明细框 + 灰画布」
+   两段式（2026-11-24），画布的灰与卡头的明度断层读成"框住的灰盒子"，已撤——
+   卡片回到 .card 默认（白底+细边+阴影），只覆写内距与溢出 */
 .graph-canvas-card {
   padding: 0;
   overflow: hidden;
-  background-color: transparent;
-  box-shadow: none;
 }
 
 /* 浮动搜索卡（anivia 查询卡语言，对齐首批 search 查询卡）：圆角 --radius-card、

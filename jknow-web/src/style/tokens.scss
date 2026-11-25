@@ -28,7 +28,7 @@
   --color-bg: #f5f7fa;
   /* 画布底（图谱/本体工作区）：亮比页灰亮一档、比纯卡白暗一档——夹在白卡头与
      页面灰之间层次连续，且与页面灰不同色（同色会读成"白卡开了个洞"） */
-  --color-canvas: #fafbfc;
+  --color-canvas: #ffffff; /* 画布底：当前与卡面同值（2026-11-25 回归纯白，方案 A）——保留独立语义位，将来上色只改此处 */
   --color-border: #e5eaf0;
   --color-neutral-soft: #f1f5f9;
   --color-ink: #1f2937;
@@ -144,7 +144,7 @@
    soft 系暗档为同色半透明洗底：在暗卡面上仍可辨（规格验收「徽章 soft 底可辨」）。 */
 html.dark {
   --color-bg: #1a1a1a;
-  --color-canvas: #161616; /* 比页底深一档、比卡 #212121 深两档，同向逻辑 */
+  --color-canvas: #212121; /* 画布底暗档：与卡面同值（回归纯白，方案 A） */
   --color-neutral-soft: #262626;
   --color-border: #3a3a3a;
   --color-ink: #e8e8e8;

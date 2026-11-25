@@ -49,10 +49,10 @@ export const CANVAS_FONT =
   '"Plus Jakarta Sans", "PingFang SC", "Microsoft YaHei", "HarmonyOS Sans SC", sans-serif';
 export let CANVAS_TEXT = "#ededed"; // --color-ink
 export let CANVAS_TEXT_2 = "#a8a8a8"; // --color-ink-2
-/** 画布底（容器层次修正 2026-11-24）：独立令牌 --color-canvas——亮 #fafbfc/暗 #161616，
- *  夹在白卡头与页面灰之间（与页面灰不同色：同色会读成"白卡开了个洞"）。
+/** 画布底：独立令牌 --color-canvas（2026-11-25 回归纯白，方案 A）——亮 #ffffff/暗 #212121，与卡面同值，
+ *  画布与卡头同为白，仅靠卡头分隔线区分。令牌保留为独立语义位，将来上色只改令牌。
  *  网格层（drawWorldGrid）先铺它再撒点阵——sigma WebGL 层透明，底色从这层透出 */
-export let CANVAS_BG = "#fafbfc";
+export let CANVAS_BG = "#ffffff";
 /* 画在节点与连线之间的字比界面的正文小一档（12，规格 §2 提档）。**画布不是
    界面**：这些字压在一片线和点上，与它们比邻的是 9–18px 的节点，不是页面
    上的正文；旧档的 11 是跟着旧的小点一起定的。浮在画布之上的悬浮卡不算
@@ -256,13 +256,13 @@ export function drawHoverCard(
   );
 }
 
-/* 世界坐标网格：随相机缩放分级淡入淡出 */
-const GRID_BASE_WORLD = 24; // 基准世界格距（匹配 ~300 尺度的布局）
-const GRID_FADE_IN_PX = 13;
-const GRID_FULL_PX = 52;
-const GRID_MAX_LEVEL_PX = 480;
-const GRID_MAX_ALPHA = 0.03; // 可读性轮调淡：静观无感、拖动仍有反馈
-
+/* 画布底层（原"世界坐标网格"）：铺 --color-canvas 底色 + 尺寸随容器同步。
+ *
+ * 网格/点阵已撤（2026-11-25 回归纯白，方案 A）：点阵在近白底上读成一层灰雾，
+ * 与卡头的明度断层让画布像被框住的灰盒子——用户两轮反馈都指向这个边界感，
+ * 干脆消灭：画布与卡头同为白，仅靠卡头分隔线区分工具区与画布。
+ * 函数名与调用点保留（相机 updated / resize 都走它）：容器尺寸变了底色要重铺，
+ * 主题切换也靠它重铺。将来想再加网格/点阵，在这里画即可 */
 export function drawWorldGrid(canvas: HTMLCanvasElement, sigma: Sigma): void {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
@@ -276,49 +276,11 @@ export function drawWorldGrid(canvas: HTMLCanvasElement, sigma: Sigma): void {
   }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, width, height);
-  /* 画布底铺 --color-canvas（容器层次修正：独立令牌，亮比页灰亮一档）——
-     **绘制时现读令牌**（token 走 computed style，html.dark 自动翻转；refreshPalette
-     不在主题切换钩子上，模块 let 会滞留旧主题值）。sigma WebGL 层透明，底色从这层透出 */
+  /* 画布底铺 --color-canvas——**绘制时现读令牌**（token 走 computed style，
+     html.dark 自动翻转；refreshPalette 不在主题切换钩子上，模块 let 会滞留
+     旧主题值）。sigma WebGL 层透明，底色从这层透出 */
   ctx.fillStyle = token("--color-canvas", CANVAS_BG);
   ctx.fillRect(0, 0, width, height);
-  if (width <= 0 || height <= 0) return;
-
-  // 世界→屏幕：两个探针点求每世界单位像素数与原点位置（无相机旋转场景）
-  const p0 = sigma.graphToViewport({ x: 0, y: 0 });
-  const p1 = sigma.graphToViewport({ x: 1, y: 0 });
-  const ppw = p1.x - p0.x;
-  if (!Number.isFinite(ppw) || ppw <= 0) return;
-
-  // 最细可见层级：屏幕间距 ≥ 淡入阈值的最小 4 幂格距
-  let spacing = GRID_BASE_WORLD;
-  while (spacing * ppw < GRID_FADE_IN_PX) spacing *= 4;
-  while (spacing * ppw >= GRID_FADE_IN_PX * 4) spacing /= 4;
-
-  /* 国内风收口（走查 A1）：线制网格改**点阵**——只在最细可见层级的交点撒点
-     （Figma 式），随缩放换档；点的半径/透明度随层级淡入因子 t 走 */
-  const ss = spacing * ppw;
-  const t = Math.min(
-    1,
-    (ss - GRID_FADE_IN_PX) / (GRID_FULL_PX - GRID_FADE_IN_PX),
-  );
-  if (t <= 0) return;
-  // 网格点是墨色不是白色：暗底上是白，纸底上是近黑（0038）——绘制时现读令牌
-  // （同底色理由：主题切换不经过 refreshPalette，模块 let 会滞留），比线制略提透明度
-  const inkTriplet = (() => {
-    const [r, g, b] = parseRgba(token("--color-ink", "#1f2937"));
-    return `${r},${g},${b}`;
-  })();
-  ctx.fillStyle = `rgba(${inkTriplet},${(GRID_MAX_ALPHA * 3 * t).toFixed(4)})`;
-  const startX = ((p0.x % ss) + ss) % ss;
-  const startY = ((p0.y % ss) + ss) % ss;
-  const r = 0.9 + t * 0.6;
-  for (let x = startX; x <= width; x += ss) {
-    for (let y = startY; y <= height; y += ss) {
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
 }
 
 /* ---------- 令牌的读者（0038 浅色版） ----------
@@ -366,7 +328,7 @@ export let INK_RGB = "255,255,255";
  * 没被 utility 用到就不进产物，getComputedStyle 读不到。于是按垫片 B 段
  * 的亮色字面量定为常量（原变量名去前缀逐条注明），**只换读法不换色**——
  * 画布色值仍是第 2 波已走查过的那一份。 */
-const LIGHT_GROUND_RGB = "250,251,252"; // 摊平边色用的纸底（= --color-canvas #fafbfc 的三元组；容器层次修正后随画布底走，灰边才不比底更暗）
+const LIGHT_GROUND_RGB = "255,255,255"; // 摊平边色用的纸底（= --color-canvas #ffffff 的三元组，回归纯白）
 const LIGHT_INK_RGB = "31,41,55"; // 原 ink-rgb（= --color-ink #1f2937）
 const LIGHT_CONTEST_RGB = "180,83,9"; // 原 contest-rgb（= #b45309，与 --color-warning-text 同值）
 /* 原 violet-rgb（= #6d28d9）。**不等于 --color-violet #7c3aed**：图例那档
@@ -469,7 +431,7 @@ export function refreshPalette() {
   EDGE_RULE = rgbOf(violet, 0.5);
   EDGE_RULE_FOCUS = rgbOf(violet, 0.95);
   // 画布上的边：浅色下按底色摊平（见 flattenOnLight）
-  CANVAS_BG = token("--color-canvas", CANVAS_BG); // 容器层次修正：亮 fafbfc/暗 161616 随主题（独立画布令牌）
+  CANVAS_BG = token("--color-canvas", CANVAS_BG); // 画布底：与卡面同值，随主题翻转（独立画布令牌）
   EDGE = flattenOnLight(EDGE);
   EDGE_INFERRED = flattenOnLight(EDGE_INFERRED);
   EDGE_FOCUS = flattenOnLight(EDGE_FOCUS);
