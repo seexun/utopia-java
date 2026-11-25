@@ -1302,10 +1302,11 @@ const statsText = computed(() => {
 </script>
 
 <template>
-  <div class="knowledge-page flex h-full flex-col p-6">
-    <!-- 画布主卡：全幅画布 + 工作区型两行卡头（2026-11-24 合一批，方案 A）——独立页头带
-         删除，标题/kb chip/节点档位/统计/搜索/图例全部收进卡头，画布上移满铺；卡形态
-         只在外框/圆角，画布无边距全填充（内距归零见 scoped .graph-canvas-card） -->
+  <div class="knowledge-page flex h-full flex-col p-0">
+    <!-- 画布主卡：工作区满铺形态（2026-11-25 走查定案）——去 .card 外框/圆角/阴影/
+         外边距，卡头贴侧栏与顶栏、画布满铺到底，Figma/白板式「工具带 + 画布」，
+         无任何框线（三轮走查：用户始终感知卡外灰框，根因是 .card 的 1px 边框 +
+         圆角 + 页面外距）。卡片类名保留仅占位，视觉由 scoped 覆写全接管 -->
     <div class="card graph-canvas-card relative flex min-h-0 flex-1 flex-col">
       <!-- 卡头（两行）：行1 标题+kb chip / 节点档位+统计；行2 搜索+类型图例 /
            边语义图例弹层触发钮（2026-11-24 留档清偿批：图例收弹层，行2 单行）。
@@ -1840,14 +1841,17 @@ const statsText = computed(() => {
 /* 重造层（reskin-b2）：只引令牌（--color-* / --radius-* / --shadow-*），
    禁硬编码色值；卡容器形态来自全局 .card（theme.scss） */
 
-/* 画布主卡：sigma 画布全幅无内距（.card 的 20px 内距归零），圆角由
-   overflow 收口（WebGL 层随容器矩形，超出圆角部分由卡裁掉）。
-   画布底与卡面同白（2026-11-25 回归纯白，方案 A）：曾试过「透明细框 + 灰画布」
-   两段式（2026-11-24），画布的灰与卡头的明度断层读成"框住的灰盒子"，已撤——
-   卡片回到 .card 默认（白底+细边+阴影），只覆写内距与溢出 */
+/* 画布主卡：工作区满铺形态（2026-11-25 走查定案）——.card 的边框/圆角/阴影/
+   白底全部压掉（卡片类名保留占位），页外距 p-6 已在模板归零：卡头贴侧栏与
+   顶栏、画布满铺到底，四周无任何框线。三轮走查定案：用户始终感知卡外灰框，
+   根因是 .card 的 1px #E5EAF0 边框 + 圆角 + 外距，非底色（底色已两轮回归） */
 .graph-canvas-card {
   padding: 0;
   overflow: hidden;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background-color: transparent;
 }
 
 /* 浮动搜索卡（anivia 查询卡语言，对齐首批 search 查询卡）：圆角 --radius-card、
