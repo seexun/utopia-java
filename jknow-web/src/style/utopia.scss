@@ -228,11 +228,3 @@
   height: 100%;
   min-height: 0;
 }
-
-/* 图谱工作区满铺（2026-11-25 走查定案）：.app-main 的 16px 页面留白会让
-   满铺画布四周留出灰圈（用户三轮走查反馈的"灰框"残余即此）——工作区页
-   豁免：padding 归零，卡头贴顶栏/侧栏、画布满铺到底。
-   :has 为 Chrome 105+ 能力（内部工具，Chrome-only 使用面） */
-.app-main:has(> div.knowledge-page > .graph-canvas-card) {
-  padding: 0;
-}
