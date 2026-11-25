@@ -79,7 +79,7 @@ export function withTopLayer<T>(programs: Record<string, T>): Record<string, T> 
 export const NODE_PROGRAMS = {
   // 方向 A（docs/design/graph-node-edge-style.md §2）：状态环 → 白描边 → 类型色实心。
   // 环的宽度是程序级常量（@sigma/node-border 不支持按节点变宽），选中/hover
-  // 的区分落在环色上（见状态表）；白描边 0.16 让实色圆在 #f5f7fa 底与白卡
+  // 的区分落在环色上（见状态表）；白描边 0.16 让实色圆在 #fcfcfd 底与白卡
   // 停靠面板上都立得住
   [NODE_TYPE_SHELL]: createNodeBorderProgram({
     borders: [

@@ -77,7 +77,7 @@
   --color-violet: #7c3aed;
 
   /* 中性：card/fill/line 是工具别名 */
-  --color-bg: #f5f7fa;
+  --color-bg: #fcfcfd;
   --color-canvas: #ffffff; /* 画布底：与卡面同值（tokens.scss 同值双源，回归纯白） */
   --color-border: #e5eaf0;
   --color-neutral-soft: #f1f5f9;

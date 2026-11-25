@@ -272,7 +272,7 @@
   height: 28px;
   border-radius: 1px;
   background: var(--color-ink);
-  box-shadow: 0 0 0 1.5px rgba(245, 247, 250, 0.95); /* 纸底色环（--color-bg 的三元组） */
+  box-shadow: 0 0 0 1.5px rgba(252, 252, 253, 0.95); /* 纸底色环（--color-bg 的三元组） */
   cursor: ew-resize;
 }
 .scrubber-range::-moz-range-thumb {
@@ -281,7 +281,7 @@
   border: none;
   border-radius: 1px;
   background: var(--color-ink);
-  box-shadow: 0 0 0 1.5px rgba(245, 247, 250, 0.95); /* 纸底色环（--color-bg 的三元组） */
+  box-shadow: 0 0 0 1.5px rgba(252, 252, 253, 0.95); /* 纸底色环（--color-bg 的三元组） */
   cursor: ew-resize;
 }
 .scrubber-range::-webkit-slider-runnable-track {

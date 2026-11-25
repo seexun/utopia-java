@@ -25,7 +25,7 @@
   --color-danger-soft: #fef2f2;
   --color-danger-text: #b91c1c;
 
-  --color-bg: #f5f7fa;
+  --color-bg: #fcfcfd;
   /* 画布底（图谱/本体工作区）：亮比页灰亮一档、比纯卡白暗一档——夹在白卡头与
      页面灰之间层次连续，且与页面灰不同色（同色会读成"白卡开了个洞"） */
   --color-canvas: #ffffff; /* 画布底：当前与卡面同值（2026-11-25 回归纯白，方案 A）——保留独立语义位，将来上色只改此处 */
