@@ -494,9 +494,13 @@
       border-bottom: 1px solid var(--color-border);
     }
 
+    /* 菜单文字对齐国内 B 端标准（用户走查"发虚不重"）：一级/组标题近实墨
+       （antd v5 菜单项 88% 墨）+ 500 字重，子项降一档 65%+400 靠字重分层，
+       选中仍主题蓝。!important 压掉别处给组标题的灰（#6b7280） */
     .el-menu-item,
     .el-sub-menu__title {
-      color: rgba(0, 0, 0, 0.65);
+      color: rgba(0, 0, 0, 0.88) !important;
+      font-weight: 500;
     }
 
     .el-menu-item.is-active {
@@ -529,6 +533,9 @@
     .nest-menu .el-sub-menu > .el-sub-menu__title,
     .el-sub-menu .el-menu-item {
       background-color: var(--el-bg-color, #fafafa);
+      /* 子项降一档：色轻一档 + 400 字重，与一级 500 拉开层级 */
+      color: rgba(0, 0, 0, 0.65) !important;
+      font-weight: 400;
 
       &:hover {
         background-color: var(--color-primary-soft, #f0f5ff);
