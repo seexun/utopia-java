@@ -1302,15 +1302,14 @@ const statsText = computed(() => {
 </script>
 
 <template>
-  <div class="knowledge-page flex h-full flex-col p-6">
-    <!-- 画布主卡：全幅画布 + 工作区型两行卡头（2026-11-24 合一批，方案 A）——独立页头带
-         删除，标题/kb chip/节点档位/统计/搜索/图例全部收进卡头，画布上移满铺；卡形态
-         只在外框/圆角，画布无边距全填充（内距归零见 scoped .graph-canvas-card） -->
-    <div class="card graph-canvas-card relative flex min-h-0 flex-1 flex-col">
+  <div class="knowledge-page flex h-full flex-col gap-[15px] p-6">
+    <!-- 工作区两卡结构（2026-11-25 用户线框图定案）：上=卡头框（标题/chip/档位/
+         统计/搜索/图例），下=画布框（满铺剩余高度），两框之间 15px 缝隙。
+         之前三轮（灰底两段式/纯白满铺）均被否——用户要的是"两个独立的框" -->
+    <div class="card">
       <!-- 卡头（两行）：行1 标题+kb chip / 节点档位+统计；行2 搜索+类型图例 /
-           边语义图例弹层触发钮（2026-11-24 留档清偿批：图例收弹层，行2 单行）。
-           bg-card 显式白底：外层卡已收敛为细框（背景透明），白/灰两段式靠它分界 -->
-      <div class="border-b border-line bg-card px-3 pb-2 pt-2">
+           边语义图例弹层触发钮（2026-11-24 留档清偿批：图例收弹层，行2 单行） -->
+      <div class="px-3 pb-2 pt-2">
         <!-- 行1：标题 + kb chip / 稳定提示 + 节点档位步进器 + 统计 -->
         <div class="flex items-center gap-2">
           <h1 class="text-title font-semibold text-ink">{{ S.nav.graph }}</h1>
@@ -1652,12 +1651,12 @@ const statsText = computed(() => {
           </el-popover>
         </div>
       </div>
+    </div>
 
-      <!-- 画布：世界坐标网格层垫在 sigma WebGL 层下；卡头下方 in-flow 满铺
-           （flex-1 min-h-0）。错误行/Loading/空态也锚进本画布层（相对画布定位）
-           ——卡头 static 化后不能再以整卡为锚，否则错误文案叠卡头行2、空态/
-           Loading 视觉中心偏移约半个卡头高（T1 审查修正） -->
-      <div class="relative min-h-0 flex-1">
+    <!-- 画布框：世界坐标网格层垫在 sigma WebGL 层下；独立卡满铺剩余高度
+         （flex-1 min-h-0）。错误行/Loading/空态也锚进本画布层（相对画布定位） -->
+    <div class="card graph-canvas-card relative flex min-h-0 flex-1 flex-col">
+        <div class="relative min-h-0 flex-1">
         <canvas ref="gridRef" class="absolute inset-0 h-full w-full" />
         <div ref="containerRef" class="absolute inset-0" />
 
@@ -1840,11 +1839,10 @@ const statsText = computed(() => {
 /* 重造层（reskin-b2）：只引令牌（--color-* / --radius-* / --shadow-*），
    禁硬编码色值；卡容器形态来自全局 .card（theme.scss） */
 
-/* 画布主卡：sigma 画布全幅无内距（.card 的 20px 内距归零），圆角由
-   overflow 收口（WebGL 层随容器矩形，超出圆角部分由卡裁掉）。
-   画布底与卡面同白（2026-11-25 回归纯白，方案 A）：曾试过「透明细框 + 灰画布」
-   两段式（2026-11-24），画布的灰与卡头的明度断层读成"框住的灰盒子"，已撤——
-   卡片回到 .card 默认（白底+细边+阴影），只覆写内距与溢出 */
+/* 画布框（工作区两卡结构 2026-11-25）：sigma 画布全幅无内距（.card 内距归零），
+   圆角由 overflow 收口（WebGL 层随容器矩形，超出圆角部分由卡裁掉）。
+   画布底与卡面同白（--color-canvas，回归纯白）——两卡结构下画布框就是
+   线框图的"下面那个大框"，卡头框独立在其上方 */
 .graph-canvas-card {
   padding: 0;
   overflow: hidden;
