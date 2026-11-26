@@ -284,9 +284,12 @@ const hasMounted = computed(() => mountedList.value.length > 0);
 </script>
 
 <template>
-  <!-- final-sprint T2：整页单列滚动（审查/检索同款根）；kb 页在若依 Layout 的
-       AppMain 内渲染（h-full 即内容窗口高，与批次 1-4 七页同根） -->
   <div class="knowledge-page h-full overflow-y-auto overscroll-contain px-8 py-6">
+    <!-- final-sprint T2：整页单列滚动（审查/检索同款根）；kb 页在若依 Layout 的
+         AppMain 内渲染（h-full 即内容窗口高，与批次 1-4 七页同根）。注意：
+         本注释必须留在根 div 内——dev 模式根级注释是真实节点，会让组件根变
+         Fragment，AppMain 的 <Transition mode="out-in"> 离场卡死后吞掉 enter，
+         渲染空白主区。 -->
     <div>
       <!-- 页头（重造要素一）：标题=数据映射、副题=库名；extra=定义/数据源两档
            切换（segmented——本体页图/表同款；定义与数据源是两件不同的事） -->

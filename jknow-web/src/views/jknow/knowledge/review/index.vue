@@ -548,10 +548,13 @@ function setPicked(on: boolean, id?: string) {
 </script>
 
 <template>
-  <!-- reskin-b4：整页单列滚动（检索/文库同款根）；rail 左栏退役，档位选择
-       上移为队列过滤卡。kb 页在若依 Layout 的 AppMain 内渲染
-       （h-full 即内容窗口高，与批次 1-3 六页同根）。 -->
   <div class="knowledge-page h-full overflow-y-auto overscroll-contain px-8 py-6">
+    <!-- reskin-b4：整页单列滚动（检索/文库同款根）；rail 左栏退役，档位选择
+         上移为队列过滤卡。kb 页在若依 Layout 的 AppMain 内渲染
+         （h-full 即内容窗口高，与批次 1-3 六页同根）。注意：本注释必须留在
+         根 div 内——根级注释会让组件根变 Fragment，AppMain 的
+         <Transition mode="out-in"> 对 Fragment 根离场卡死后吞掉 enter，
+         菜单跳转渲染空白主区（dev 注释是真实节点，prod 丢弃故不复现）。 -->
     <div>
       <!-- 队列过滤卡：页头合一（2026-11-24 留档清偿批，图谱/本体页同家族）——
            独立页头带删除，标题=审核 + kb chip=库名收进卡头首行（border-b 分隔，

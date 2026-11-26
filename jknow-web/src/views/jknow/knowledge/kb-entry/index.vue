@@ -91,12 +91,14 @@ const workspaceReady = computed(
 </script>
 
 <template>
-  <!-- 单根包装（kb/account 若依壳内联验收顺手项）：若依 AppMain 主区的
-       <Transition mode="out-in"> 要求子组件是单个真实元素根（KbRedirect 根注释
-       的既有约定「根必须是带内容盒的真实元素」）；本模板原是 MyKbs / 引导卡 /
-       等待页三选一的多根 fragment，这里同法包一层兜住。菜单链的空白主区根因
-       在「挂载 → replace」跳板，已由 router 守卫直跳修复（见 router/index.ts）。 -->
   <div class="h-full">
+    <!-- 单根包装（kb/account 若依壳内联验收顺手项）：若依 AppMain 主区的
+         <Transition mode="out-in"> 要求子组件是单个真实元素根（KbRedirect 根注释
+         的既有约定「根必须是带内容盒的真实元素」）；本模板原是 MyKbs / 引导卡 /
+         等待页三选一的多根 fragment，这里同法包一层兜住。菜单链的空白主区根因
+         在「挂载 → replace」跳板，已由 router 守卫直跳修复（见 router/index.ts）。
+         注意：本注释必须留在根 div 内——dev 模式根级注释是真实节点，会让组件根
+         变 Fragment，Transition(out-in) 离场卡死后吞掉 enter，渲染空白主区。 -->
     <MyKbs v-if="workspaceReady" />
     <!-- 引导卡：8s 未解析出工作区/库——状态一句话，动作在按钮上（与 kbScope
          的 noAccess 落地页同一副骨架） -->

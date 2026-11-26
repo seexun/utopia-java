@@ -295,11 +295,13 @@ function resetAudit(fn: () => void) {
 </script>
 
 <template>
-  <!-- reskin-b4：整页单列滚动（检索/文库/审查同款根）；左栏分节 rail 退役，
-       分节上移为页头下的 el-tabs（全局形态自动跟随）。section ref 仍是
-       分节的唯一事实源——四节内容、成员/台账查询的 enabled 闸、弹窗接线
-       原样（每张卡一个保存的语义不变）。 -->
   <div class="knowledge-page h-full overflow-y-auto overscroll-contain px-8 py-6">
+    <!-- reskin-b4：整页单列滚动（检索/文库/审查同款根）；左栏分节 rail 退役，
+         分节上移为页头下的 el-tabs（全局形态自动跟随）。section ref 仍是
+         分节的唯一事实源——四节内容、成员/台账查询的 enabled 闸、弹窗接线
+         原样（每张卡一个保存的语义不变）。注意：本注释必须留在根 div 内——
+         dev 模式根级注释是真实节点，会让组件根变 Fragment，AppMain 的
+         <Transition mode="out-in"> 离场卡死后吞掉 enter，渲染空白主区。 -->
     <!-- 设置是读一列字段，不是铺一张桌子：内容居中限宽 -->
     <div class="mx-auto w-full max-w-4xl">
       <!-- 页头（重造要素一）：标题=设置，副题=库名（独立路由位 /kb/:kbId/settings）；
