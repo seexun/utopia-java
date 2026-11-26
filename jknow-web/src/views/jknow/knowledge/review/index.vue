@@ -560,7 +560,7 @@ function setPicked(on: boolean, id?: string) {
            独立页头带删除，标题=审核 + kb chip=库名收进卡头首行（border-b 分隔，
            单 h1 补位；页内无现成队列总计数变量，右段按 YAGNI 不加）；
            14 档药丸原样入卡身。 -->
-      <div class="card mb-6">
+      <div class="card mb-[15px]">
         <!-- 卡头首行：标题 + kb chip -->
         <div class="flex items-center gap-2 border-b border-line pb-2">
           <h1 class="text-title font-semibold text-ink">{{ S.review.title }}</h1>
