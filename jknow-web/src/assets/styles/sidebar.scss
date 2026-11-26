@@ -218,7 +218,7 @@
 
   .hideSidebar {
     .sidebar-container {
-      width: 60px !important;
+      width: 54px !important; /* 对齐 gvdata 折叠态 54px（展开 240px） */
     }
 
     // 侧栏折叠过窄（60px 图标栏）：文字放不下，底部工具/状态区整体隐藏，展开入口仍在顶部汉堡按钮
