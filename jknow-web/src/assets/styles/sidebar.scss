@@ -533,8 +533,9 @@
     .nest-menu .el-sub-menu > .el-sub-menu__title,
     .el-sub-menu .el-menu-item {
       background-color: var(--el-bg-color, #fafafa);
-      /* 子项降一档：色轻一档 + 400 字重，与一级 500 拉开层级 */
-      color: rgba(0, 0, 0, 0.65) !important;
+      /* 二级与一级同墨（antd v5 菜单规范：层级只靠缩进，不做色重分档——
+         上一轮 65% 灰与一级 88% 跳变过大被走查否掉） */
+      color: rgba(0, 0, 0, 0.88) !important;
       font-weight: 400;
 
       &:hover {

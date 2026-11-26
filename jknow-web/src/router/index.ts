@@ -75,61 +75,61 @@ export const constantRoutes = [
         path: ":kbId/graph",
         component: () => import("@/views/jknow/knowledge/graph/index.vue"),
         hidden: true,
-        meta: { title: "图谱" }
+        meta: { title: "图谱" , activeMenu: "/workbench/graph" }
       },
       {
         path: ":kbId/search",
         component: () => import("@/views/jknow/knowledge/search/index.vue"),
         hidden: true,
-        meta: { title: "检索" }
+        meta: { title: "检索" , activeMenu: "/workbench/search" }
       },
       {
         path: ":kbId/library",
         component: () => import("@/views/jknow/knowledge/library/index.vue"),
         hidden: true,
-        meta: { title: "文库" }
+        meta: { title: "文库" , activeMenu: "/knowledge-mgmt/library" }
       },
       {
         path: ":kbId/doc/:docId",
         component: () => import("@/views/jknow/knowledge/doc-viewer/index.vue"),
         hidden: true,
-        meta: { title: "文档" }
+        meta: { title: "文档" , activeMenu: "/knowledge-mgmt/library" }
       },
       {
         path: ":kbId/ontology",
         component: () => import("@/views/jknow/knowledge/ontology/index.vue"),
         hidden: true,
-        meta: { title: "本体" }
+        meta: { title: "本体" , activeMenu: "/knowledge-mgmt/ontology" }
       },
       {
         path: ":kbId/review",
         component: () => import("@/views/jknow/knowledge/review/index.vue"),
         hidden: true,
-        meta: { title: "审查" }
+        meta: { title: "审查" , activeMenu: "/knowledge-mgmt/review" }
       },
       {
         path: ":kbId/mappings",
         component: () => import("@/views/jknow/knowledge/mappings/index.vue"),
         hidden: true,
-        meta: { title: "映射" }
+        meta: { title: "映射" , activeMenu: "/knowledge-mgmt/mappings" }
       },
       {
         path: ":kbId/settings",
         component: () => import("@/views/jknow/knowledge/kb-settings/index.vue"),
         hidden: true,
-        meta: { title: "库设置" }
+        meta: { title: "库设置" , activeMenu: "/config/settings" }
       },
       {
         path: ":kbId/chat/:conversationId?",
         component: () => import("@/views/jknow/knowledge/chat/index.vue"),
         hidden: true,
-        meta: { title: "问答" }
+        meta: { title: "问答" , activeMenu: "/workbench/chat" }
       },
       {
         path: ":kbId/docs",
         component: () => import("@/views/jknow/knowledge/docs/index.vue"),
         hidden: true,
-        meta: { title: "文档中心" }
+        meta: { title: "文档中心" , activeMenu: "/knowledge-mgmt/library" }
       }
     ]
   },
