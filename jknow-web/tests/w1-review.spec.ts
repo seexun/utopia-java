@@ -143,38 +143,39 @@ afterEach(() => {
 });
 
 describe("Review 页数据层：按分档 + 页码取数", () => {
-  it("默认落在总览但按 duplicates 档取数（页 0、offset 0、types any）", async () => {
+  it("默认落在待审核（重排后无总览档，页 0、offset 0、types any）", async () => {
     reviewMock.mockResolvedValue({
-      counts: counts({ duplicates: 3 }),
-      queue: "duplicates",
+      counts: counts({ pending: 3, duplicates: 20 }),
+      queue: "pending",
       items: []
     });
     const w = await mountReview("/kb/kb1/review");
     await flushPromises();
-    expect(reviewMock).toHaveBeenCalledWith("kb1", "duplicates", 6, 0, "any");
-    // 左栏徽标 = 服务端的 COUNT（不是数组长度）
-    expect(w.find(".badge-soft").text()).toContain("");
-    expect(w.html()).toContain(S.review.railOverview);
+    expect(reviewMock).toHaveBeenCalledWith("kb1", "pending", 10, 0, "any");
+    // 队列入口只住在左导航：分组标题在，「总览」药丸已撤（重排批 2026-11-26）
+    expect(w.html()).toContain(S.review.queueGroupFacts);
+    const zi = w.html().indexOf("总览");
+    console.log("CTX", zi >= 0 ? w.html().slice(Math.max(0, zi - 250), zi + 80) : "(none)");
   });
 
   it("换档带各自的页大小与 offset；types 只在 duplicates 档跟随筛选", async () => {
     reviewMock.mockResolvedValue({
-      counts: counts({ duplicates: 20, pending: 2 }),
-      queue: "duplicates",
+      counts: counts({ duplicates: 20, pending: 2, conflicts: 1 }),
+      queue: "pending",
       items: []
     });
     const w = await mountReview("/kb/kb1/review");
     await flushPromises();
     reviewMock.mockClear();
 
-    // 点左栏「待确认」：FACT_PAGE=10、回第一页
-    const railButtons = w.findAll("button").filter(b =>
-      b.text().includes(S.review.railPending)
-    );
-    expect(railButtons.length).toBeGreaterThan(0);
-    await railButtons[0].trigger("click");
+    // 点「知识冲突」（默认档已是待审核）：FACT_PAGE=10、回第一页
+    const conflictBtn = w.findAll("button").find(b =>
+      b.text().includes(S.review.railConflicts)
+    )!;
+    expect(conflictBtn).toBeTruthy();
+    await conflictBtn.trigger("click");
     await flushPromises();
-    expect(reviewMock).toHaveBeenLastCalledWith("kb1", "pending", 10, 0, "any");
+    expect(reviewMock).toHaveBeenLastCalledWith("kb1", "conflicts", 8, 0, "any");
 
     // 回 duplicates 并切类型筛选：清空参数回到第一页
     reviewMock.mockClear();
@@ -226,14 +227,14 @@ describe("Review 页数据层：按分档 + 页码取数", () => {
     expect(reviewMock).toHaveBeenLastCalledWith("kb1", "duplicates", 6, 6, "any");
   });
 
-  it("九档全空：左栏仍按 COUNT 显示 0，通用空态说「整个待办全清」", async () => {
-    reviewMock.mockResolvedValue({ counts: counts(), queue: "duplicates", items: [] });
+  it("九档全空：默认档是待审核，通用空态说「整个待办全清」", async () => {
+    reviewMock.mockResolvedValue({ counts: counts(), queue: "pending", items: [] });
     const w = await mountReview("/kb/kb1/review");
     await flushPromises();
-    expect(w.html()).not.toContain(S.review.empty); // 总览不显示队列空态
+    expect(w.html()).toContain(S.review.empty); // 默认档=待审核，全零出队列空态
   });
 
-  it("站内 ?queue=agent 跳转不重挂也换档（C-1）——总览「去处理」点进 agent 档", async () => {
+  it("站内 ?queue=agent 跳转不重挂也换档（C-1）——统计卡「去处理」点进 agent 档", async () => {
     // open>0 总览才出「去处理」链接（overview.tsx Stat action）
     summaryMock.mockResolvedValue({
       waiting: Object.fromEntries(
@@ -269,8 +270,15 @@ describe("Review 页数据层：按分档 + 页码取数", () => {
     expect(agentBtn()).toBeTruthy();
     // 挂载时没有 ?queue=：agent 档不激活
     expect(agentBtn().classes()).not.toContain("bg-primary-soft");
-    // 总览「去处理」= RouterLink 站内 push（path 不变、只改 query）——
-    // lay-content 按 path 定 key 不重挂，sel 只能靠 watch ?queue= 跟过来
+    // 统计卡默认收起：先展开卡头——agent.open>0 的「去处理」= RouterLink
+    // 站内 push（path 不变、只改 query）——lay-content 按 path 定 key 不重挂，
+    // sel 只能靠 watch ?queue= 跟过来（C-1 原样，只是链接搬进了统计卡）
+    const statsHead = w
+      .findAll("button")
+      .find(b => b.text().includes(S.review.statsTitle(0)))!;
+    expect(statsHead).toBeTruthy();
+    await statsHead.trigger("click");
+    await flushPromises();
     const go = w
       .findAll("a")
       .find(a => a.text().includes(S.review.overviewOpen));

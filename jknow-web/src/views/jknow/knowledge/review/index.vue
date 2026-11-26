@@ -58,7 +58,7 @@ import { toast } from "@/domain/toast";
 import { useKbContextHook } from "@/store/knowledge/modules/kb";
 import { useKbScope } from "@/composables/useKbScope";
 import { useKbRole } from "@/composables/useKbRole";
-import { ReviewOverview } from "./overview";
+import { ReviewKpiBar, ReviewStatsCard } from "./overview";
 import {
   PendingFactRow,
   DuplicateCard,
@@ -135,8 +135,23 @@ const RAIL_LABEL: Record<string, string> = {
   violations: S.review.railViolations,
   defects: S.review.railDefects,
   alignment: S.review.railAlignment,
-  errata: S.review.railErrata
+  errata: S.review.railErrata,
+  agent: S.review.railAgent,
+  decisions: S.review.railDecisions,
+  merges: S.review.railMerges
 };
+
+/* 左侧队列导航的分组（重排批 2026-11-26 治乱走查）：语义四组替代竖线硬隔
+   的 14 药丸——待办入口只住在导航，同一组计数只说一遍 */
+const QUEUE_GROUPS: { label: string; items: Sel[] }[] = [
+  { label: S.review.queueGroupFacts, items: ["pending", "conflicts"] },
+  {
+    label: S.review.queueGroupEntity,
+    items: ["duplicates", "unconfirmed", "lowconf", "violations", "defects"]
+  },
+  { label: S.review.queueGroupStruct, items: ["alignment", "errata"] },
+  { label: S.review.queueGroupHistory, items: ["agent", "decisions", "merges"] }
+];
 
 const PAGE_SIZE: Record<Exclude<Sel, "overview">, number> = {
   pending: FACT_PAGE,
@@ -191,7 +206,7 @@ const sel = ref<Sel>(
   QUEUE_ORDER.includes((route.query.queue as Sel) ?? ("" as Sel)) ||
     route.query.queue === "agent"
     ? (route.query.queue as Sel)
-    : "overview"
+    : "pending"
 );
 /* C-1（W3 审查收口）：站内跳转只改 query 不换 path（lay-content 按 path 定
    组件 key，不重挂）——sel 必须跟着 ?queue= 走，否则总览「去处理」深链
@@ -202,7 +217,7 @@ const queueParam = computed(() =>
   QUEUE_ORDER.includes((route.query.queue as Sel) ?? ("" as Sel)) ||
     route.query.queue === "agent"
     ? (route.query.queue as Sel)
-    : "overview"
+    : "pending"
 );
 const page = ref(0);
 watch(queueParam, v => {
@@ -256,10 +271,12 @@ const history = useQuery({
   enabled: computed(() => !!kbId.value && sel.value === "decisions")
 });
 // 总览：只在落在它上面时拉
+/* 重排批（2026-11-26）：KPI 条与统计卡全程要用 summary——原「只在总览档拉」
+   的闸随总览档一起退役，进库即拉 */
 const summary = useQuery({
   queryKey: computed(() => ["reviewSummary", kbId.value]),
   queryFn: () => reviewSummary(kbId.value),
-  enabled: computed(() => !!kbId.value && sel.value === "overview")
+  enabled: computed(() => !!kbId.value)
 });
 
 // 库详情（治理开关在总览 Agent 段用；与 KbScope 共键）
@@ -556,12 +573,10 @@ function setPicked(on: boolean, id?: string) {
          <Transition mode="out-in"> 对 Fragment 根离场卡死后吞掉 enter，
          菜单跳转渲染空白主区（dev 注释是真实节点，prod 丢弃故不复现）。 -->
     <div>
-      <!-- 队列过滤卡：页头合一（2026-11-24 留档清偿批，图谱/本体页同家族）——
-           独立页头带删除，标题=审核 + kb chip=库名收进卡头首行（border-b 分隔，
-           单 h1 补位；页内无现成队列总计数变量，右段按 YAGNI 不加）；
-           14 档药丸原样入卡身。 -->
+      <!-- 页头卡（重排批 2026-11-26 治乱走查，用户拍板）：标题 + kb chip +
+           KPI 概览条——原 8 张统计大卡浓缩为四个数，一行扫完。
+           KPI 数据来自 reviewSummary；加载中先不渲染（卡片只剩标题行） -->
       <div class="card mb-[15px]">
-        <!-- 卡头首行：标题 + kb chip -->
         <div class="flex items-center gap-2 border-b border-line pb-2">
           <h1 class="text-title font-semibold text-ink">{{ S.review.title }}</h1>
           <span
@@ -570,98 +585,65 @@ function setPicked(on: boolean, id?: string) {
             {{ kb?.name }}
           </span>
         </div>
-
-        <!-- 队列过滤条（重造要素二）：14 档一排药丸——总览 / 九队列 + agent /
-             历史（台账 + 合并史）/ 数据映射（外链）。计数徽章 badge-soft 读
-             服务端 COUNT（SSE 推动刷新）；agent 跑动中的琥珀脉冲点保留。
-             选中 primary-soft（scoped 补皮），bg-primary-soft 类同时留在
-             元素上——w1-review spec 以它为选中锚 -->
-        <div class="flex flex-wrap items-center gap-1.5 pt-3">
-        <UPill
-          :active="active === 'overview'"
-          :class="['queue-pill', active === 'overview' && 'bg-primary-soft']"
-          @click="select('overview')"
-        >
-          {{ S.review.railOverview }}
-        </UPill>
-        <span class="mx-1 h-4 w-px shrink-0 bg-line-strong" aria-hidden />
-        <UPill
-          v-for="q in QUEUE_ORDER"
-          :key="q"
-          :active="active === q"
-          :class="['queue-pill', active === q && 'bg-primary-soft']"
-          @click="select(q)"
-        >
-          <span class="truncate">{{ RAIL_LABEL[q] }}</span>
-          <span
-            v-if="counts[q] > 0"
-            class="badge-soft badge-soft-info tabular-nums"
-          >
-            {{ counts[q] }}
-          </span>
-        </UPill>
-        <!-- agent 的队列（0025）：徽标是等人回答的建议数 -->
-        <UPill
-          :active="active === 'agent'"
-          :class="['queue-pill', active === 'agent' && 'bg-primary-soft']"
-          @click="select('agent')"
-        >
-          <span class="truncate">{{ S.review.railAgent }}</span>
-          <span
-            v-if="agentRunning"
-            class="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-warning"
-          />
-          <span
-            v-if="counts.agent > 0"
-            class="badge-soft badge-soft-info tabular-nums"
-          >
-            {{ counts.agent }}
-          </span>
-        </UPill>
-        <span class="mx-1 h-4 w-px shrink-0 bg-line-strong" aria-hidden />
-        <!-- 历史组：台账 + 合并史 -->
-        <span class="mr-1 shrink-0 text-aux font-medium text-ink-3">
-          {{ S.review.tabHistory }}
-        </span>
-        <UPill
-          :active="active === 'decisions'"
-          :class="['queue-pill', active === 'decisions' && 'bg-primary-soft']"
-          @click="select('decisions')"
-        >
-          {{ S.review.railDecisions }}
-        </UPill>
-        <UPill
-          :active="active === 'merges'"
-          :class="['queue-pill', active === 'merges' && 'bg-primary-soft']"
-          @click="select('merges')"
-        >
-          <span class="truncate">{{ S.review.railMerges }}</span>
-          <span
-            v-if="counts.merges > 0"
-            class="badge-soft badge-soft-info tabular-nums"
-          >
-            {{ counts.merges }}
-          </span>
-        </UPill>
-        <span class="mx-1 h-4 w-px shrink-0 bg-line-strong" aria-hidden />
-        <!-- 数据映射：两组都不属的外链。计数留着——收件箱该说「有几条等你」；
-             无内容区标题，ⓘ 留在行内（旧仓第 5 轮例外，同位） -->
-        <RouterLink class="pill" :to="`/kb/${kbId}/mappings`">
-          <span class="truncate">{{ S.review.railMappings }}</span>
-          <el-tooltip :content="S.review.railMappingsHint" placement="top">
-            <span
-              class="inline-grid size-[14px] shrink-0 cursor-help place-items-center rounded-full border border-ink-3 text-aux text-ink-3"
-            >i</span>
-          </el-tooltip>
-          <span
-            v-if="counts.mappings > 0"
-            class="badge-soft badge-soft-info tabular-nums"
-          >
-            {{ counts.mappings }}
-          </span>
-        </RouterLink>
+        <div class="pt-3">
+          <ReviewKpiBar v-if="summary.data.value" :summary="summary.data.value" />
         </div>
       </div>
+
+      <!-- 两栏：左=队列导航（语义四组 + 计数，滚动钉住）；右=选中队列的处理台。
+           病灶治理：同一组队列只说一遍（导航是唯一入口），办事不回头找导航。
+           层级只靠缩进（国内菜单规范），导航钉左、内容随页滚 -->
+      <div class="flex items-start gap-[15px]">
+        <!-- 队列导航卡 -->
+        <nav
+          class="card sticky top-0 max-h-[calc(100vh-140px)] w-[250px] shrink-0 self-start overflow-y-auto"
+        >
+          <div class="px-2 py-2">
+            <template v-for="g in QUEUE_GROUPS" :key="g.label">
+              <div class="px-2 pb-1 pt-3 text-[11px] text-ink-3">
+                {{ g.label }}
+              </div>
+              <button
+                v-for="q in g.items"
+                :key="q"
+                type="button"
+                class="flex w-full items-center gap-2 rounded-md px-2.5 py-[7px] text-left text-sub hover:bg-primary-soft"
+                :class="active === q && 'bg-primary-soft font-medium text-primary'"
+                @click="select(q)"
+              >
+                <span class="truncate">{{ RAIL_LABEL[q] }}</span>
+                <span
+                  v-if="counts[q] > 0"
+                  class="ml-auto shrink-0 rounded-full border border-line bg-card px-1.5 text-[11px] leading-4 tabular-nums text-ink-2"
+                  :class="active === q && 'border-[#bfdbfe] text-primary'"
+                >
+                  {{ counts[q] }}
+                </span>
+              </button>
+            </template>
+            <!-- 数据映射：外链（带 ⓘ 与计数），收在导航末尾 -->
+            <RouterLink
+              class="flex w-full items-center gap-2 rounded-md px-2.5 py-[7px] text-sub hover:bg-primary-soft"
+              :to="`/kb/${kbId}/mappings`"
+            >
+              <span class="truncate">{{ S.review.railMappings }}</span>
+              <el-tooltip :content="S.review.railMappingsHint" placement="top">
+                <span
+                  class="inline-grid size-[14px] shrink-0 cursor-help place-items-center rounded-full border border-ink-3 text-aux text-ink-3"
+                >i</span>
+              </el-tooltip>
+              <span
+                v-if="counts.mappings > 0"
+                class="ml-auto shrink-0 rounded-full border border-line bg-card px-1.5 text-[11px] leading-4 tabular-nums text-ink-2"
+              >
+                {{ counts.mappings }}
+              </span>
+            </RouterLink>
+          </div>
+        </nav>
+
+        <!-- 右：选中队列的处理台（队列表单逻辑零改动，只是搬进右栏） -->
+        <div class="min-w-0 flex-1">
 
       <!-- 一次只显示选中的一类，单一分页 -->
       <Loading v-if="review.isLoading.value && isQueueSel" />
@@ -700,21 +682,6 @@ function setPicked(on: boolean, id?: string) {
         >
           {{ queueEmpty ? S.review.empty : S.review.categoryEmpty }}
         </div>
-
-        <!-- 总览 -->
-        <template v-if="active === 'overview'">
-          <Loading v-if="summary.isLoading.value" />
-          <p v-else-if="summary.isError.value" class="text-body text-danger">
-            {{ String(summary.error.value) }}
-          </p>
-          <ReviewOverview
-            v-else-if="summary.data.value"
-            :summary="summary.data.value"
-            :governance="kb?.governance ?? kbDetail.data.value?.governance ?? false"
-            :settings-to="`/kb/${kbId}/settings`"
-            @pick="(q: string) => select(q as Sel)"
-          />
-        </template>
 
         <!-- 重复项（带类型筛选 + 批量裁决 #428） -->
         <template v-if="active === 'duplicates' && counts.duplicates > 0">
@@ -1069,6 +1036,18 @@ function setPicked(on: boolean, id?: string) {
           @page="(p: number) => (page = p)"
         />
       </section>
+
+      <!-- 统计卡（办过的/agent/成色）：折叠卡收尾——待办在前、统计在后，
+           零数据的段落/图表不出（重排批走查病灶⑥） -->
+      <ReviewStatsCard
+        v-if="summary.data.value"
+        class="mt-[15px]"
+        :summary="summary.data.value"
+        :governance="kb?.governance ?? kbDetail.data.value?.governance ?? false"
+        :settings-to="`/kb/${kbId}/settings`"
+      />
+        </div>
+      </div>
     </div>
   </div>
 </template>

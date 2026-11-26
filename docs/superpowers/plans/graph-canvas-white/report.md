@@ -192,3 +192,27 @@
 | console / 单测 | 零 error ✓ / 425+425（58 文件）✓ | |
 
 截图 `anchors-1920.png` / `anchors-dark-1920.png`。typecheck ✓ / Vite 200 ✓。已提交并推送。
+
+## 十三、追补：审查页信息架构重排（2026-11-26，用户拍板）
+
+用户走查"知识管理/审查菜单页面好乱"。诊断：乱在信息架构——同一组队列说三遍（药丸条/8 张统计大卡/档标题）、8 张大卡占满首屏把办事入口挤下折叠线、待办与统计混排无主次、14 药丸竖线硬隔无分组语义、点开队列后导航滚出视口、零数据柱状图占屏。
+
+### 重排（与图谱页同一套壳：左导航 + 右内容，15px 缝隙）
+
+- **页头卡**：标题 + kb chip + **KPI 概览条**（原 8 张大卡浓缩为四数：待我处理[蓝]/近 30 天已办/最久等待（天）[≥14 红]/超 14 天队列[红]）
+- **左导航卡（250px sticky）**：队列按语义四组（事实审核/实体与本体/结构与模型/历史与工具），行=名称+计数徽章，选中蓝底 pill；数据映射外链收末尾带 ⓘ
+- **右栏处理台**：档标题行 + ⓘ + hint + 全部队列原有表单/批量/分页（**逻辑零改动**），待审核卡片（确认/驳回）直接在右栏办事
+- **统计卡**：办过的/agent/成色折叠卡收尾（默认收起）；每日柱状图仅在有非零数据时渲染
+- 默认档 overview → **pending**（总览档退役；深链 ?queue= 全兼容）
+
+### 代码面
+
+- overview.tsx：ReviewOverview 拆为 **ReviewKpiBar + ReviewStatsCard**（空摘要防御——`??` 挡不住 `{}` 形状 mock，按字段判空整体换零值）
+- index.vue：QUEUE_GROUPS 分组表；RAIL_LABEL 补 decisions/merges/agent 三键（原导航渲染空按钮的根因）；sel 默认档改 pending；页头/两栏/统计卡模板重排；队列表单逻辑零触碰
+- i18n：kpiWaiting/kpiDone30/kpiOldest/kpiHighRisk/statsTitle/queueGroupFacts~History（zh/en）
+- w1-review.spec 5 用例按新设计改写（默认 pending、无总览药丸、空态断言翻转、C-1 经统计卡「去处理」）；w2 册需动（空摘要防御后自愈）
+- summary 查询 `enabled: sel==='overview'` 闸随总览退役一并移除（KPI/统计全程需要）
+
+### 实测
+
+标签栈配平 ✓ / typecheck ✓ / **单测 425+425（58 文件）全绿** ✓ / 页面探针：KPI 四项 + 四组导航（12 按钮）+ 选中 pill（待审核 3）+ sticky ✓ / 统计卡展开联动 ✓ / 零 console error ✓。截图 `review-after-1920.png` / `review-after-stats-1920.png` / `review-before-1920.png`（改前留档）。已提交并推送。

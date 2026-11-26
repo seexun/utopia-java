@@ -2074,6 +2074,16 @@ export const en = {
     historyEmpty: "No merges yet.",
     // 左栏分类导航
     railOverview: "Overview",
+    /* Review redesign (2026-11-26): KPI bar / queue groups / stats card */
+    kpiWaiting: "Awaiting me",
+    kpiDone30: "Done in 30d",
+    kpiOldest: "Longest wait (days)",
+    kpiHighRisk: "Queues over 14d",
+    statsTitle: (n: number) => `Stats · ${n} done in 30d`,
+    queueGroupFacts: "Fact review",
+    queueGroupEntity: "Entity & ontology",
+    queueGroupStruct: "Structure & model",
+    queueGroupHistory: "History & tools",
     railPending: "Awaiting your nod",
     railDuplicates: "Duplicates",
     railConflicts: "Conflicts",

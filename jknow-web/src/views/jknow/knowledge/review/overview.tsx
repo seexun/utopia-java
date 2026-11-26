@@ -141,228 +141,323 @@ function DailyBars(props: { days: ReviewSummary["decided"]["daily"] }) {
   );
 }
 
-export const ReviewOverview = defineComponent({
-  name: "ReviewOverview",
+/* ===== 重排批（2026-11-26 治"乱"走查，用户拍板）=====
+   原 ReviewOverview（8 张统计大卡平铺）拆成两件：
+   - ReviewKpiBar：页头卡里的四个数（待我处理/近30天已办/最久等待/超14天队列），
+     一行扫完，取代平铺大卡；
+   - ReviewStatsCard：右栏收尾的折叠统计卡（办过的/agent/成色），默认收起——
+     待办在前、统计在后。等着办的 8 卡撤除：队列入口与计数只住在左导航。
+   数据依旧全来自 GET /review/summary，这里只画不算。 */
+import ChevronDownIcon from "~icons/lucide/chevron-down";
+
+/** KPI 概览条：四个数一行扫完。超 14 天未处理的量染红（国内 B 端告警档） */
+export const ReviewKpiBar = defineComponent({
+  name: "ReviewKpiBar",
+  props: {
+    summary: {
+      type: Object as PropType<ReviewSummary>,
+      required: true
+    }
+  },
+  setup(props) {
+    return () => {
+      /* 空摘要防御：调用方（如 W2 写测试）可能给 `{}` 形状的 summary——
+         每个字段兜底，KPI 条显示 0 而不是渲染崩掉整页 */
+      const waiting = (props.summary.waiting ?? {}) as Record<
+        string,
+        { count: number; oldest_at: string | null }
+      >;
+      const waitingTotal = WAITING.reduce(
+        (n, w) => n + (waiting[w.key]?.count ?? 0),
+        0
+      );
+      const atOf = (w: { oldest_at: string | null }): number =>
+        w.oldest_at ? daysSince(w.oldest_at) : 0;
+      const oldest = Math.max(0, ...WAITING.map(w => atOf(waiting[w.key] ?? { count: 0, oldest_at: null })));
+      const highRisk = WAITING.filter(
+        w => (waiting[w.key]?.count ?? 0) > 0 && atOf(waiting[w.key] ?? { count: 0, oldest_at: null }) >= 14
+      ).length;
+      const decided30 = props.summary.decided?.last_30d?.total ?? 0;
+      const items = [
+        {
+          value: waitingTotal,
+          label: S.review.kpiWaiting,
+          cls: waitingTotal > 0 ? "text-primary" : "text-ink"
+        },
+        { value: decided30, label: S.review.kpiDone30, cls: "text-ink" },
+        {
+          value: oldest,
+          label: S.review.kpiOldest,
+          cls: oldest >= 14 ? "text-danger" : "text-ink"
+        },
+        {
+          value: highRisk,
+          label: S.review.kpiHighRisk,
+          cls: highRisk > 0 ? "text-danger" : "text-ink"
+        }
+      ];
+      return (
+        <div class="flex flex-wrap items-center gap-x-8 gap-y-2">
+          {items.map(it => (
+            <div key={it.label} class="flex items-baseline gap-2">
+              <span
+                class={["text-[26px] font-bold leading-none tabular-nums", it.cls]}
+              >
+                {it.value}
+              </span>
+              <span class="text-sub text-ink-2">{it.label}</span>
+            </div>
+          ))}
+        </div>
+      );
+    };
+  }
+});
+
+/** 右栏收尾的折叠统计卡：办过的（7/30 天 + 每日柱 + 按动作/按人）+ agent +
+    成色。默认收起；零数据段落不出（每日柱全零时只留一句说明）。 */
+export const ReviewStatsCard = defineComponent({
+  name: "ReviewStatsCard",
   props: {
     summary: {
       type: Object as PropType<ReviewSummary>,
       required: true
     },
-    /** 这个库的治理开关（0025）：关着时 Agent 那一段说明去哪里打开 */
     governance: { type: Boolean, default: false },
     settingsTo: { type: String, default: "" }
   },
-  emits: ["pick"],
   setup(props) {
+    const open = ref(false);
     return () => {
-      const { waiting, decided, health, agent } = props.summary;
-      const waitingTotal = WAITING.reduce((n, w) => n + waiting[w.key].count, 0);
+      /* 空摘要防御（同 KPI 条）：`??` 挡不住 `{}` 形状的 mock——按字段判空，
+         缺了就整体换零值形状（折叠态只显示头部大数，展开段落各自兜底） */
+      const decided =
+        props.summary.decided && props.summary.decided.last_30d
+          ? props.summary.decided
+          : ({
+              last_7d: { total: 0, automatic: 0 },
+              last_30d: { total: 0, automatic: 0, by_action: [], by_actor: [] },
+              daily: []
+            } as unknown as ReviewSummary["decided"]);
+      const health =
+        props.summary.health && props.summary.health.facts != null
+          ? props.summary.health
+          : ({
+              facts: 0,
+              low_confidence: 0,
+              unconfirmed: 0,
+              contested: 0
+            } as unknown as ReviewSummary["health"]);
+      const agent =
+        props.summary.agent && props.summary.agent.open != null
+          ? props.summary.agent
+          : ({
+              running: false,
+              queue: 0,
+              open: 0,
+              last_7d: { applied: 0 },
+              last_30d: { applied: 0, accepted: 0, overridden: 0, reverted: 0 }
+            } as unknown as ReviewSummary["agent"]);
       const share = (n: number) =>
         health.facts === 0
           ? "—"
           : `${Math.round((n / health.facts) * 1000) / 10}%`;
       return (
-        <div class="space-y-8">
-          {/* 等着办的 */}
-          <section>
-            <GroupLabel class="mb-3" count={waitingTotal}>
-              {S.review.overviewWaiting}
-            </GroupLabel>
-            {waitingTotal === 0 ? (
-              <div class="rounded-card border border-line bg-card p-8 text-center text-body text-ink-2">
-                {S.review.overviewAllClear}
-              </div>
-            ) : (
-              <div class="stat-grid">
-                {WAITING.filter(w => waiting[w.key].count > 0).map(w => {
-                  const q = waiting[w.key];
-                  return (
-                    <Stat
-                      key={w.key}
-                      value={q.count}
-                      label={w.label}
-                      icon={w.icon}
-                      tone={w.tone}
-                      note={
-                        q.oldest_at
-                          ? S.review.overviewOldest(daysSince(q.oldest_at))
-                          : null
-                      }
-                      action={{
-                        label: S.review.overviewOpen,
-                        to: `?queue=${w.key}`
-                      }}
-                    />
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
-          {/* 办过的 */}
-          <section>
-            <GroupLabel class="mb-3" count={decided.last_30d.total}>
-              {S.review.overviewDecided}
-            </GroupLabel>
-            <div class="grid grid-cols-2 gap-3">
-              <Stat
-                value={decided.last_7d.total}
-                label={S.review.overviewLast7}
-                icon={HistoryIcon}
-                tone="primary"
-                note={S.review.overviewAutomatic(decided.last_7d.automatic)}
-              />
-              <Stat
-                value={decided.last_30d.total}
-                label={S.review.overviewLast30}
-                icon={HistoryIcon}
-                tone="neutral"
-                note={S.review.overviewAutomatic(decided.last_30d.automatic)}
-              />
-            </div>
-            <div class="mt-3 rounded-card border border-line bg-card p-4">
-              <div class="mb-3 text-aux text-ink-2">{S.review.overviewDaily}</div>
-              <DailyBars days={decided.daily} />
-            </div>
-            {decided.last_30d.total === 0 ? (
-              <p class="mt-3 text-sub text-ink-2">
-                {S.review.overviewNoDecisions}
-              </p>
-            ) : (
-              <div class="mt-3 grid gap-3 md:grid-cols-2">
-                <div class="rounded-card border border-line bg-card p-4">
-                  <div class="mb-2 text-aux text-ink-2">
-                    {S.review.overviewByAction}
-                  </div>
-                  <div class="flex flex-wrap gap-2">
-                    {decided.last_30d.by_action.map(a => (
-                      <UChip key={a.action}>
-                        {(S.review.decisionActions[
-                          a.action as keyof typeof S.review.decisionActions
-                        ] ?? a.action) + ` · ${a.count}`}
-                      </UChip>
-                    ))}
-                  </div>
+        <div class="card overflow-hidden">
+          <button
+            type="button"
+            class="flex w-full items-center gap-2 px-4 py-3 text-left"
+            onClick={() => (open.value = !open.value)}
+          >
+            <ChevronDownIcon
+              width={14}
+              height={14}
+              class="shrink-0 text-ink-2 transition-transform duration-150"
+              style={open.value ? undefined : { transform: "rotate(-90deg)" }}
+            />
+            <span class="text-body font-medium text-ink">
+              {S.review.statsTitle(decided.last_30d.total)}
+            </span>
+          </button>
+          {open.value && (
+            <div class="space-y-7 border-t border-line px-4 py-4">
+              {/* 办过的 */}
+              <section>
+                <div class="mb-3 text-body font-medium text-ink">
+                  {S.review.overviewDecided}
                 </div>
-                <div class="rounded-card border border-line bg-card p-4">
-                  <div class="mb-2 text-aux text-ink-2">
-                    {S.review.overviewByActor}
-                  </div>
-                  <div class="space-y-1">
-                    {decided.last_30d.by_actor.map(a => (
-                      <div
-                        key={a.actor_id ?? "auto"}
-                        class="flex items-center justify-between text-body"
-                      >
-                        <span class="truncate text-ink-2">
-                          {a.actor_id === null
-                            ? S.review.aiActor
-                            : (a.label ?? a.actor_id)}
-                        </span>
-                        <span class="tabular-nums text-ink-2">{a.count}</span>
-                      </div>
-                    ))}
-                  </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <Stat
+                    value={decided.last_7d.total}
+                    label={S.review.overviewLast7}
+                    icon={HistoryIcon}
+                    tone="primary"
+                    note={S.review.overviewAutomatic(decided.last_7d.automatic)}
+                  />
+                  <Stat
+                    value={decided.last_30d.total}
+                    label={S.review.overviewLast30}
+                    icon={HistoryIcon}
+                    tone="neutral"
+                    note={S.review.overviewAutomatic(decided.last_30d.automatic)}
+                  />
                 </div>
-              </div>
-            )}
-          </section>
-
-          {/* agent 做过的（0025）：开关关着且什么都没做过时只说一句去哪里打开 */}
-          <section>
-            <GroupLabel class="mb-3" count={agent.open}>
-              {S.review.overviewAgent}
-            </GroupLabel>
-            {!props.governance && (
-              <p class="mb-3 text-sub text-ink-2">
-                {S.review.overviewAgentOff}{" "}
-                {props.settingsTo && (
-                  <RouterLink class="link-inline text-sub" to={props.settingsTo}>
-                    {S.review.overviewAgentSettings}
-                  </RouterLink>
+                {decided.daily.some(d => d.count > 0) && (
+                  <div class="mt-3 rounded-card border border-line bg-card p-4">
+                    <div class="mb-3 text-aux text-ink-2">
+                      {S.review.overviewDaily}
+                    </div>
+                    <DailyBars days={decided.daily} />
+                  </div>
                 )}
-              </p>
-            )}
-            {agent.running ? (
-              <p class="mb-3 flex items-center text-sub text-ink-2">
-                <span class="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-warning" />
-                {S.review.overviewAgentRunning(agent.queue)}
-              </p>
-            ) : props.governance && agent.queue > 0 ? (
-              <p class="mb-3 text-sub text-ink-2">
-                {S.review.overviewAgentQueue(agent.queue)}
-              </p>
-            ) : null}
-            {(props.governance || agent.open > 0 || agent.last_30d.applied > 0) && (
-              <div class="stat-grid">
-                <Stat
-                  value={agent.open}
-                  label={S.review.overviewAgentOpen}
-                  icon={BotIcon}
-                  tone="primary"
-                  action={
-                    agent.open > 0
-                      ? { label: S.review.overviewOpen, to: "?queue=agent" }
-                      : undefined
-                  }
-                />
-                <Stat
-                  value={agent.last_7d.applied}
-                  label={S.review.overviewAgentApplied}
-                  icon={BotIcon}
-                  tone="success"
-                  note={S.review.overviewLast7}
-                />
-                <Stat
-                  value={agent.last_30d.accepted}
-                  label={S.review.overviewAgentAccepted}
-                  icon={CheckCheckIcon}
-                  tone="success"
-                  note={S.review.overviewAgentOverridden(agent.last_30d.overridden)}
-                />
-                <Stat
-                  value={agent.last_30d.reverted}
-                  label={S.review.overviewAgentReverted}
-                  icon={Undo2Icon}
-                  tone="neutral"
-                  note={S.review.overviewLast30}
-                />
-              </div>
-            )}
-          </section>
+                {decided.last_30d.total === 0 ? (
+                  <p class="mt-3 text-sub text-ink-2">
+                    {S.review.overviewNoDecisions}
+                  </p>
+                ) : (
+                  <div class="mt-3 grid gap-3 md:grid-cols-2">
+                    <div class="rounded-card border border-line bg-card p-4">
+                      <div class="mb-2 text-aux text-ink-2">
+                        {S.review.overviewByAction}
+                      </div>
+                      <div class="flex flex-wrap gap-2">
+                        {decided.last_30d.by_action.map(a => (
+                          <UChip key={a.action}>
+                            {(S.review.decisionActions[
+                              a.action as keyof typeof S.review.decisionActions
+                            ] ?? a.action) + ` · ${a.count}`}
+                          </UChip>
+                        ))}
+                      </div>
+                    </div>
+                    <div class="rounded-card border border-line bg-card p-4">
+                      <div class="mb-2 text-aux text-ink-2">
+                        {S.review.overviewByActor}
+                      </div>
+                      <div class="space-y-1">
+                        {decided.last_30d.by_actor.map(a => (
+                          <div
+                            key={a.actor_id ?? "auto"}
+                            class="flex items-center justify-between text-body"
+                          >
+                            <span class="truncate text-ink-2">
+                              {a.actor_id === null
+                                ? S.review.aiActor
+                                : (a.label ?? a.actor_id)}
+                            </span>
+                            <span class="tabular-nums text-ink-2">{a.count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </section>
 
-          {/* 库的成色 */}
-          <section>
-            <GroupLabel class="mb-3" count={health.facts}>
-              {S.review.overviewHealth}
-            </GroupLabel>
-            <p class="mb-3 text-sub text-ink-2">
-              {S.review.overviewFacts(health.facts)}
-            </p>
-            <div class="grid grid-cols-3 gap-3">
-              <Stat
-                value={health.low_confidence}
-                label={S.review.railLowConfidence}
-                icon={GaugeIcon}
-                tone="warning"
-                note={share(health.low_confidence)}
-              />
-              <Stat
-                value={health.unconfirmed}
-                label={S.review.railUnconfirmed}
-                icon={CircleDashedIcon}
-                tone="neutral"
-                note={share(health.unconfirmed)}
-              />
-              <Stat
-                value={health.contested}
-                label={S.review.overviewContested}
-                icon={SwordsIcon}
-                tone="danger"
-                note={share(health.contested)}
-              />
+              {/* agent 做过的（0025） */}
+              <section>
+                <div class="mb-3 text-body font-medium text-ink">
+                  {S.review.overviewAgent}
+                </div>
+                {!props.governance && (
+                  <p class="mb-3 text-sub text-ink-2">
+                    {S.review.overviewAgentOff}{" "}
+                    {props.settingsTo && (
+                      <RouterLink
+                        class="link-inline text-sub"
+                        to={props.settingsTo}
+                      >
+                        {S.review.overviewAgentSettings}
+                      </RouterLink>
+                    )}
+                  </p>
+                )}
+                {agent.running ? (
+                  <p class="mb-3 flex items-center text-sub text-ink-2">
+                    <span class="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-warning" />
+                    {S.review.overviewAgentRunning(agent.queue)}
+                  </p>
+                ) : props.governance && agent.queue > 0 ? (
+                  <p class="mb-3 text-sub text-ink-2">
+                    {S.review.overviewAgentQueue(agent.queue)}
+                  </p>
+                ) : null}
+                {(props.governance ||
+                  agent.open > 0 ||
+                  agent.last_30d.applied > 0) && (
+                  <div class="stat-grid">
+                    <Stat
+                      value={agent.open}
+                      label={S.review.overviewAgentOpen}
+                      icon={BotIcon}
+                      tone="primary"
+                      action={
+                        agent.open > 0
+                          ? { label: S.review.overviewOpen, to: "?queue=agent" }
+                          : undefined
+                      }
+                    />
+                    <Stat
+                      value={agent.last_7d.applied}
+                      label={S.review.overviewAgentApplied}
+                      icon={BotIcon}
+                      tone="success"
+                      note={S.review.overviewLast7}
+                    />
+                    <Stat
+                      value={agent.last_30d.accepted}
+                      label={S.review.overviewAgentAccepted}
+                      icon={CheckCheckIcon}
+                      tone="success"
+                      note={S.review.overviewAgentOverridden(
+                        agent.last_30d.overridden
+                      )}
+                    />
+                    <Stat
+                      value={agent.last_30d.reverted}
+                      label={S.review.overviewAgentReverted}
+                      icon={Undo2Icon}
+                      tone="neutral"
+                      note={S.review.overviewLast30}
+                    />
+                  </div>
+                )}
+              </section>
+
+              {/* 库的成色 */}
+              <section>
+                <div class="mb-3 text-body font-medium text-ink">
+                  {S.review.overviewHealth}
+                </div>
+                <p class="mb-3 text-sub text-ink-2">
+                  {S.review.overviewFacts(health.facts)}
+                </p>
+                <div class="grid grid-cols-3 gap-3">
+                  <Stat
+                    value={health.low_confidence}
+                    label={S.review.railLowConfidence}
+                    icon={GaugeIcon}
+                    tone="warning"
+                    note={share(health.low_confidence)}
+                  />
+                  <Stat
+                    value={health.unconfirmed}
+                    label={S.review.railUnconfirmed}
+                    icon={CircleDashedIcon}
+                    tone="neutral"
+                    note={share(health.unconfirmed)}
+                  />
+                  <Stat
+                    value={health.contested}
+                    label={S.review.overviewContested}
+                    icon={SwordsIcon}
+                    tone="danger"
+                    note={share(health.contested)}
+                  />
+                </div>
+              </section>
             </div>
-          </section>
+          )}
         </div>
       );
     };
