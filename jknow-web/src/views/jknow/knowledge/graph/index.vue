@@ -1302,74 +1302,26 @@ const statsText = computed(() => {
 </script>
 
 <template>
-  <div class="knowledge-page flex h-full flex-col gap-[15px] p-6">
-    <!-- 工作区两卡结构（2026-11-25 用户线框图定案）：上=卡头框（标题/chip/档位/
-         统计/搜索/图例），下=画布框（满铺剩余高度），两框之间 15px 缝隙。
-         之前三轮（灰底两段式/纯白满铺）均被否——用户要的是"两个独立的框" -->
-    <div class="card">
-      <!-- 卡头（两行）：行1 标题+kb chip / 节点档位+统计；行2 搜索+类型图例 /
-           边语义图例弹层触发钮（2026-11-24 留档清偿批：图例收弹层，行2 单行） -->
-      <div class="px-3 pb-2 pt-2">
-        <!-- 行1：标题 + kb chip / 稳定提示 + 节点档位步进器 + 统计 -->
-        <div class="flex items-center gap-2">
+  <div class="knowledge-page flex h-full gap-[15px] p-6">
+    <!-- 工作区左右两栏（2026-11-26 用户拍板）：左=工具栏卡（280px 竖排：
+         标题/搜索/图例/边图例/档位/统计），右=画布框（flex-1 满铺整个内容高），
+         两框之间 15px 缝隙。画布从 766px 高（扁带状 0.48）升到 918px（0.70） -->
+    <div class="card flex w-[280px] flex-none flex-col overflow-y-auto">
+      <!-- 左工具栏（竖排五段）：标题+chip → 搜索 → 返回全图 → 类型图例 →
+           边图例弹层 → 底部（稳定提示/档位/统计）。控件与状态全部原样，仅重排 -->
+      <div class="flex flex-1 flex-col gap-2.5">
+        <!-- 标题 + kb chip -->
+        <div class="flex flex-wrap items-center gap-2">
           <h1 class="text-title font-semibold text-ink">{{ S.nav.graph }}</h1>
           <span
             class="rounded-full border border-line bg-fill px-2 py-0.5 text-aux text-ink-2"
           >
             {{ kb?.name }}
           </span>
-          <div class="ml-auto flex items-center gap-2">
-            <!-- 稳定提示 tag 化（国内风收口走查 A5）：裸文本改浅色 tag+spinner，
-                 完成即消失（v-if 语义不变） -->
-            <span
-              v-if="stabilizing"
-              class="flex items-center gap-1 rounded-full bg-primary-soft px-2 py-0.5 text-aux text-primary"
-            >
-              <Loader2Icon width="11" height="11" class="animate-spin" />
-              {{ S.graph.stabilizing }}
-            </span>
-            <!-- 节点档位 ± 步进器：控制画多少节点的档位（功能控件，非缩放）原样迁入 -->
-            <div
-              class="flex items-center overflow-hidden rounded-ctl border border-line"
-            >
-              <button
-                type="button"
-                class="px-2 py-1.5 text-ink-2 hover:bg-fill disabled:opacity-40"
-                :title="S.graph.nodeBudgetLess"
-                :disabled="nodeBudget <= NODE_BUDGETS[0]"
-                @click="
-                  nodeBudget =
-                    NODE_BUDGETS[Math.max(0, NODE_BUDGETS.indexOf(nodeBudget) - 1)]
-                "
-              >
-                −
-              </button>
-              <button
-                type="button"
-                class="px-2 py-1.5 text-ink-2 hover:bg-fill disabled:opacity-40"
-                :title="S.graph.nodeBudgetMore"
-                :disabled="
-                  !capped || nodeBudget >= NODE_BUDGETS[NODE_BUDGETS.length - 1]
-                "
-                @click="
-                  nodeBudget =
-                    NODE_BUDGETS[
-                      Math.min(
-                        NODE_BUDGETS.length - 1,
-                        NODE_BUDGETS.indexOf(nodeBudget) + 1
-                      )
-                    ]
-                "
-              >
-                +
-              </button>
-            </div>
-            <span class="tabular-nums text-aux text-ink-2">{{ statsText }}</span>
-          </div>
         </div>
-        <!-- 行2：搜索（建议框 absolute 以本行为参照）+ 返回全图 + 类型图例 /
-             边语义图例触发钮（五项在弹层里，行2 单行不折行） -->
-        <div class="mt-2 flex items-start gap-2">
+        <!-- 搜索 → 返回全图 → 类型图例 → 边图例 → 底部组（mt-auto 沉底，
+             矮视口下随内容自然流、整卡滚动） -->
+        <div class="flex flex-1 flex-col gap-2.5">
           <div class="relative">
             <div class="relative">
               <SearchIcon
@@ -1379,7 +1331,7 @@ const statsText = computed(() => {
               />
               <el-input
                 v-model="searchInput"
-                class="graph-search w-58"
+                class="graph-search w-full"
                 :placeholder="
                   inSubgraph ? S.graph.searchInSubgraph : S.graph.searchEntity
                 "
@@ -1449,7 +1401,7 @@ const statsText = computed(() => {
           </div>
           <el-button
             v-if="focusEntity"
-            class="graph-shadow"
+            class="graph-shadow w-full"
             @click="
               () => {
                 focusEntity = null;
@@ -1460,8 +1412,8 @@ const statsText = computed(() => {
             {{ S.graph.backToOverview }}
           </el-button>
 
-          <!-- 图例（点击切换类型显隐）。只摆前 LEGEND_MAX 个；卡头内允许折行 -->
-          <div class="flex min-w-0 flex-wrap gap-2">
+          <!-- 图例（点击切换类型显隐）。只摆前 LEGEND_MAX 个；窄栏改竖排 -->
+          <div class="flex min-w-0 flex-col items-start gap-1.5">
             <UPill
               v-for="[key, t] in legendShown"
               :key="key"
@@ -1590,11 +1542,11 @@ const statsText = computed(() => {
           <!-- 边语义图例（规格 graph-edge-legend.md §1）：卡头行2 单行化（2026-11-24
                留档清偿批）——inline 五项收进 el-popover，行2 只留触发钮（暗色随 EP
                令牌自动） -->
-          <el-popover placement="bottom-end" :width="300" trigger="click">
+          <el-popover placement="bottom-start" :width="300" trigger="click">
             <template #reference>
               <button
                 type="button"
-                class="ml-auto flex shrink-0 items-center gap-1.5 rounded-ctl border border-line px-2 py-1 text-aux text-ink-2 hover:bg-fill"
+                class="flex w-full items-center gap-1.5 rounded-ctl border border-line px-2 py-1 text-aux text-ink-2 hover:bg-fill"
                 :title="S.graph.edgeLegend"
               >
                 <GitCompareIcon width="12" height="12" />
@@ -1649,13 +1601,65 @@ const statsText = computed(() => {
               </el-checkbox>
             </div>
           </el-popover>
+
+          <!-- 底部组（mt-auto 沉底）：稳定提示 tag + 节点档位步进器 + 统计
+               （原横排头部行1 右侧组原样迁入） -->
+          <div class="mt-auto flex flex-col gap-2 pt-1">
+            <span
+              v-if="stabilizing"
+              class="flex items-center gap-1 rounded-full bg-primary-soft px-2 py-0.5 text-aux text-primary"
+            >
+              <Loader2Icon width="11" height="11" class="animate-spin" />
+              {{ S.graph.stabilizing }}
+            </span>
+            <div class="flex flex-wrap items-center gap-2">
+              <!-- 节点档位 ± 步进器：控制画多少节点的档位（功能控件，非缩放） -->
+              <div
+                class="flex items-center overflow-hidden rounded-ctl border border-line"
+              >
+                <button
+                  type="button"
+                  class="px-2 py-1.5 text-ink-2 hover:bg-fill disabled:opacity-40"
+                  :title="S.graph.nodeBudgetLess"
+                  :disabled="nodeBudget <= NODE_BUDGETS[0]"
+                  @click="
+                    nodeBudget =
+                      NODE_BUDGETS[Math.max(0, NODE_BUDGETS.indexOf(nodeBudget) - 1)]
+                  "
+                >
+                  −
+                </button>
+                <button
+                  type="button"
+                  class="px-2 py-1.5 text-ink-2 hover:bg-fill disabled:opacity-40"
+                  :title="S.graph.nodeBudgetMore"
+                  :disabled="
+                    !capped || nodeBudget >= NODE_BUDGETS[NODE_BUDGETS.length - 1]
+                  "
+                  @click="
+                    nodeBudget =
+                      NODE_BUDGETS[
+                        Math.min(
+                          NODE_BUDGETS.length - 1,
+                          NODE_BUDGETS.indexOf(nodeBudget) + 1
+                        )
+                      ]
+                  "
+                >
+                  +
+                </button>
+              </div>
+              <span class="tabular-nums text-aux text-ink-2">{{ statsText }}</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- 画布框：世界坐标网格层垫在 sigma WebGL 层下；独立卡满铺剩余高度
-         （flex-1 min-h-0）。错误行/Loading/空态也锚进本画布层（相对画布定位） -->
-    <div class="card graph-canvas-card relative flex min-h-0 flex-1 flex-col">
+      <!-- 画布框（右栏）：世界坐标网格层垫在 sigma WebGL 层下；独立卡满铺
+           整个内容高（flex-1 min-h-0）。错误行/Loading/空态也锚进本画布层
+           （相对画布定位） -->
+      <div class="card graph-canvas-card relative flex min-h-0 flex-1 flex-col">
         <div class="relative min-h-0 flex-1">
         <canvas ref="gridRef" class="absolute inset-0 h-full w-full" />
         <div ref="containerRef" class="absolute inset-0" />
@@ -1839,10 +1843,10 @@ const statsText = computed(() => {
 /* 重造层（reskin-b2）：只引令牌（--color-* / --radius-* / --shadow-*），
    禁硬编码色值；卡容器形态来自全局 .card（theme.scss） */
 
-/* 画布框（工作区两卡结构 2026-11-25）：sigma 画布全幅无内距（.card 内距归零），
+/* 画布框（工作区左右两栏 2026-11-26）：sigma 画布全幅无内距（.card 内距归零），
    圆角由 overflow 收口（WebGL 层随容器矩形，超出圆角部分由卡裁掉）。
-   画布底与卡面同白（--color-canvas，回归纯白）——两卡结构下画布框就是
-   线框图的"下面那个大框"，卡头框独立在其上方 */
+   画布底与卡面同白（--color-canvas，回归纯白）——左右两栏下画布框就是
+   右侧那个大框，左工具栏卡独立在其左侧 */
 .graph-canvas-card {
   padding: 0;
   overflow: hidden;

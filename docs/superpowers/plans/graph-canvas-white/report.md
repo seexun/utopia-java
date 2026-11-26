@@ -62,3 +62,29 @@
 | console | 零 error ✓ | |
 
 截图 `two-card-1920.png` / `two-card-1920-dark.png` 目验：与线框一致——上=短卡头框，下=大画布框，独立描边圆角，缝隙露页面底色。`pnpm typecheck` ✓ / `pnpm test` 425/425 ✓。
+
+## 七、追补：工作区左右两栏（2026-11-26，用户拍板）
+
+上下两卡上线后用户反馈"画布太窄"（高宽比 0.48 扁带状，径向布局四角浪费），拍板改左右两栏（视觉伴侣提案页 two-column-proposal 先行确认）。`graph/index.vue` 结构再调整：
+
+- 根容器 `flex h-full flex-col gap-[15px] p-6` → `flex h-full gap-[15px] p-6`（row 向）。
+- 左工具栏卡 `card flex w-[280px] flex-none flex-col overflow-y-auto`：竖排五段=标题+kb chip → 搜索（w-full）→ 返回全图（w-full）→ 类型图例（横排转竖排 `flex-col items-start`）→ 边图例弹层（触发钮 w-full、placement bottom-start）→ 底部组（稳定 tag/档位步进器/统计，`mt-auto` 沉底）。控件与状态全部原样迁移，仅重排。
+- 画布框 `flex-1 min-h-0` 满铺整个内容高；时间轴/工具塔/详情浮层/错误行/Loading/空态锚定不变。
+- 踩坑两枚：① 左栏卡吃全局 `.card` 15px 内距后容器又叠 `p-3` 双重内距（内容仅 224px）——去掉容器 p-3 统一走卡内距；② dev server 启动命令带 `| head -20`，head 读完退出 SIGPIPE 误杀 dev server——重启不带管道。
+
+### 实测（two-col-shot.js / two-col-dark.js，1920×1080）
+
+| 断言 | 亮 | 暗 |
+|---|---|---|
+| 根容器 flexDirection | row ✓ | — |
+| `.knowledge-page > .card` 数 | 2 ✓ | 2 ✓ |
+| 左栏卡 | x=280 w=280 h=908（满高）✓ | — |
+| 画布框 | x=575 1305×908（高宽比 0.70）✓ | — |
+| 横向缝隙 | 15px ✓ | — |
+| 同顶同底 | true/true ✓ | — |
+| 搜索框宽 | 248（满内容宽）✓ | — |
+| 沉底组 | bottom=1024（贴内距沿）✓ | — |
+| 画布框底色 | #FFFFFF | rgb(33,33,33) ✓ |
+| console | 零 error ✓ | |
+
+截图 `two-col-1920.png` / `two-col-1920-dark.png`。`pnpm typecheck` ✓ / `pnpm test` 425/425（58 文件）✓。
