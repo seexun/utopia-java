@@ -284,6 +284,65 @@ const searchHits = computed(() =>
 
 const hiddenTypes = ref(new Set<string>());
 const showDerived = ref(true);
+/* 边样式点选显隐（国内面板图例即过滤器）：与 hiddenTypes 同构，按建边时
+   归档的 kind 藏边；实体行点显隐同款交互（隐藏项 35% 透明+删除线） */
+const hiddenEdgeKinds = ref(new Set<string>());
+function toggleEdgeKind(kind: string) {
+  const next = new Set(hiddenEdgeKinds.value);
+  if (next.has(kind)) next.delete(kind);
+  else next.add(kind);
+  hiddenEdgeKinds.value = next;
+}
+/* 关系组行数据：五类边线样本 + 计数（计数按数据边归类，回应"24 是什么"——
+   总数在底部统计条，组内不再放无上下文的总数徽章）。S 为模块常量、
+   切语言整页重载，普通数组不会滞留旧语言 */
+const EDGE_KIND_ROWS = [
+  { key: "fact", label: S.graph.edgeFact, sample: EDGE, size: 3, warn: false },
+  {
+    key: "inferred",
+    label: S.graph.edgeInferred,
+    sample: EDGE_INFERRED,
+    size: 3,
+    warn: false
+  },
+  {
+    key: "derived",
+    label: S.graph.edgeDerived,
+    sample: EDGE_DERIVED,
+    size: 4,
+    warn: false
+  },
+  {
+    key: "contested",
+    label: S.graph.edgeContested,
+    sample: EDGE_CONTEST,
+    size: 4,
+    warn: true
+  },
+  {
+    key: "blocked",
+    label: S.graph.edgeBlocked,
+    sample: edgeGhost(),
+    size: 2,
+    warn: false
+  }
+];
+const edgeKindCounts = computed(() => {
+  const m = new Map<string, number>();
+  for (const e of data.data.value?.edges ?? []) {
+    const k = e.blocked
+      ? "blocked"
+      : e.contested
+        ? "contested"
+        : e.derived
+          ? "derived"
+          : e.inferred
+            ? "inferred"
+            : "fact";
+    m.set(k, (m.get(k) ?? 0) + 1);
+  }
+  return m;
+});
 /* 左栏面板（gvdata 同款）：整栏折叠 + 分组折叠（会话内状态，不持久化） */
 const panelCollapsed = ref(false);
 const entityGroupOpen = ref(true);
@@ -679,6 +738,17 @@ function buildCanvas() {
               : EDGE,
       contested: e.contested,
       blocked: e.blocked,
+      /* 边样式点选显隐（国内面板图例即过滤器）：建边时归类存档，
+         edgeReducer 与邻接缓存按此藏边 */
+      kind: e.blocked
+        ? "blocked"
+        : e.contested
+          ? "contested"
+          : e.derived
+            ? "derived"
+            : e.inferred
+              ? "inferred"
+              : "fact",
       type: curvature === 0 ? "line" : "curved",
       curvature,
       derived: e.derived
@@ -788,6 +858,7 @@ function buildCanvas() {
     focus: "",
     edges: null as Set<string> | null,
     derived: true,
+    kinds: null as Set<string> | null,
     size: -1,
     set: new Set<string>()
   };
@@ -797,17 +868,21 @@ function buildCanvas() {
       liveNbr.focus !== focus ||
       liveNbr.edges !== ae ||
       liveNbr.derived !== showDerived.value ||
+      liveNbr.kinds !== hiddenEdgeKinds.value ||
       liveNbr.size !== g.size
     ) {
       const set = new Set<string>();
       g.forEachEdge(focus, (e, attrs, src, tgt) => {
         if (ae && !ae.has(e)) return;
         if (!showDerived.value && attrs.derived === true) return;
+        /* 被点选藏掉的边类同样不算"还连着"——与画布隐身保持一致 */
+        if (hiddenEdgeKinds.value.has(attrs.kind as string)) return;
         set.add(src === focus ? tgt : src);
       });
       liveNbr.focus = focus;
       liveNbr.edges = ae;
       liveNbr.derived = showDerived.value;
+      liveNbr.kinds = hiddenEdgeKinds.value;
       liveNbr.size = g.size;
       liveNbr.set = set;
     }
@@ -951,6 +1026,12 @@ function buildCanvas() {
       const sk = g.getNodeAttribute(s, "typeKey") as string;
       const tk = g.getNodeAttribute(t, "typeKey") as string;
       if (hiddenTypes.value.has(sk) || hiddenTypes.value.has(tk)) {
+        res.hidden = true;
+        return res;
+      }
+      /* 边样式点选：藏掉的类直接隐身（置于派生呼吸动画之前——藏起来的
+         边不必再算后面那些提亮/压暗，与上方端点隐藏同一收口） */
+      if (hiddenEdgeKinds.value.has(attrs.kind as string)) {
         res.hidden = true;
         return res;
       }
@@ -1476,8 +1557,9 @@ const statsText = computed(() => {
               </button>
             </div>
 
-            <!-- 关系组：五类边线图例常显（graph-edge-legend.md 本意：粗细/颜色
-                 是边的语言；用户拍板展开显示，不再藏弹层）+ 边标签开关直排 -->
+            <!-- 关系组：五类边线可点选显隐（图例即过滤器，与实体类型组同交互：
+                 隐藏行 35% 透明+删除线）+ 行内计数（按数据边归类）。组头不放
+                 无上下文的总数徽章——总数在底部统计条 -->
             <button
               type="button"
               class="flex w-full items-center gap-1.5 px-1.5 pb-1.5 pt-2"
@@ -1490,62 +1572,55 @@ const statsText = computed(() => {
               <span class="text-[12px] font-semibold tracking-wide text-ink-2">
                 {{ S.graph.edgeGroup }}
               </span>
-              <span
-                class="ml-auto shrink-0 rounded-full bg-fill px-1.5 text-[11px] leading-4 tabular-nums text-ink-2"
-              >
-                {{ data.data.value?.edges?.length ?? 0 }}
-              </span>
               <ChevronDownIcon
                 width="12"
                 height="12"
-                class="shrink-0 text-ink-2 transition-transform duration-150"
+                class="ml-auto shrink-0 text-ink-2 transition-transform duration-150"
                 :class="!edgeGroupOpen && '-rotate-90'"
               />
             </button>
             <div v-show="edgeGroupOpen" class="flex flex-col pb-1 pt-0.5">
-              <div class="flex items-center gap-2 px-1.5 py-1.5">
-                <span
-                  class="inline-block h-[3px] w-4 shrink-0 rounded-full"
-                  :style="{ background: EDGE }"
-                />
-                <span class="text-sub text-ink">{{ S.graph.edgeFact }}</span>
-              </div>
-              <div class="flex items-center gap-2 px-1.5 py-1.5">
-                <span
-                  class="inline-block h-[3px] w-4 shrink-0 rounded-full"
-                  :style="{ background: EDGE_INFERRED }"
-                />
-                <span class="text-sub text-ink">{{ S.graph.edgeInferred }}</span>
-              </div>
-              <div class="flex items-center gap-2 px-1.5 py-1.5">
-                <span
-                  class="inline-block h-[4px] w-4 shrink-0 rounded-full"
-                  :style="{ background: EDGE_DERIVED }"
-                />
-                <span class="text-sub text-ink">{{ S.graph.edgeDerived }}</span>
-              </div>
-              <div class="flex items-center gap-2 px-1.5 py-1.5">
-                <span
-                  class="inline-block h-[4px] w-4 shrink-0 rounded-full"
-                  :style="{ background: EDGE_CONTEST }"
-                />
-                <span class="text-sub text-ink">⚠ {{ S.graph.edgeContested }}</span>
-              </div>
-              <div class="flex items-center gap-2 px-1.5 py-1.5">
-                <span
-                  class="inline-block h-[2px] w-4 shrink-0 rounded-full"
-                  :style="{ background: edgeGhost() }"
-                />
-                <span class="text-sub text-ink">{{ S.graph.edgeBlocked }}</span>
-              </div>
-              <!-- 边标签开关直排（原在弹层内；renderEdgeLabels 唯一事实源不变） -->
-              <el-checkbox
-                v-model="showAllEdgeLabels"
-                size="small"
-                class="ml-1.5 mt-1"
+              <button
+                v-for="ek in EDGE_KIND_ROWS"
+                :key="ek.key"
+                type="button"
+                class="flex items-center gap-2 rounded-lg px-1.5 py-1.5 hover:bg-primary-soft"
+                @click="
+                  toggleEdgeKind(ek.key);
+                  sigmaRef?.refresh();
+                "
               >
-                {{ S.graph.showAllEdgeLabels }}
-              </el-checkbox>
+                <span
+                  class="inline-block w-4 shrink-0 rounded-full"
+                  :style="{
+                    height: ek.size + 'px',
+                    background: ek.sample,
+                    opacity: hiddenEdgeKinds.has(ek.key) ? 0.35 : 1
+                  }"
+                />
+                <span
+                  :class="[
+                    'min-w-0 flex-1 truncate text-left text-sub',
+                    hiddenEdgeKinds.has(ek.key)
+                      ? 'text-ink-2 line-through'
+                      : 'text-ink'
+                  ]"
+                >
+                  {{ ek.warn ? "⚠ " : "" }}{{ ek.label }}
+                </span>
+                <span
+                  class="shrink-0 rounded-full bg-fill px-1.5 text-[11px] leading-4 tabular-nums text-ink-2"
+                >
+                  {{ edgeKindCounts.get(ek.key) ?? 0 }}
+                </span>
+              </button>
+              <!-- 边标签开关（行+开关形态；renderEdgeLabels 唯一事实源不变） -->
+              <div class="flex items-center gap-2 px-1.5 py-1.5">
+                <span class="min-w-0 flex-1 truncate text-left text-sub text-ink">
+                  {{ S.graph.showAllEdgeLabels }}
+                </span>
+                <el-switch v-model="showAllEdgeLabels" size="small" />
+              </div>
             </div>
           </div>
 
