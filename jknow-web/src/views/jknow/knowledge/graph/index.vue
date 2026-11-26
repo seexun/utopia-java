@@ -347,6 +347,7 @@ const edgeKindCounts = computed(() => {
 const panelCollapsed = ref(false);
 const entityGroupOpen = ref(true);
 const edgeGroupOpen = ref(true);
+const viewGroupOpen = ref(true);
 
 const types = computed(() => {
   const map = new Map<
@@ -1622,10 +1623,83 @@ const statsText = computed(() => {
                 <el-switch v-model="showAllEdgeLabels" size="small" />
               </div>
             </div>
+
+            <!-- 视图组：节点档位（画布内容量档位，非缩放；小库未超最低档时
+                 "+" 停用）。原在沉底统计条里——它是画布视图控制，与统计混在
+                 一根钉底条里不合理（用户走查②），移入滚动区独立成组 -->
+            <button
+              type="button"
+              class="flex w-full items-center gap-1.5 px-1.5 pb-1.5 pt-2"
+              @click="viewGroupOpen = !viewGroupOpen"
+            >
+              <span
+                class="h-3 w-[3px] shrink-0 rounded-sm"
+                style="background: #0ea5e9"
+              />
+              <span class="text-[12px] font-semibold tracking-wide text-ink-2">
+                {{ S.graph.viewGroup }}
+              </span>
+              <ChevronDownIcon
+                width="12"
+                height="12"
+                class="ml-auto shrink-0 text-ink-2 transition-transform duration-150"
+                :class="!viewGroupOpen && '-rotate-90'"
+              />
+            </button>
+            <div v-show="viewGroupOpen" class="flex flex-col pb-1 pt-0.5">
+              <div
+                class="flex items-center gap-2 px-1.5 py-1.5"
+                :title="S.graph.nodeBudget"
+              >
+                <span class="min-w-0 flex-1 truncate text-left text-sub text-ink">
+                  {{ S.graph.nodeBudgetLabel }}
+                </span>
+                <div
+                  class="flex items-center overflow-hidden rounded-ctl border border-line"
+                >
+                  <button
+                    type="button"
+                    class="px-2 py-1.5 text-ink-2 hover:bg-fill disabled:opacity-40"
+                    :title="S.graph.nodeBudgetLess"
+                    :disabled="nodeBudget <= NODE_BUDGETS[0]"
+                    @click="
+                      nodeBudget =
+                        NODE_BUDGETS[Math.max(0, NODE_BUDGETS.indexOf(nodeBudget) - 1)]
+                    "
+                  >
+                    −
+                  </button>
+                  <span
+                    class="min-w-[40px] border-x border-line px-1 text-center text-[11px] tabular-nums text-ink-2"
+                  >
+                    {{ nodeBudget }}
+                  </span>
+                  <button
+                    type="button"
+                    class="px-2 py-1.5 text-ink-2 hover:bg-fill disabled:opacity-40"
+                    :title="S.graph.nodeBudgetMore"
+                    :disabled="
+                      !capped || nodeBudget >= NODE_BUDGETS[NODE_BUDGETS.length - 1]
+                    "
+                    @click="
+                      nodeBudget =
+                        NODE_BUDGETS[
+                          Math.min(
+                            NODE_BUDGETS.length - 1,
+                            NODE_BUDGETS.indexOf(nodeBudget) + 1
+                          )
+                        ]
+                    "
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <!-- 沉底统计条（国内面板底部操作条同款 border-t 钉底）：稳定提示 +
-               节点档位步进器 + 统计 -->
+          <!-- 沉底统计条（border-t 钉底）：纯统计信息（节点档位属画布视图控制，
+               已移入滚动区"视图"组——用户走查：档位放统计条里不合理） -->
           <div
             class="flex flex-none flex-col gap-2 border-t border-line px-3.5 py-2.5"
           >
@@ -1636,50 +1710,9 @@ const statsText = computed(() => {
               <Loader2Icon width="11" height="11" class="animate-spin" />
               {{ S.graph.stabilizing }}
             </span>
-            <div class="flex flex-wrap items-center gap-2">
-              <span class="shrink-0 text-aux text-ink-2">
-                {{ S.graph.nodeBudgetLabel }}
-              </span>
-              <!-- 节点档位 ± 步进器：控制画多少节点的档位（功能控件，非缩放） -->
-              <div
-                class="flex items-center overflow-hidden rounded-ctl border border-line"
-              >
-                <button
-                  type="button"
-                  class="px-2 py-1.5 text-ink-2 hover:bg-fill disabled:opacity-40"
-                  :title="S.graph.nodeBudgetLess"
-                  :disabled="nodeBudget <= NODE_BUDGETS[0]"
-                  @click="
-                    nodeBudget =
-                      NODE_BUDGETS[Math.max(0, NODE_BUDGETS.indexOf(nodeBudget) - 1)]
-                  "
-                >
-                  −
-                </button>
-                <button
-                  type="button"
-                  class="px-2 py-1.5 text-ink-2 hover:bg-fill disabled:opacity-40"
-                  :title="S.graph.nodeBudgetMore"
-                  :disabled="
-                    !capped || nodeBudget >= NODE_BUDGETS[NODE_BUDGETS.length - 1]
-                  "
-                  @click="
-                    nodeBudget =
-                      NODE_BUDGETS[
-                        Math.min(
-                          NODE_BUDGETS.length - 1,
-                          NODE_BUDGETS.indexOf(nodeBudget) + 1
-                        )
-                      ]
-                  "
-                >
-                  +
-                </button>
-              </div>
-              <span class="ml-auto shrink-0 tabular-nums text-aux text-ink-2">
-                {{ statsText }}
-              </span>
-            </div>
+            <span class="shrink-0 tabular-nums text-aux text-ink-2">
+              {{ statsText }}
+            </span>
           </div>
         </div>
         <!-- 贴缘折叠钮（left-pane-toggle 同款 18×38 圆角胶囊，贴缘垂直居中） -->

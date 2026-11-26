@@ -857,6 +857,7 @@ export const zh: Strings = {
        常显，不藏弹层——用户拍板展开显示） */
     entityGroup: "实体类型",
     edgeGroup: "关系",
+    viewGroup: "视图",
     nodeBudgetLabel: "节点档位",
     panelCollapse: "收起面板",
     panelExpand: "展开面板",

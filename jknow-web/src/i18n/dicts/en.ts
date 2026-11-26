@@ -967,6 +967,7 @@ export const en = {
        always visible again (spec graph-edge-legend.md intent — user approved) */
     entityGroup: "Entity types",
     edgeGroup: "Relations",
+    viewGroup: "View",
     nodeBudgetLabel: "Node budget",
     panelCollapse: "Collapse panel",
     panelExpand: "Expand panel",
