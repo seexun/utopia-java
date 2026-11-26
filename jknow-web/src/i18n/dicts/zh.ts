@@ -852,6 +852,9 @@ export const zh: Strings = {
     nodeBudget: "画多少个实体",
     nodeBudgetMore: "多画一些",
     nodeBudgetLess: "少画一些",
+    /* 档位行解释文案（用户走查"点加减没反应"）：停用要有原因在眼前 */
+    budgetCapped: (a: number, b: number) => `已按档位截取 ${a} / ${b} 个实体`,
+    budgetUncapped: (n: number) => `全库 ${n} 个实体，未超当前档位`,
     /* 左栏分组面板（gvdata OperatorTree 同款语言 2026-11-26）：竖条分组头 +
        沉底统计条 + 贴缘折叠钮。边图例回归规格本意（graph-edge-legend.md：
        常显，不藏弹层——用户拍板展开显示） */

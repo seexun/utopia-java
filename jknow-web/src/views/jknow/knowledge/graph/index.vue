@@ -1695,6 +1695,15 @@ const statsText = computed(() => {
                   </button>
                 </div>
               </div>
+              <!-- 档位解释行（走查"点加减没反应"）：停用要有原因在眼前——
+                   超档显示截取数，未超档说明全部已画 -->
+              <p class="px-1.5 text-[11px] leading-4 text-ink-3">
+                {{
+                  capped
+                    ? S.graph.budgetCapped(nodeCount, totalNodes)
+                    : S.graph.budgetUncapped(totalNodes)
+                }}
+              </p>
             </div>
           </div>
 
