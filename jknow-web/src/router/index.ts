@@ -68,55 +68,68 @@ export const constantRoutes = [
     redirect: "/library",
     hidden: true,
     children: [
+      /* meta.title（主题色渗透批 2026-11-26）：页签/面包屑按 meta.title 取名——
+         补齐后 KB 工作页才进得了页签（addTags 原按 route.name 放行，KB 子路由
+         无 name 被拒收，页签永远只剩"首页"），面包屑也有当前级蓝字可落 */
       {
         path: ":kbId/graph",
         component: () => import("@/views/jknow/knowledge/graph/index.vue"),
-        hidden: true
+        hidden: true,
+        meta: { title: "图谱" }
       },
       {
         path: ":kbId/search",
         component: () => import("@/views/jknow/knowledge/search/index.vue"),
-        hidden: true
+        hidden: true,
+        meta: { title: "检索" }
       },
       {
         path: ":kbId/library",
         component: () => import("@/views/jknow/knowledge/library/index.vue"),
-        hidden: true
+        hidden: true,
+        meta: { title: "文库" }
       },
       {
         path: ":kbId/doc/:docId",
         component: () => import("@/views/jknow/knowledge/doc-viewer/index.vue"),
-        hidden: true
+        hidden: true,
+        meta: { title: "文档" }
       },
       {
         path: ":kbId/ontology",
         component: () => import("@/views/jknow/knowledge/ontology/index.vue"),
-        hidden: true
+        hidden: true,
+        meta: { title: "本体" }
       },
       {
         path: ":kbId/review",
         component: () => import("@/views/jknow/knowledge/review/index.vue"),
-        hidden: true
+        hidden: true,
+        meta: { title: "审查" }
       },
       {
         path: ":kbId/mappings",
         component: () => import("@/views/jknow/knowledge/mappings/index.vue"),
-        hidden: true
+        hidden: true,
+        meta: { title: "映射" }
       },
       {
         path: ":kbId/settings",
         component: () => import("@/views/jknow/knowledge/kb-settings/index.vue"),
-        hidden: true
+        hidden: true,
+        meta: { title: "库设置" }
       },
       {
         path: ":kbId/chat/:conversationId?",
         component: () => import("@/views/jknow/knowledge/chat/index.vue"),
-        hidden: true
+        hidden: true,
+        meta: { title: "问答" }
       },
       {
         path: ":kbId/docs",
         component: () => import("@/views/jknow/knowledge/docs/index.vue"),
-        hidden: true
+        hidden: true,
+        meta: { title: "文档中心" }
       }
     ]
   },

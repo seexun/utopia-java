@@ -21,8 +21,12 @@ function getBreadcrumb(): void {
   // only show routes with meta.title
   let matched: any[] = []
   const pathNum = findPathNum(route.path)
-  // multi-level menu
-  if (pathNum > 2) {
+  /* KB 工作页（主题色渗透批 2026-11-26）：/kb/:kbId/* 是带参动态路由，
+     走下方多级菜单字符串匹配分支必失配（':kbId' 段对不上 UUID），层级被吞成
+     单级"首页"——直接用 route.matched 取链，末级=当前页（蓝字锚） */
+  if (route.path.startsWith("/kb/")) {
+    matched = route.matched.filter((item: any) => item.meta && item.meta.title)
+  } else if (pathNum > 2) {
     const reg = /\/\w+/gi
     const pathList = route.path.match(reg)?.map((item: string, index: number) => {
       if (index !== 0) item = item.slice(1)
@@ -90,7 +94,10 @@ getBreadcrumb()
   line-height: 50px;
 
   .no-redirect {
-    color: #97a8be;
+    /* 主题色渗透②（治"白茫茫"走查）：面包屑当前级蓝字加粗——顶栏的层级锚点
+       （灵云数智中台"数据标准 / 标准数据元"同款形态） */
+    color: var(--current-color, #2563eb);
+    font-weight: 600;
     cursor: text;
   }
 }

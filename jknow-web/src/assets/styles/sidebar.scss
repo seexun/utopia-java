@@ -148,12 +148,14 @@
         padding: 0 10px;
         border-radius: var(--radius-ctl);
         cursor: pointer;
-        color: var(--color-ink-2);
+        /* 主题色渗透③（治"白茫茫"走查）：折叠菜单蓝字——侧栏底部的功能锚点
+           （灵云数智中台折叠菜单蓝字同款） */
+        color: var(--current-color, #2563eb);
         transition: background-color var(--transition-base), color var(--transition-base);
 
         &:hover {
-          background-color: var(--color-neutral-soft);
-          color: var(--color-ink);
+          background-color: var(--color-primary-soft, #f0f5ff);
+          color: var(--current-color, #2563eb);
         }
 
         .el-icon {

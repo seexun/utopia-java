@@ -44,7 +44,9 @@ const switcherBg = computed(() => {
 });
 const switcherText = computed(() => {
   if (settingsStore.isDark) return "var(--sidebar-text)";
-  return sideTheme.value === "theme-dark" ? variables.menuText : variables.menuLightText;
+  /* 主题色渗透④（治"白茫茫"走查）：kb 切换器浅色态蓝字——库切换是侧栏底部
+     的核心操作，给它主题色锚位（暗色保持原亮字不变） */
+  return sideTheme.value === "theme-dark" ? variables.menuText : "var(--current-color, #2563eb)";
 });
 const switcherHover = computed(() => {
   if (settingsStore.isDark) return "var(--menu-hover)";

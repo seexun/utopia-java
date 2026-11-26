@@ -207,9 +207,15 @@ function initTags(): void {
 }
 
 function addTags(): void {
-  const { name } = route
+  const { name, path } = route
+  /* 主题色渗透批（2026-11-26 治"白茫茫"）：KB 动态子路由无 route.name，原
+     `if (name)` 把图谱/审查/文库等工作页全部拒在页签外——按 path 放行进
+     visited（keep-alive 缓存仍按 name 走，无名路由只进页签不进缓存表，
+     避免 undefined 混入 cachedViews） */
   if (name) {
     useTagsViewStore().addView(route)
+  } else if (path) {
+    useTagsViewStore().addVisitedView(route)
   }
 }
 
@@ -522,9 +528,12 @@ $tags-bar-height: 38px;
   &.tags-view-container--chrome {
     --chrome-strip-bg: var(--color-card);
     --chrome-strip-border: var(--el-border-color-lighter, var(--color-border));
-    --chrome-tab-active-bg: var(--el-color-primary-light-9);
+    /* 主题色渗透①（治"白茫茫"走查）：激活页签实色蓝底白字——白壳需要实色
+       锚点，淡色版（22% 混合底+蓝字）密度≈0 是"白茫茫"主因之一（灵云数智
+       中台同款形态） */
+    --chrome-tab-active-bg: var(--el-color-primary);
     --chrome-tab-text: var(--el-text-color-regular, var(--color-ink-2));
-    --chrome-tab-text-active: var(--el-color-primary);
+    --chrome-tab-text-active: #ffffff;
     --chrome-wing-r: 10px;
 
     overflow: visible;
