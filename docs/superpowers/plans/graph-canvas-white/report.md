@@ -88,3 +88,30 @@
 | console | 零 error ✓ | |
 
 截图 `two-col-1920.png` / `two-col-1920-dark.png`。`pnpm typecheck` ✓ / `pnpm test` 425/425（58 文件）✓。
+
+## 八、追补：左栏 gvdata 同款面板重设计（2026-11-26，用户拍板）
+
+用户两轮反馈"左栏不像国内软件"后，放弃泛化方案，直接移植参考项目 gvdata-ui 自己的左栏语言（`dpp/components/canvasShell/OperatorTree.vue` + `prop-pane` + `left-pane-toggle` 源码逐项对照）：
+
+- **面板头**：标题+kb chip 固定顶部，border-b 分隔（prop-pane__header 同款）
+- **灰底填充式搜索**：`.graph-search` 改 `--color-fill` 底、无描边、圆角 8px，focus 白底+主色描边（op-search 同款）
+- **竖条分组**：实体类型 / 关系两组，3px 竖条（主色/紫）+ 12px/600 组名 + 计数徽章 + 折叠箭头（op-group__header 同款）；实体行=色点+名称+计数，hover 浅主色底；"+N 个类"弹层撤除（全类直列、组内滚动）
+- **边图例常显**（用户拍板，回归 graph-edge-legend.md 本意）：五类边线样本行直排进关系组，"显示全部标签"开关同步直排，原弹层撤除
+- **沉底统计条**：border-t 钉底——稳定 tag + 节点档位（新增 label 键）+ 统计右贴
+- **贴缘折叠钮**：18×38 圆角 9px 白底胶囊贴左栏右缘垂直居中（left-pane-toggle 同款）；收起后栏宽 16px、画布吃满 1569px；会话内状态
+- 撤除：UPill 图例、GitCompareIcon、legendQ/legendShown/legendRest/legendRestFiltered/LEGEND_MAX；新增 i18n 键 entityGroup/edgeGroup/nodeBudgetLabel/panelCollapse/panelExpand（zh/en）
+
+### 实测（panel-shot.js / panel-shot-dark.js，1920×1080）
+
+| 断言 | 展开 | 收起 |
+|---|---|---|
+| 左栏宽 | 280px ✓ | 16px ✓（画布 1305→1569 吃满）|
+| 面板头 border-b / 沉底条 border-t | 有 ✓（头 62px、条 944-1024 贴内距沿）| — |
+| 实体类型行 / 边图例行 | 6 行 ✓ / 5 行常显 ✓ | — |
+| 折叠往返 | 280→16→280 ✓ | — |
+| 横向缝隙 | 15px ✓ | 15px ✓ |
+| console | 零 error ✓ | 零 error ✓ |
+
+截图 `panel-1920.png` / `panel-dark-1920.png` / `panel-collapsed-1920.png` / `panel-dark-collapsed-1920.png`。`pnpm typecheck` ✓ / `pnpm test` 425/425（58 文件）✓。
+
+**踩坑留档**：实施中根容器被提前闭合（`</div>` 误插在折叠钮之后），画布框跑到根外成为第二根节点——正则 div 计数器骗过了检查（总数配平但嵌套错位），Vite 直接 500 "Invalid end tag"（vue/compiler-core）；换真·标签栈解析器定位后修正。教训：**结构性改动用栈式解析器验嵌套，不要只数数量**；多根节点还会复发 AppMain Transition 空白页（f1b08e2 同源）。

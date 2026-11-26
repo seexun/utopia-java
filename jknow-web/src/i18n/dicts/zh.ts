@@ -852,6 +852,14 @@ export const zh: Strings = {
     nodeBudget: "画多少个实体",
     nodeBudgetMore: "多画一些",
     nodeBudgetLess: "少画一些",
+    /* 左栏分组面板（gvdata OperatorTree 同款语言 2026-11-26）：竖条分组头 +
+       沉底统计条 + 贴缘折叠钮。边图例回归规格本意（graph-edge-legend.md：
+       常显，不藏弹层——用户拍板展开显示） */
+    entityGroup: "实体类型",
+    edgeGroup: "关系",
+    nodeBudgetLabel: "节点档位",
+    panelCollapse: "收起面板",
+    panelExpand: "展开面板",
     legendSearch: "筛选类",
     legendNone: "没有匹配的类",
     legendOnly: "只看",

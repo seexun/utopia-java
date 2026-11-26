@@ -962,6 +962,14 @@ export const en = {
     nodeBudget: "How many entities to draw",
     nodeBudgetMore: "Draw more",
     nodeBudgetLess: "Draw fewer",
+    /* Left panel groups (gvdata OperatorTree language, 2026-11-26): grouped
+       headers + pinned stats bar + edge-of-panel collapse. Edge legend is
+       always visible again (spec graph-edge-legend.md intent — user approved) */
+    entityGroup: "Entity types",
+    edgeGroup: "Relations",
+    nodeBudgetLabel: "Node budget",
+    panelCollapse: "Collapse panel",
+    panelExpand: "Expand panel",
     legendSearch: "Filter classes",
     legendNone: "No class matches",
     legendOnly: "Only",

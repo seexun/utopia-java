@@ -30,7 +30,9 @@ import ZoomOutIcon from "~icons/lucide/zoom-out";
 import Loader2Icon from "~icons/lucide/loader-2";
 import Maximize2Icon from "~icons/lucide/maximize-2";
 import WaypointsIcon from "~icons/lucide/waypoints";
-import GitCompareIcon from "~icons/lucide/git-compare";
+import ChevronDownIcon from "~icons/lucide/chevron-down";
+import ChevronLeftIcon from "~icons/lucide/chevron-left";
+import ChevronRightIcon from "~icons/lucide/chevron-right";
 import {
   graphOverview,
   graphNeighborhood,
@@ -98,7 +100,6 @@ import { layOutParallelEdges, computeActiveAt } from "./parallel-edges";
 import { TimeScrubber } from "./time-scrubber";
 import { EntityPanel } from "./entity-panel";
 import {
-  UPill,
   ToolButton,
   ToolDivider,
   ToolTower,
@@ -107,7 +108,6 @@ import {
 } from "@/components/knowledge/kit";
 defineOptions({ name: "UtopiaGraphPage" });
 
-const LEGEND_MAX = 6;
 /* 画多少个节点的可选档位。最大值与后端 GRAPH_NODE_CAP_MAX 对齐 */
 const NODE_BUDGETS: number[] = [150, 300, 600, 1000];
 const DAY_MS = 24 * 3600 * 1000;
@@ -284,7 +284,10 @@ const searchHits = computed(() =>
 
 const hiddenTypes = ref(new Set<string>());
 const showDerived = ref(true);
-const legendQ = ref("");
+/* 左栏面板（gvdata 同款）：整栏折叠 + 分组折叠（会话内状态，不持久化） */
+const panelCollapsed = ref(false);
+const entityGroupOpen = ref(true);
+const edgeGroupOpen = ref(true);
 
 const types = computed(() => {
   const map = new Map<
@@ -307,13 +310,6 @@ const types = computed(() => {
     (a, b) => b[1].count - a[1].count || a[1].label.localeCompare(b[1].label)
   );
 });
-const legendShown = computed(() => types.value.slice(0, LEGEND_MAX));
-const legendRest = computed(() => types.value.slice(LEGEND_MAX));
-const legendRestFiltered = computed(() =>
-  legendRest.value.filter(([, t]) =>
-    t.label.toLowerCase().includes(legendQ.value.toLowerCase())
-  )
-);
 const derivedCount = computed(
   () => (data.data.value?.edges ?? []).filter(e => e.derived).length
 );
@@ -1303,15 +1299,22 @@ const statsText = computed(() => {
 
 <template>
   <div class="knowledge-page flex h-full gap-[15px] p-6">
-    <!-- 工作区左右两栏（2026-11-26 用户拍板）：左=工具栏卡（280px 竖排：
-         标题/搜索/图例/边图例/档位/统计），右=画布框（flex-1 满铺整个内容高），
-         两框之间 15px 缝隙。画布从 766px 高（扁带状 0.48）升到 918px（0.70） -->
-    <div class="card flex w-[280px] flex-none flex-col overflow-y-auto">
-      <!-- 左工具栏（竖排五段）：标题+chip → 搜索 → 返回全图 → 类型图例 →
-           边图例弹层 → 底部（稳定提示/档位/统计）。控件与状态全部原样，仅重排 -->
-      <div class="flex flex-1 flex-col gap-2.5">
-        <!-- 标题 + kb chip -->
-        <div class="flex flex-wrap items-center gap-2">
+    <!-- 工作区左右两栏 + 左栏 gvdata 同款面板语言（2026-11-26 用户拍板）：
+         面板头(border-b) → 灰底搜索 → 竖条分组（实体/关系）→ 沉底统计条(border-t)；
+         贴缘折叠小胶囊（left-pane-toggle 同款，收起后栏宽 16px、画布吃满）。
+         控件语义零变化（点击显隐/搜索/档位原样），边图例回归规格本意常显不藏弹层 -->
+    <div
+      class="relative flex-none transition-[width] duration-200 ease-out"
+      :class="panelCollapsed ? 'w-4' : 'w-[280px]'"
+    >
+      <div
+        class="card flex h-full flex-col overflow-hidden"
+        :class="panelCollapsed ? 'pointer-events-none opacity-0' : ''"
+      >
+        <!-- 面板头：标题 + kb chip（prop-pane__header 同款 border-b） -->
+        <div
+          class="flex flex-wrap items-center gap-2 border-b border-line px-3.5 pb-2.5 pt-3"
+        >
           <h1 class="text-title font-semibold text-ink">{{ S.nav.graph }}</h1>
           <span
             class="rounded-full border border-line bg-fill px-2 py-0.5 text-aux text-ink-2"
@@ -1319,9 +1322,9 @@ const statsText = computed(() => {
             {{ kb?.name }}
           </span>
         </div>
-        <!-- 搜索 → 返回全图 → 类型图例 → 边图例 → 底部组（mt-auto 沉底，
-             矮视口下随内容自然流、整卡滚动） -->
-        <div class="flex flex-1 flex-col gap-2.5">
+        <!-- 搜索区（op-search 同款：灰底填充式输入，focus 白底+主色描边）。
+             建议框 absolute 以本区为参照 -->
+        <div class="flex-none px-3.5 pb-1 pt-3">
           <div class="relative">
             <div class="relative">
               <SearchIcon
@@ -1399,212 +1402,158 @@ const statsText = computed(() => {
               </el-button>
             </div>
           </div>
-          <el-button
-            v-if="focusEntity"
-            class="graph-shadow w-full"
-            @click="
-              () => {
-                focusEntity = null;
-                syncUrl();
-              }
-            "
-          >
-            {{ S.graph.backToOverview }}
-          </el-button>
-
-          <!-- 图例（点击切换类型显隐）。只摆前 LEGEND_MAX 个；窄栏改竖排 -->
-          <div class="flex min-w-0 flex-col items-start gap-1.5">
-            <UPill
-              v-for="[key, t] in legendShown"
-              :key="key"
-              :dim="hiddenTypes.has(key)"
-              @click="toggleHidden(key)"
+            <el-button
+              v-if="focusEntity"
+              class="graph-shadow mt-2 w-full"
+              @click="
+                () => {
+                  focusEntity = null;
+                  syncUrl();
+                }
+              "
             >
-              <span
-                :class="[
-                  'h-2 w-2',
-                  t.shape === 'square' ? 'scale-90' : 'rounded-full'
-                ]"
-                :style="{ background: t.color }"
-              />
-              <span>{{ t.label }}</span>
-            </UPill>
-
-            <!-- +N 个类：弹层里全列表（查找 / 全开 / 全关 / 只看这个） -->
-            <el-popover v-if="legendRest.length > 0" width="288" trigger="click">
-              <template #reference>
-                <UPill :title="S.graph.legendAllHint">
-                  {{ S.graph.legendMore(types.length) }}
-                  <span
-                    v-if="legendRest.some(([k]) => hiddenTypes.has(k))"
-                    class="h-1.5 w-1.5 rounded-full bg-ink-2"
-                  />
-                </UPill>
-              </template>
-              <div
-                class="border-b border-line px-3 py-2 text-body font-medium text-ink"
-              >
-                {{ S.graph.legendMore(types.length) }}
-              </div>
-              <div class="flex items-center gap-2 border-b border-line px-3 py-2">
-                <button
-                  type="button"
-                  class="link-inline text-sub"
-                  :disabled="hiddenTypes.size === 0"
-                  @click="
-                    () => {
-                      hiddenTypes = new Set();
-                      sigmaRef?.refresh();
-                    }
-                  "
-                >
-                  {{ S.graph.legendShowAll(hiddenTypes.size) }}
-                </button>
-                <button
-                  type="button"
-                  class="link-inline ml-auto text-sub"
-                  :disabled="hiddenTypes.size === types.length"
-                  @click="
-                    () => {
-                      hiddenTypes = new Set(types.map(([k]) => k));
-                      sigmaRef?.refresh();
-                    }
-                  "
-                >
-                  {{ S.graph.legendHideAll }}
-                </button>
-              </div>
-              <div class="border-b border-line px-3 py-2">
-                <el-input
-                  v-model="legendQ"
-                  :placeholder="S.graph.legendSearch"
-                  size="small"
-                />
-              </div>
-              <div class="max-h-64 overflow-y-auto overscroll-contain px-2 py-1">
-                <div
-                  v-for="[key, t] in legendRestFiltered"
-                  :key="key"
-                  class="group flex items-center gap-2"
-                >
-                  <button
-                    type="button"
-                    class="flex min-w-0 flex-1 items-center justify-start rounded-none px-0"
-                    @click="toggleHidden(key)"
-                  >
-                    <span
-                      class="h-2 w-2 shrink-0"
-                      :class="t.shape === 'square' ? 'scale-90' : 'rounded-full'"
-                      :style="{
-                        background: t.color,
-                        opacity: hiddenTypes.has(key) ? 0.35 : 1
-                      }"
-                    />
-                    <span
-                      :class="[
-                        'truncate text-sub',
-                        hiddenTypes.has(key)
-                          ? 'text-ink-2 line-through'
-                          : 'text-ink'
-                      ]"
-                    >
-                      {{ t.label }}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    class="reveal shrink-0 text-sub text-ink-2 hover:text-ink"
-                    @click="
-                      () => {
-                        hiddenTypes = new Set(
-                          types.map(([k]) => k).filter(k => k !== key)
-                        );
-                        sigmaRef?.refresh();
-                      }
-                    "
-                  >
-                    {{ S.graph.legendOnly }}
-                  </button>
-                  <span class="shrink-0 tabular-nums text-aux text-ink-2">
-                    {{ t.count }}
-                  </span>
-                </div>
-                <div
-                  v-if="legendRestFiltered.length === 0"
-                  class="px-2 py-2 text-sub text-ink-2"
-                >
-                  {{ S.graph.legendNone }}
-                </div>
-              </div>
-            </el-popover>
+              {{ S.graph.backToOverview }}
+            </el-button>
           </div>
 
-          <!-- 边语义图例（规格 graph-edge-legend.md §1）：卡头行2 单行化（2026-11-24
-               留档清偿批）——inline 五项收进 el-popover，行2 只留触发钮（暗色随 EP
-               令牌自动） -->
-          <el-popover placement="bottom-start" :width="300" trigger="click">
-            <template #reference>
-              <button
-                type="button"
-                class="flex w-full items-center gap-1.5 rounded-ctl border border-line px-2 py-1 text-aux text-ink-2 hover:bg-fill"
-                :title="S.graph.edgeLegend"
-              >
-                <GitCompareIcon width="12" height="12" />
-                {{ S.graph.edgeLegend }}
-              </button>
-            </template>
-            <!-- 原标题+五项整体移入（保留原 flex 排版，容器改 flex-col gap-1.5） -->
-            <div
-              class="flex flex-col items-start gap-1.5 text-aux text-ink-3"
+          <!-- 分组滚动区（op-list 同款）：竖条分组头 + 计数徽章 + 折叠箭头 -->
+          <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-1">
+            <!-- 实体类型组：点击行=显隐切换（隐藏项 35% 透明+删除线，语义同前）。
+                 全类直列、组内滚动（原 +N 弹层撤除） -->
+            <button
+              type="button"
+              class="flex w-full items-center gap-1.5 px-1.5 pb-1.5 pt-2"
+              :title="S.graph.legendAllHint"
+              @click="entityGroupOpen = !entityGroupOpen"
             >
-              <span class="font-semibold">{{ S.graph.edgeLegend }}</span>
-              <span class="flex items-center gap-1.5">
+              <span class="h-3 w-[3px] shrink-0 rounded-sm bg-primary" />
+              <span class="text-[12px] font-semibold tracking-wide text-ink-2">
+                {{ S.graph.entityGroup }}
+              </span>
+              <span
+                class="ml-auto shrink-0 rounded-full bg-fill px-1.5 text-[11px] leading-4 tabular-nums text-ink-2"
+              >
+                {{ types.length }}
+              </span>
+              <ChevronDownIcon
+                width="12"
+                height="12"
+                class="shrink-0 text-ink-2 transition-transform duration-150"
+                :class="!entityGroupOpen && '-rotate-90'"
+              />
+            </button>
+            <div v-show="entityGroupOpen" class="flex flex-col pb-1">
+              <button
+                v-for="[key, t] in types"
+                :key="key"
+                type="button"
+                class="flex items-center gap-2 rounded-lg px-1.5 py-1.5 hover:bg-primary-soft"
+                @click="toggleHidden(key)"
+              >
                 <span
-                  class="inline-block h-[3px] w-4 rounded-full"
+                  :class="[
+                    'h-3 w-3 shrink-0',
+                    t.shape === 'square' ? 'scale-90' : 'rounded-full'
+                  ]"
+                  :style="{
+                    background: t.color,
+                    opacity: hiddenTypes.has(key) ? 0.35 : 1
+                  }"
+                />
+                <span
+                  :class="[
+                    'min-w-0 flex-1 truncate text-left text-sub',
+                    hiddenTypes.has(key) ? 'text-ink-2 line-through' : 'text-ink'
+                  ]"
+                >
+                  {{ t.label }}
+                </span>
+                <span
+                  class="shrink-0 rounded-full bg-fill px-1.5 text-[11px] leading-4 tabular-nums text-ink-2"
+                >
+                  {{ t.count }}
+                </span>
+              </button>
+            </div>
+
+            <!-- 关系组：五类边线图例常显（graph-edge-legend.md 本意：粗细/颜色
+                 是边的语言；用户拍板展开显示，不再藏弹层）+ 边标签开关直排 -->
+            <button
+              type="button"
+              class="flex w-full items-center gap-1.5 px-1.5 pb-1.5 pt-2"
+              @click="edgeGroupOpen = !edgeGroupOpen"
+            >
+              <span
+                class="h-3 w-[3px] shrink-0 rounded-sm"
+                style="background: #7c3aed"
+              />
+              <span class="text-[12px] font-semibold tracking-wide text-ink-2">
+                {{ S.graph.edgeGroup }}
+              </span>
+              <span
+                class="ml-auto shrink-0 rounded-full bg-fill px-1.5 text-[11px] leading-4 tabular-nums text-ink-2"
+              >
+                {{ data.data.value?.edges?.length ?? 0 }}
+              </span>
+              <ChevronDownIcon
+                width="12"
+                height="12"
+                class="shrink-0 text-ink-2 transition-transform duration-150"
+                :class="!edgeGroupOpen && '-rotate-90'"
+              />
+            </button>
+            <div v-show="edgeGroupOpen" class="flex flex-col pb-1 pt-0.5">
+              <div class="flex items-center gap-2 px-1.5 py-1.5">
+                <span
+                  class="inline-block h-[3px] w-4 shrink-0 rounded-full"
                   :style="{ background: EDGE }"
                 />
-                {{ S.graph.edgeFact }}
-              </span>
-              <span class="flex items-center gap-1.5">
+                <span class="text-sub text-ink">{{ S.graph.edgeFact }}</span>
+              </div>
+              <div class="flex items-center gap-2 px-1.5 py-1.5">
                 <span
-                  class="inline-block h-[3px] w-4 rounded-full"
+                  class="inline-block h-[3px] w-4 shrink-0 rounded-full"
                   :style="{ background: EDGE_INFERRED }"
                 />
-                {{ S.graph.edgeInferred }}
-              </span>
-              <span class="flex items-center gap-1.5">
+                <span class="text-sub text-ink">{{ S.graph.edgeInferred }}</span>
+              </div>
+              <div class="flex items-center gap-2 px-1.5 py-1.5">
                 <span
-                  class="inline-block h-[4px] w-4 rounded-full"
+                  class="inline-block h-[4px] w-4 shrink-0 rounded-full"
                   :style="{ background: EDGE_DERIVED }"
                 />
-                {{ S.graph.edgeDerived }}
-              </span>
-              <span class="flex items-center gap-1.5">
+                <span class="text-sub text-ink">{{ S.graph.edgeDerived }}</span>
+              </div>
+              <div class="flex items-center gap-2 px-1.5 py-1.5">
                 <span
-                  class="inline-block h-[4px] w-4 rounded-full"
+                  class="inline-block h-[4px] w-4 shrink-0 rounded-full"
                   :style="{ background: EDGE_CONTEST }"
                 />
-                ⚠ {{ S.graph.edgeContested }}
-              </span>
-              <span class="flex items-center gap-1.5">
+                <span class="text-sub text-ink">⚠ {{ S.graph.edgeContested }}</span>
+              </div>
+              <div class="flex items-center gap-2 px-1.5 py-1.5">
                 <span
-                  class="inline-block h-[2px] w-4 rounded-full"
+                  class="inline-block h-[2px] w-4 shrink-0 rounded-full"
                   :style="{ background: edgeGhost() }"
                 />
-                {{ S.graph.edgeBlocked }}
-              </span>
-              <!-- 国内风收口（走查 A3）：边标签显示开关——默认隐藏，开=全量
-                   显示中文标签（renderEdgeLabels 唯一事实源） -->
-              <el-divider style="margin: 4px 0" />
-              <el-checkbox v-model="showAllEdgeLabels" size="small">
+                <span class="text-sub text-ink">{{ S.graph.edgeBlocked }}</span>
+              </div>
+              <!-- 边标签开关直排（原在弹层内；renderEdgeLabels 唯一事实源不变） -->
+              <el-checkbox
+                v-model="showAllEdgeLabels"
+                size="small"
+                class="ml-1.5 mt-1"
+              >
                 {{ S.graph.showAllEdgeLabels }}
               </el-checkbox>
             </div>
-          </el-popover>
+          </div>
 
-          <!-- 底部组（mt-auto 沉底）：稳定提示 tag + 节点档位步进器 + 统计
-               （原横排头部行1 右侧组原样迁入） -->
-          <div class="mt-auto flex flex-col gap-2 pt-1">
+          <!-- 沉底统计条（国内面板底部操作条同款 border-t 钉底）：稳定提示 +
+               节点档位步进器 + 统计 -->
+          <div
+            class="flex flex-none flex-col gap-2 border-t border-line px-3.5 py-2.5"
+          >
             <span
               v-if="stabilizing"
               class="flex items-center gap-1 rounded-full bg-primary-soft px-2 py-0.5 text-aux text-primary"
@@ -1613,6 +1562,9 @@ const statsText = computed(() => {
               {{ S.graph.stabilizing }}
             </span>
             <div class="flex flex-wrap items-center gap-2">
+              <span class="shrink-0 text-aux text-ink-2">
+                {{ S.graph.nodeBudgetLabel }}
+              </span>
               <!-- 节点档位 ± 步进器：控制画多少节点的档位（功能控件，非缩放） -->
               <div
                 class="flex items-center overflow-hidden rounded-ctl border border-line"
@@ -1649,12 +1601,23 @@ const statsText = computed(() => {
                   +
                 </button>
               </div>
-              <span class="tabular-nums text-aux text-ink-2">{{ statsText }}</span>
+              <span class="ml-auto shrink-0 tabular-nums text-aux text-ink-2">
+                {{ statsText }}
+              </span>
             </div>
           </div>
         </div>
+        <!-- 贴缘折叠钮（left-pane-toggle 同款 18×38 圆角胶囊，贴缘垂直居中） -->
+        <button
+          type="button"
+          class="absolute -right-[9px] top-1/2 z-20 flex h-[38px] w-[18px] -translate-y-1/2 items-center justify-center rounded-[9px] border border-line bg-card text-ink-2 shadow-pop hover:text-primary"
+          :title="panelCollapsed ? S.graph.panelExpand : S.graph.panelCollapse"
+          @click="panelCollapsed = !panelCollapsed"
+        >
+          <ChevronRightIcon v-if="panelCollapsed" width="12" height="12" />
+          <ChevronLeftIcon v-else width="12" height="12" />
+        </button>
       </div>
-    </div>
 
       <!-- 画布框（右栏）：世界坐标网格层垫在 sigma WebGL 层下；独立卡满铺
            整个内容高（flex-1 min-h-0）。错误行/Loading/空态也锚进本画布层
@@ -1852,17 +1815,18 @@ const statsText = computed(() => {
   overflow: hidden;
 }
 
-/* 浮动搜索卡（anivia 查询卡语言，对齐首批 search 查询卡）：圆角 --radius-card、
-   实底卡面、pop 浮层阴影；focus 光晕由全局主题层提供
-   （theme.scss：.el-input__wrapper.is-focus → primary 描边 + glow） */
+/* 左栏搜索（op-search 同款，gvdata OperatorTree 2026-11-26）：灰底填充式、
+   无描边、圆角 8px；focus 白底 + 主色描边（描边由全局主题层提供：
+   theme.scss .el-input__wrapper.is-focus → primary ring + glow） */
 .graph-search :deep(.el-input__wrapper),
 .graph-search :deep(.el-input__wrapper:hover) {
   padding-left: 30px;
-  border-radius: var(--radius-card);
+  border-radius: 8px;
+  background-color: var(--color-fill, #f1f5f9);
+  box-shadow: none;
+}
+.graph-search :deep(.el-input__wrapper.is-focus) {
   background-color: var(--color-card);
-  box-shadow:
-    0 0 0 1px var(--color-border) inset,
-    var(--shadow-pop);
 }
 
 /* 顶部「全图」返回钮：与搜索卡同一浮层海拔（原硬编码 rgb() 阴影令牌化） */
