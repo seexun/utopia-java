@@ -33,8 +33,6 @@ import { toast } from "@/domain/toast";
 import { useKbScope } from "@/composables/useKbScope";
 import { useKbRole } from "@/composables/useKbRole";
 import { USegmented, UPill, UPager, UChip, Loading } from "@/components/knowledge/kit";
-/* PageHeader（reskin-b1 自 gvdata 零改写迁入）：22/800 标题 + 副题 + extra 动作区 */
-import PageHeader from "@/components/PageHeader/index.vue";
 
 const PAGE = 25;
 
@@ -61,6 +59,22 @@ const page = ref(0);
 const picked = ref(new Set<string>());
 const deciding = ref(new Set<string>());
 watch([tab, status, q, () => kbId.value], () => (picked.value = new Set()));
+/* SQL 代码块的展开态（重排批 2026-11-27）：默认只露一行，点开看全文。
+   换筛选/翻页时收起——离开眼前的行没必要留着展开 */
+const expanded = ref(new Set<string>());
+watch([status, q, page], () => (expanded.value = new Set()));
+function toggleExpanded(id: string) {
+  const next = new Set(expanded.value);
+  next.has(id) ? next.delete(id) : next.add(id);
+  expanded.value = next;
+}
+/** 定义的三种形态（决定"怎么算"列代码块前的小标签）：SQL / 表达式 / 表 */
+function defKind(m: ConceptMapping): "sql" | "expr" | "table" | null {
+  if (m.sql) return "sql";
+  if (m.expr) return "expr";
+  if (m.table_name) return "table";
+  return null;
+}
 
 const data = useQuery({
   queryKey: computed(() => [
@@ -291,11 +305,19 @@ const hasMounted = computed(() => mountedList.value.length > 0);
          Fragment，AppMain 的 <Transition mode="out-in"> 离场卡死后吞掉 enter，
          渲染空白主区。 -->
     <div>
-      <!-- 页头（重造要素一）：标题=数据映射、副题=库名；extra=定义/数据源两档
-           切换（segmented——本体页图/表同款；定义与数据源是两件不同的事） -->
-      <PageHeader :title="S.mapping.title" :subtitle="kbName">
-        <template #extra>
+      <!-- 整页收进一张卡（重排批 2026-11-27 治"难看"走查）：原裸 PageHeader +
+           三行灰字 + 无卡表格，与图谱/审查"白卡 + 卡片头"的壳脱节。
+           卡头=标题 + kb chip + 口径/数据源两档，与本体页图/表同位 -->
+      <div class="card">
+        <div class="flex items-center gap-2 border-b border-line pb-2.5">
+          <h1 class="text-title font-semibold text-ink">{{ S.mapping.title }}</h1>
+          <span
+            class="truncate rounded-full border border-line bg-fill px-2 py-0.5 text-aux text-ink-2"
+          >
+            {{ kbName }}
+          </span>
           <USegmented
+            class="ml-auto"
             :value="tab"
             :options="[
               { value: 'definitions', label: S.mapping.tabDefinitions },
@@ -303,12 +325,13 @@ const hasMounted = computed(() => mountedList.value.length > 0);
             ]"
             @change="(v: string) => (tab = v as Tab)"
           />
-        </template>
-      </PageHeader>
-      <p class="mb-6 text-sub text-ink-2">{{ S.mapping.hint }}</p>
+        </div>
+
+        <!-- 说明句收进卡身首行（原页头下方的裸段落） -->
+        <p class="pt-3 text-sub text-ink-2">{{ S.mapping.hint }}</p>
 
       <!-- ======== 数据源 ======== -->
-      <div v-if="tab === 'sources'" class="space-y-4">
+      <div v-if="tab === 'sources'" class="space-y-4 pt-4">
         <p class="text-sub text-ink-2">{{ S.mapping.sourcesHint }}</p>
         <div
           class="divide-y divide-line rounded-card border border-line bg-card"
@@ -409,10 +432,8 @@ const hasMounted = computed(() => mountedList.value.length > 0);
 
       <!-- ======== 定义 ======== -->
       <div v-else>
-        <!-- 状态过滤条（重造要素二）：四档药丸——计数徽章 badge-soft 读服务端
-             counts（原 el-select 标签里的括号数挪进徽章）；选中 primary-soft
-             （scoped 补皮），换档回第一页（原 el-select @change 同规矩） -->
-        <div class="mb-4 flex flex-wrap items-center gap-1.5">
+        <!-- 筛选条（进卡内，与卡身同宽）：状态四档药丸 -->
+        <div class="flex flex-wrap items-center gap-1.5 pt-3">
           <UPill
             v-for="f in FILTERS"
             :key="f.key"
@@ -430,13 +451,14 @@ const hasMounted = computed(() => mountedList.value.length > 0);
           </UPill>
         </div>
 
-        <p v-if="status === 'rejected'" class="mb-2 text-sub text-ink-2">
+        <p v-if="status === 'rejected'" class="mt-2 text-sub text-ink-2">
           {{ S.mapping.rejectedHint }}
         </p>
-        <!-- 最近一轮探索的账（#503）：单看列表答不了「漏了多少」 -->
+        <!-- 最近一轮探索的账（#503）：单看列表答不了「漏了多少」。
+             没跑过探索时不再单独占一行灰字——账目只在真有数据时出现 -->
         <p
           v-if="data.data.value?.last_run"
-          class="mb-4 text-sub text-ink-2"
+          class="mt-2 text-sub text-ink-2"
         >
           {{
             S.mapping.lastRun({
@@ -448,14 +470,13 @@ const hasMounted = computed(() => mountedList.value.length > 0);
             })
           }}
         </p>
-        <p v-else class="mb-4 text-sub text-ink-2">{{ S.mapping.lastRunMissing }}</p>
 
         <Loading v-if="data.isLoading.value" />
         <!-- 映射表卡（重造要素三，文库范式：搜索行+表格一体）：状态筛已升页级
              药丸，卡内搜索行留搜索/全选/批量动作；列集以原行实况不增删——
              概念/数据源/怎么算/状态+动作（表头键用 i18n 现成的 colConcept 一族）；
              行内展开的编辑表单与改版史落「怎么算」列（那一列分到的宽度最宽） -->
-        <div v-else class="card map-table-card">
+        <div v-else class="map-table-card">
           <div class="map-search-bar">
             <el-input
               v-model="q"
@@ -520,7 +541,9 @@ const hasMounted = computed(() => mountedList.value.length > 0);
                   <span v-if="m.unit" class="text-aux text-ink-2"
                     >[{{ m.unit }}]</span
                   >
-                  <UChip v-if="m.derived" tone="warn">{{
+                  <!-- 派生=事实描述（这条口径是算出来的），不是需要警示的状态：
+                       warn 黄在已确认行旁抢主信息的戏，降为中性 -->
+                  <UChip v-if="m.derived" tone="neutral">{{
                     S.mapping.derivedBadge
                   }}</UChip>
                 </div>
@@ -531,12 +554,38 @@ const hasMounted = computed(() => mountedList.value.length > 0);
                 <span class="text-sub text-ink-2">{{ m.source }}</span>
               </template>
             </el-table-column>
-            <el-table-column :label="S.mapping.colDefinition" min-width="240">
+            <el-table-column :label="S.mapping.colDefinition" min-width="320">
               <template #default="{ row: m }">
-                <div class="break-all tabular-nums text-sub text-ink-2">
-                  {{ howComputed(m) ?? S.mapping.noDefinition }}
+                <!-- 定义代码块（重排批）：原裸文本 break-all 随机折行，是全页最乱处。
+                     改为浅灰底等宽块 + 类型小标（SQL/表达式/表），默认单行截断，
+                     点「展开」看全文 -->
+                <div v-if="howComputed(m)" class="min-w-0">
+                  <div class="map-def-block">
+                    <span class="map-def-kind">{{
+                      defKind(m) === "sql"
+                        ? S.mapping.defKindSql
+                        : defKind(m) === "expr"
+                          ? S.mapping.defKindExpr
+                          : S.mapping.defKindTable
+                    }}</span>
+                    <code
+                      class="map-def-code"
+                      :class="expanded.has(m.id) && 'map-def-code--open'"
+                      >{{ howComputed(m) }}</code
+                    >
+                  </div>
+                  <button
+                    type="button"
+                    class="map-def-toggle"
+                    @click="toggleExpanded(m.id)"
+                  >
+                    {{ expanded.has(m.id) ? S.mapping.defCollapse : S.mapping.defExpand }}
+                  </button>
                 </div>
-                <p v-if="m.summary" class="mt-1 text-sub text-ink-2">
+                <span v-else class="text-sub text-ink-2">{{
+                  S.mapping.noDefinition
+                }}</span>
+                <p v-if="m.summary" class="mt-1.5 text-sub text-ink-2">
                   {{ m.summary }}
                 </p>
 
@@ -664,7 +713,7 @@ const hasMounted = computed(() => mountedList.value.length > 0);
                 </div>
               </template>
             </el-table-column>
-            <el-table-column :label="S.mapping.colStatus" width="110">
+            <el-table-column :label="S.mapping.colStatus" width="96">
               <template #default="{ row: m }">
                 <UChip
                   :tone="
@@ -679,13 +728,14 @@ const hasMounted = computed(() => mountedList.value.length > 0);
                 </UChip>
               </template>
             </el-table-column>
-            <!-- 动作列不带表头（文库动作列同款）：**拍板那一下描边，其余不是
-                 实底**；编辑开着时让位（原 v-else-if 同语义——表单占位，动作收起） -->
-            <el-table-column width="230" align="right">
+            <!-- 动作列（重排批）：待审批留「确认/拒绝」主按钮；「编辑/改版历史」
+                 收进 ⋯ 下拉——原 230px 挤 4 个按钮折成两行错位。编辑开着时让位
+                 （原 v-else-if 同语义——表单占位，动作收起） -->
+            <el-table-column width="200" align="right">
               <template #default="{ row: m }">
                 <div
                   v-if="canManage && editingId !== m.id"
-                  class="flex flex-wrap items-center justify-end gap-1"
+                  class="flex items-center justify-end gap-1"
                 >
                   <template v-if="m.status === 'proposed'">
                     <el-button
@@ -705,16 +755,30 @@ const hasMounted = computed(() => mountedList.value.length > 0);
                       {{ S.mapping.reject }}
                     </el-button>
                   </template>
-                  <el-button size="small" text @click="openEdit(m)">
-                    {{ S.mapping.edit }}
-                  </el-button>
-                  <el-button
-                    size="small"
-                    text
-                    @click="historyId = historyId === m.id ? null : m.id"
+                  <el-dropdown
+                    trigger="click"
+                    placement="bottom-end"
+                    @command="
+                      (cmd: string) => {
+                        if (cmd === 'edit') openEdit(m);
+                        else historyId = historyId === m.id ? null : m.id;
+                      }
+                    "
                   >
-                    {{ S.mapping.history }}
-                  </el-button>
+                    <el-button size="small" text class="ml-1 px-2" :title="S.mapping.moreActions">
+                      <Icon icon="lucide:ellipsis" width="14" height="14" />
+                    </el-button>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item command="edit">{{
+                          S.mapping.edit
+                        }}</el-dropdown-item>
+                        <el-dropdown-item command="history">{{
+                          S.mapping.history
+                        }}</el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
                 </div>
               </template>
             </el-table-column>
@@ -734,6 +798,7 @@ const hasMounted = computed(() => mountedList.value.length > 0);
           />
         </div>
       </div>
+      </div>
     </div>
   </div>
 </template>
@@ -750,15 +815,78 @@ const hasMounted = computed(() => mountedList.value.length > 0);
   background: var(--color-primary-soft);
 }
 
-/* 搜索行（文库 lib-search-bar 同款）：原模板内联 16rem 宽度移入 */
+/* 搜索行（文库 lib-search-bar 同款）：原模板内联 16rem 宽度移入。
+   进卡后上方紧贴筛选药丸，补 12px 上间距 */
 .map-search-bar {
   display: flex;
   gap: 8px;
   align-items: center;
+  margin-top: 12px;
   margin-bottom: 16px;
 
   .map-filter {
     width: 16rem;
+  }
+}
+
+/* ---------- 定义代码块（重排批 2026-11-27）---------- */
+
+/* 浅灰底等宽块：SQL 是「给人读一段代码」，不是正文——等宽 + 不随机折行 */
+.map-def-block {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-fill);
+}
+
+/* 类型小标（SQL / 表达式 / 表）：一眼分清这条定义是哪种形态 */
+.map-def-kind {
+  flex-shrink: 0;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--color-card);
+  color: var(--color-ink-2);
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 500;
+}
+
+/* 默认单行截断（留右内距给渐隐），展开后通铺多行 */
+.map-def-code {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono",
+    monospace;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: pre;
+  text-overflow: ellipsis;
+}
+
+.map-def-code--open {
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* 展开/收起：轻量文字钮，不抢确认/拒绝的视觉分量 */
+.map-def-toggle {
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-primary);
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
   }
 }
 </style>

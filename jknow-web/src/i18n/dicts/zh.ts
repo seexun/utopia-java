@@ -1736,6 +1736,13 @@ export const zh: Strings = {
     colStatus: "状态",
     derivedBadge: "派生",
     noDefinition: "（未填）",
+    /* 重排批（2026-11-27 治"难看"走查）：SQL 代码块 + 更多操作下拉 */
+    defKindSql: "SQL",
+    defKindExpr: "表达式",
+    defKindTable: "表",
+    defExpand: "展开",
+    defCollapse: "收起",
+    moreActions: "更多操作",
     approve: "确认",
     reject: "拒绝",
     selectPage: "全选本页",

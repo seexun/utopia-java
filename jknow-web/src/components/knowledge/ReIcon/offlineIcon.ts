@@ -54,6 +54,7 @@ import LucideBookOpen from "~icons/lucide/book-open?raw";
 import LucideCheckCheck from "~icons/lucide/check-check?raw";
 import LucideChevronRight from "~icons/lucide/chevron-right?raw";
 import LucideDatabase from "~icons/lucide/database?raw";
+import LucideEllipsis from "~icons/lucide/ellipsis?raw";
 import LucideHistory from "~icons/lucide/history?raw";
 import LucideInbox from "~icons/lucide/inbox?raw";
 import LucideKeyRound from "~icons/lucide/key-round?raw";
@@ -120,6 +121,7 @@ const icons = [
   ["lucide:check-check", LucideCheckCheck],
   ["lucide:chevron-right", LucideChevronRight],
   ["lucide:database", LucideDatabase],
+  ["lucide:ellipsis", LucideEllipsis],
   ["lucide:history", LucideHistory],
   ["lucide:inbox", LucideInbox],
   ["lucide:key-round", LucideKeyRound],

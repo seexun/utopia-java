@@ -301,3 +301,25 @@
 | typecheck / 单测 | — | ✓ / 425+425 ✓ |
 
 截图 `onto-corner-fixed.png` / `onto-edge-labels-fixed.png`。已提交并推送。
+
+## 十八、追补：数据映射页重排（2026-11-27，用户走查"难看"）
+
+诊断 6 处：页面无卡片包裹（与图谱/审查"白卡+卡片头"壳脱节）；SQL 裸文本 break-all 随机折行（全页最乱处）；操作列 230px 挤 4 个按钮折成两行错位；状态列 110px 只放一个小标签留大片空白；页头下三行灰字堆叠；标题 22px 特粗与全站 16px 卡头规格不一。
+
+### 改动（逻辑零改动，仅布局/样式）
+
+- **整页收进一张卡**：裸 PageHeader → 卡片头（标题 + kb chip + 口径/数据源 segmented，本体页图/表同位）
+- **SQL 代码块**：浅灰底等宽 + 类型小标（SQL/表达式/表）+ 默认单行截断 +「展开/收起」（`expanded` Set，换筛选/翻页自动收起）
+- **操作列**：待审批留「确认/拒绝」，「编辑/改版历史」收进 ⋯ 下拉（el-dropdown）；列宽 230→200、状态列 110→96
+- **"派生"标签** warn 黄 → neutral：它是事实描述不是警示态，抢主信息的戏
+- **灰字精简**：说明句进卡身首行；"还没跑过探索"不再单独占行（账目只在真有 last_run 时出现）
+- 筛选药丸与搜索行之间补 12px 间距
+
+### 踩坑两枚（留档）
+
+1. **Sass 里写了 Tailwind 类名**：`.map-def-code` 规则内误写 `tabular-nums;`（那是工具类不是 CSS 属性），Sass 报 `expected "{"` → Vite 模块 500 → 整页空白。typecheck 与标签栈校验都过了，只有 dev server 日志看得到——**样式块改动后要看 dev server 日志，不能只信 typecheck**。
+2. **图标规范**：项目有 `icon-offline.spec` 守着——页面级图标必须走运行时 `<Icon>` + 在 `offlineIcon.ts` 注册表登记。`lucide:ellipsis` 未登记渲染为空；正确做法是登记，不是改成 `~icons/` 直接导入。
+
+### 实测（mappings-verify.js）
+
+整页收卡 1584px ✓ / 卡片头 ✓ / 4 筛选药丸 ✓ / 3 个 SQL 代码块（18px 单行）✓ / 展开后 36px + 按钮变"收起" ✓ / 行内 ⋯ 下拉 = [编辑, 改版历史] ✓ / 数据源 tab 仍在卡内 ✓ / 零 console error ✓。typecheck ✓ / 单测 425+425 ✓（`w2-settings-writes` 的 revise 用例按新交互改为经下拉打开编辑）。截图 `mappings-after.png` / `mappings-expanded.png` / `mappings-dropdown.png` / `mappings-sources.png`。已提交并推送。

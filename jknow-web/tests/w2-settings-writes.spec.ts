@@ -260,7 +260,24 @@ describe("Mappings 写流（W2）", () => {
     const w = await mountAt(Mappings, "/kb/kb1/mappings", [
       { path: "/kb/:kbId/mappings", component: Mappings as never }
     ]);
-    await clickExact(w, S.mapping.edit as string);
+    // 「编辑/改版历史」收进了行尾 ⋯ 下拉（重排批 2026-11-27）：先开下拉再点菜单项。
+    // el-dropdown 的菜单 teleport 到 body，从 document.body 找；直接派发 command
+    // 事件等价于用户点中那一项（jsdom 里 popper 定位不触发 click）
+    const more = w
+      .findAll("button")
+      .find(b => b.attributes("title") === (S.mapping.moreActions as string));
+    expect(more, "⋯ 更多操作按钮不存在").toBeTruthy();
+    const dropdown = more!.element.closest(".el-dropdown");
+    expect(dropdown, "⋯ 不在 el-dropdown 里").toBeTruthy();
+    dropdown!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flushPromises();
+    await flushPromises();
+    const editItem = Array.from(
+      document.body.querySelectorAll(".el-dropdown-menu__item")
+    ).find(el => el.textContent?.trim() === (S.mapping.edit as string));
+    expect(editItem, `下拉项「${S.mapping.edit}」不存在`).toBeTruthy();
+    editItem!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flushPromises();
     // 表单出现（工具行的搜索/筛选输入不算）：在编辑容器内按标签定位 SQL 那格
     const editBox = w.findAll("div").find(d => d.classes().includes("border-t"));
     expect(editBox).toBeTruthy();

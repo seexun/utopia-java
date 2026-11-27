@@ -2004,6 +2004,13 @@ export const en = {
     colStatus: "Status",
     derivedBadge: "Derived",
     noDefinition: "(empty)",
+    /* Redesign (2026-11-27): SQL code block + more-actions dropdown */
+    defKindSql: "SQL",
+    defKindExpr: "Expr",
+    defKindTable: "Table",
+    defExpand: "Expand",
+    defCollapse: "Collapse",
+    moreActions: "More actions",
     approve: "Confirm",
     reject: "Reject",
     selectPage: "Select this page",
