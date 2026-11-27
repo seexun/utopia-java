@@ -278,3 +278,26 @@
 | 图谱页波及 | 未传新选项，默认值生效 ✓ |
 
 截图 `onto-drag-after.png` / `onto-edge-labels.png` / `onto-final-deepzoom.png` / `onto-sweep-2.png`。已提交并推送。
+
+## 十七、追补：本体画布左上角"黑色横线"（2026-11-27，用户走查）
+
+用户截图：图例上方、卡片左上角有一条黑色短横线。逐层排查（命中测试无 DOM 元素 → 三张 2D 画布读像素）定位到：**`sigma-edgeLabels` 画布像素 (0..9, 0)，颜色 rgb(107,114,128) = 边标签色 `--color-ink-2`**——是某个关系名被画到画布左上角外、只剩顶部 1px 的残片。
+
+- **根因**：`@sigma/edge-curve` 的 `createDrawCurvedEdgeLabel` 算标签锚点时拿「两端点距离」做除数：
+  `diff = √(diffX² + diffY²)`；自环边（域 === 值域）两端是同一个节点，`diff = 0`，随后 `offset * vec / length` 除零 → 坐标 `Infinity` → canvas 把名字画到画布外。演示库的 供货给/合作/共建（公司→公司）正是自环。
+- **为何现在才出现**：上一批（十六）接回了 `renderEdgeLabels` 按缩放开关，默认视图即开 → 潜伏的库 bug 显形。旧仓同样没对自环标签做规避（同款库、同款逻辑），只是默认不显示边标签所以看不到。
+- **修复**：`edgeReducer` 对 `s === t` 的边置 `label = ""`（标签位置数学上无定义，名字交给悬停高亮与右侧面板）。置于提亮分支之前，悬停自环时同样不出残片。
+
+**连带修复**：`canvas-chrome-docked` 此前被写成常驻类，`right: 24.75rem` 把图例容器拉成 918px 宽。改回旧仓的**条件类**（选中类/关系时才给右侧停靠面板让位），容器恢复内容宽 196px；用 kit 的 `cn()` 归一化条件类。
+
+### 实测（onto-blackbar-verify.js）
+
+| 断言 | 修复前 | 修复后 |
+|---|---|---|
+| edgeLabels 画布左上角深色像素 | 10 | **0**（默认视图）/ **0**（放大 2 档）|
+| 普通关系边标签 | 位于/扩产/出任CEO/任职于 | 同样在 ✓ |
+| 图例容器宽 | 918px | 196px ✓ |
+| 图例 docked 类 | 常驻 true | 未选中 false ✓ |
+| typecheck / 单测 | — | ✓ / 425+425 ✓ |
+
+截图 `onto-corner-fixed.png` / `onto-edge-labels-fixed.png`。已提交并推送。

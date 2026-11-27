@@ -42,7 +42,12 @@ import {
   withTopLayer
 } from "@/domain/pages/graphCanvas";
 import { S } from "@/i18n";
-import { ToolButton, ToolDivider, ToolTower } from "@/components/knowledge/kit";
+import {
+  cn,
+  ToolButton,
+  ToolDivider,
+  ToolTower
+} from "@/components/knowledge/kit";
 import {
   buildSchemaGraph,
   EDGE_TYPE_ARROW,
@@ -226,6 +231,12 @@ export const SchemaGraphCanvas = defineComponent({
                开关（见下方 updateEdgeLabels）。规则边挂名字：那是它唯一说得出
                自己是谁的地方 */
             if (kind !== RELATION_KIND && kind !== RULE_KIND) res.label = "";
+            /* 自环（域 === 值域，如 供货给: 公司→公司）不挂标签。曲边程序
+               createDrawCurvedEdgeLabel 算标签锚点时拿「两端点距离」做除数——
+               自环两端是同一个节点，距离为 0，坐标算成 Infinity，canvas 把名字
+               画到画布左上角外，只留顶部 1px 残片（走查"箭头位置有个黑色的
+               东西"）。位置在数学上无定义，名字交给悬停高亮与右侧面板说 */
+            if (s === t) res.label = "";
 
             const hov = hoverNodeRef.value;
             const hoverHit = hov !== null && (hov === s || hov === t);
@@ -357,8 +368,18 @@ export const SchemaGraphCanvas = defineComponent({
         <div ref={containerRef} class="absolute inset-0" />
 
         {/* 左上：静态图例（旧仓同款 badge-soft 药丸，一粒一条边）。无标题——
-            旧仓这一排不带"模式图"字样；说明性徽标不可点，不给悬停反馈 */}
-        <div class="canvas-chrome-docked pointer-events-none absolute left-3 top-3 z-10 flex flex-wrap items-center gap-2">
+            旧仓这一排不带"模式图"字样；说明性徽标不可点，不给悬停反馈。
+            canvas-chrome-docked 是**条件类**（旧仓同款）：选中类/关系、右侧
+            停靠面板打开时才给面板让出一列；平时不占位。此前写成了常驻，
+            图例容器被 right: 24.75rem 拉成 918px 宽 */}
+        <div
+          class={cn(
+            "pointer-events-none absolute left-3 top-3 z-10 flex flex-wrap items-center gap-2",
+            (props.selected?.kind === "class" ||
+              props.selected?.kind === "relation") &&
+              "canvas-chrome-docked"
+          )}
+        >
           {edgeLegend.value.map(([label, kind, h]) => (
             <span
               key={label}
