@@ -255,9 +255,10 @@ export const SchemaGraphCanvas = defineComponent({
         <canvas ref={gridRef} class="absolute inset-0 size-full " />
         <div ref={containerRef} class="absolute inset-0" />
 
-        {/* 左上：图例（四种边的语义，常显） */}
-        <div class="canvas-chrome-docked pointer-events-auto absolute left-3 top-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-ctl border border-line bg-card/90 px-2.5 py-1 text-aux text-ink-3">
-          <span class="font-semibold">{S.ontology.schemaDiagram}</span>
+        {/* 左上：图例（四种边的语义，常显）。标签用正文墨色——图例是给人读的，
+            灰字在白底上发虚；标题行靠字重区分 */}
+        <div class="canvas-chrome-docked pointer-events-auto absolute left-3 top-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-ctl border border-line bg-card/90 px-2.5 py-1 text-aux text-ink">
+          <span class="font-semibold text-ink">{S.ontology.schemaDiagram}</span>
           {edgeLegend.value.map((label, i) => (
             <span key={label} class="flex items-center gap-1.5">
               <span
@@ -268,7 +269,9 @@ export const SchemaGraphCanvas = defineComponent({
                     false,
                     false
                   ),
-                  height: i === 1 || i === 3 ? 3 : 2
+                  /* 高度必须带单位：JSX 不给数字补 px，裸数字是无效 CSS，
+                     色块会塌成 0 高——四种边只剩灰字标签（走查"缺图例"） */
+                  height: i === 1 || i === 3 ? "3px" : "2px"
                 }}
               />
               {label}
