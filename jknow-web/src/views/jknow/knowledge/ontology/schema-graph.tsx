@@ -37,7 +37,12 @@ import {
   withTopLayer
 } from "@/domain/pages/graphCanvas";
 import { S } from "@/i18n";
-import { ToolButton, ToolDivider, ToolTower } from "@/components/knowledge/kit";
+import {
+  ToolButton,
+  ToolDivider,
+  ToolTower,
+  UPill
+} from "@/components/knowledge/kit";
 import {
   buildSchemaGraph,
   EDGE_TYPE_ARROW,
@@ -134,20 +139,15 @@ export const SchemaGraphCanvas = defineComponent({
           props.rules
         );
         const g = result.graph;
-        // 静态布局：circular 起始 + 一次收敛的 FA2（无 worker 动画——W1 静态视觉）。
-        // 参数对齐旧仓 OntologySchemaGraph.tsx layoutSchemaGraph：600 步 /
-        // gravity 0.35 / scalingRatio 22 / outboundAttractionDistribution。迁移
-        // 时曾被减到 80 步——FA2 是渐进展开的，步数不够就停在图还没舒展开的
-        // 那一刻（用户走查"画面怪怪的"根因之一）
+        // 静态布局：FA2 一轮 + 圆环兜底（无 worker 动画——W1 静态视觉）
         if (g.order > 0) {
           circular.assign(g, { scale: 300 });
           forceAtlas2.assign(g, {
-            iterations: 600,
+            iterations: 80,
             settings: {
               ...forceAtlas2.inferSettings(g),
-              gravity: 0.35,
-              scalingRatio: 22,
-              outboundAttractionDistribution: true
+              gravity: 0.4,
+              scalingRatio: 24
             }
           });
         }
@@ -242,18 +242,12 @@ export const SchemaGraphCanvas = defineComponent({
       sigmaRef.value = null;
     });
 
-    /* 图例条目（旧仓同构）：三种边常显；规则那一条只在真有规则时出现——
-       没有规则的库不该看到一个解释不存在的东西的图例 */
-    const edgeLegend = computed(() =>
-      [
-        [S.ontology.schemaLegendInheritance, SUBCLASS_KIND, "2px"],
-        [S.ontology.schemaLegendRelation, RELATION_KIND, "3px"],
-        [S.ontology.schemaLegendDisjoint, DISJOINT_KIND, "2px"],
-        ...(props.rules.length
-          ? ([[S.ontology.schemaLegendRule, RULE_KIND, "3px"]] as const)
-          : [])
-      ] as const
-    );
+    const edgeLegend = computed(() => [
+      S.ontology.schemaLegendInheritance,
+      S.ontology.schemaLegendRelation,
+      S.ontology.schemaLegendDisjoint,
+      S.ontology.schemaLegendRule
+    ]);
 
     return () => (
       <div class="absolute inset-0">
@@ -261,52 +255,75 @@ export const SchemaGraphCanvas = defineComponent({
         <canvas ref={gridRef} class="absolute inset-0 size-full " />
         <div ref={containerRef} class="absolute inset-0" />
 
-        {/* 左上：静态图例（旧仓同款 badge-soft 药丸，一粒一条边）。无标题——
-            旧仓这一排不带"模式图"字样；说明性徽标不可点，不给悬停反馈 */}
-        <div class="canvas-chrome-docked pointer-events-none absolute left-3 top-3 z-10 flex flex-wrap items-center gap-2">
-          {edgeLegend.value.map(([label, kind, h]) => (
-            <span
-              key={label}
-              class="badge-soft badge-soft-info pointer-events-auto gap-2"
-            >
-              {/* 高度必须带单位：JSX 不给数字补 px，裸数字是无效 CSS，
-                  色块会塌成 0 高（走查"缺图例"的根因） */}
+        {/* 左上：图例（四种边的语义，常显）。标签用正文墨色——图例是给人读的，
+            灰字在白底上发虚；标题行靠字重区分 */}
+        <div class="canvas-chrome-docked pointer-events-auto absolute left-3 top-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-ctl border border-line bg-card/90 px-2.5 py-1 text-aux text-ink">
+          <span class="font-semibold text-ink">{S.ontology.schemaDiagram}</span>
+          {edgeLegend.value.map((label, i) => (
+            <span key={label} class="flex items-center gap-1.5">
               <span
-                class="inline-block w-3 shrink-0 rounded-full"
-                style={{ background: edgeColorFor(kind, false, false), height: h }}
+                class="inline-block w-4 rounded-full"
+                style={{
+                  background: edgeColorFor(
+                    [SUBCLASS_KIND, RELATION_KIND, DISJOINT_KIND, RULE_KIND][i],
+                    false,
+                    false
+                  ),
+                  /* 高度必须带单位：JSX 不给数字补 px，裸数字是无效 CSS，
+                     色块会塌成 0 高——四种边只剩灰字标签（走查"缺图例"） */
+                  height: i === 1 || i === 3 ? "3px" : "2px"
+                }}
               />
               {label}
             </span>
           ))}
-          {/* 没画的有多少：只在真有隐藏类时出现（旧仓 scope.hidden > 0）。
-              迁移版曾把它写成常驻并回显"模式图"——与图例标题重复 */}
-          {props.hiddenCount > 0 && (
-            <span class="badge-soft badge-soft-info pointer-events-auto">
-              {S.ontology.schemaMoreClasses(props.hiddenCount)}
-            </span>
-          )}
         </div>
 
-        {/* 左下：缩放 + 归位（旧仓同位 bottom-4 left-3）。**真实相机缩放**——
-            旧仓 animatedZoom/animatedUnzoom；迁移版曾把它错接到取景档位上，
-            小库（类数 < 最低档 30）两个按钮恒灰。取景档位不再占用这组按钮 */}
-        <div class="pointer-events-auto absolute bottom-4 left-3 z-10 flex flex-col items-start gap-2">
+        {/* 右上：取景药丸 + 缩放塔 */}
+        <div class="pointer-events-auto absolute right-3 top-3 flex items-start gap-2">
+          <UPill static>
+            {props.hiddenCount > 0
+              ? S.ontology.schemaMoreClasses(props.hiddenCount)
+              : S.ontology.schemaDiagram}
+          </UPill>
           <ToolTower>
             <ToolButton
-              label={S.ontology.schemaZoomIn}
+              label={S.ontology.schemaZoomOut}
+              disabled={props.budget <= SCHEMA_BUDGETS[0]}
               onClick={() =>
-                sigmaRef.value?.getCamera().animatedZoom({ duration: 220 })
+                emit(
+                  "budget",
+                  SCHEMA_BUDGETS[
+                    Math.max(0, SCHEMA_BUDGETS.indexOf(props.budget) - 1)
+                  ]
+                )
               }
             >
-              {{ icon: () => <ZoomInIcon width={15} height={15} /> }}
+              {{
+                icon: () => <ZoomOutIcon width={15} height={15} />
+              }}
             </ToolButton>
             <ToolButton
-              label={S.ontology.schemaZoomOut}
+              label={S.ontology.schemaZoomIn}
+              disabled={
+                !props.capped ||
+                props.budget >= SCHEMA_BUDGETS[SCHEMA_BUDGETS.length - 1]
+              }
               onClick={() =>
-                sigmaRef.value?.getCamera().animatedUnzoom({ duration: 220 })
+                emit(
+                  "budget",
+                  SCHEMA_BUDGETS[
+                    Math.min(
+                      SCHEMA_BUDGETS.length - 1,
+                      SCHEMA_BUDGETS.indexOf(props.budget) + 1
+                    )
+                  ]
+                )
               }
             >
-              {{ icon: () => <ZoomOutIcon width={15} height={15} /> }}
+              {{
+                icon: () => <ZoomInIcon width={15} height={15} />
+              }}
             </ToolButton>
             <ToolDivider />
             <ToolButton
@@ -315,7 +332,9 @@ export const SchemaGraphCanvas = defineComponent({
                 sigmaRef.value?.getCamera().animatedReset({ duration: 300 })
               }
             >
-              {{ icon: () => <Maximize2Icon width={15} height={15} /> }}
+              {{
+                icon: () => <Maximize2Icon width={15} height={15} />
+              }}
             </ToolButton>
           </ToolTower>
         </div>
@@ -325,7 +344,7 @@ export const SchemaGraphCanvas = defineComponent({
           <div class="pointer-events-none absolute inset-0 grid place-items-center">
             <span
               class="inline-block animate-spin rounded-full border-2 border-current border-t-transparent text-ink-2"
-              style={{ width: "28px", height: "28px" }}
+              style={{ width: 28, height: 28 }}
             />
           </div>
         )}
