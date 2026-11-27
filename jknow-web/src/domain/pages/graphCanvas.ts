@@ -117,6 +117,14 @@ export interface CanvasOptions {
   /** 边上写不写字。`/graph` 的边是谓词，要写；本体页只有关系边写 */
   renderEdgeLabels?: boolean;
   minEdgeThickness?: number;
+  /** 节点缩到多小就不画名字（屏幕半径 px）。默认 5（图谱页的「远处只认地标」）。
+   *  本体页传 0：类数只有几十个、胶囊彼此不压，没有字墙之虞，而胶囊一掉
+   *  就露出底下的裸实心圆——「城市缩着缩着变成一个圆圈」正是它 */
+  labelRenderedSizeThreshold?: number;
+  /** 每「labelGridCellSize 见方」最多留几个名字（sigma 的密度筛）。默认 0.8。
+   *  本体页传 2：胶囊不随缩小消失之后，靠放宽密度减少互压——类数少，
+   *  多留的名字本来就是屏幕上仅有的那几个 */
+  labelDensity?: number;
 }
 
 /** `new Sigma(g, el, { ...sigmaOptions(...), nodeReducer, edgeReducer })`。
@@ -167,8 +175,8 @@ export function sigmaOptions(o: CanvasOptions) {
     labelFont: CANVAS_FONT,
     labelSize: CANVAS_LABEL_SIZE,
     labelColor: { color: CANVAS_TEXT },
-    labelRenderedSizeThreshold: 5,
-    labelDensity: 0.8,
+    labelRenderedSizeThreshold: o.labelRenderedSizeThreshold ?? 5,
+    labelDensity: o.labelDensity ?? 0.8,
     labelGridCellSize: 130,
     minCameraRatio: o.minCameraRatio,
     maxCameraRatio: o.maxCameraRatio,

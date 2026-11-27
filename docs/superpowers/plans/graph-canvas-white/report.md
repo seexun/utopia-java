@@ -253,3 +253,28 @@
 ### 实测（onto-clip-probe.js）
 
 图例 = [继承, 关系, 互斥]（无规则不出规则项）✓ / 无"模式图"重复 ✓ / 右上无取景药丸 ✓ / 缩放塔左下（卡内 13,795）三按钮全可用 ✓ / "维度"完整在画布内 ✓ / 零 console error ✓。截图 `onto-after-1920.png`。typecheck ✓ / 单测 425+425 ✓。已提交并推送。
+
+## 十六、追补：本体画布交互三条修复（2026-11-27，用户走查）
+
+用户走查三条，对照旧仓 OntologySchemaGraph.tsx 逐条核实——**两条是迁移遗漏，一条是原版同款取舍**：
+
+| # | 现象 | 核实结论 | 处理 |
+|---|---|---|---|
+| 1 | "城市"缩到一定程度变成圆圈 | sigma `labelRenderedSizeThreshold: 5`：节点屏幕半径 < 5px 不画名字，胶囊消失露出底下裸实心圆。叶子类 size=8 最先跌破临界，所以总是它先变圆。**原版同款**——用"变圆点"换"不压字" | 本体页阈值归 0（类少、无字墙之虞）；`sigmaOptions` 加 `labelRenderedSizeThreshold`/`labelDensity` 可选项（默认值不变，图谱页零波及） |
+| 2 | 节点无法拖动 | 旧仓 `attachDrag(sigma, {container, hovering, onMove})` **整段未迁** | 接回 attachDrag + `draggedPositions` 记录（重建图时把拖过的节点钉回原位，不被重新布局拽回） |
+| 3 | 关系线没有内容 | schema.ts 建边时已挂 `label`（r.label / "N 条关系"），但旧仓 `renderEdgeLabels = ratio < 1.1` 开关**未迁**，一直是默认 false | 接回 `updateEdgeLabels`（相机 updated 时按缩放开关） |
+
+连带还原（同一处遗漏）：**悬停/选中高亮**——旧仓 enterNode/leaveNode/enterEdge/leaveEdge 四事件 + edgeReducer 的 hover 提亮加粗换批、无关键压暗，迁移版全无；`minCameraRatio: 0.05` 漏传（CanvasOptions 必填项，被 `as never` 绕过）。
+
+### 实测（onto-fix-verify.js / onto-threshold-verify.js）
+
+| 断言 | 结果 |
+|---|---|
+| 拖动"指标"节点 | 位移生效，图重建后不回弹 ✓ |
+| 关系线标签 | 位于 / 扩产 / 出任CEO / 任职于 显现 ✓ |
+| 缩小 7 档 | 七个胶囊全在，无裸圆点 ✓ |
+| 悬停"城市" | 主色描边胶囊 ✓ |
+| typecheck / 单测 | ✓ / 425+425 ✓ |
+| 图谱页波及 | 未传新选项，默认值生效 ✓ |
+
+截图 `onto-drag-after.png` / `onto-edge-labels.png` / `onto-final-deepzoom.png` / `onto-sweep-2.png`。已提交并推送。

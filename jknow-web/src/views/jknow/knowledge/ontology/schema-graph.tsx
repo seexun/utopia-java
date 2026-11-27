@@ -1,7 +1,8 @@
-/* 本体模式图画布（对照旧仓 pages/OntologySchemaGraph.tsx 的画布面，W1 静态视觉）：
-   节点胶囊/白描边实色、三种边语义的色与形、图例药丸、缩放塔、点选。
+/* 本体模式图画布（对照旧仓 pages/OntologySchemaGraph.tsx 的画布面）：
+   节点胶囊/白描边实色、三种边语义的色与形、图例药丸、缩放塔、点选、
+   拖拽摆位、悬停/选中高亮、关系标签按缩放显现。
    画布机器（graphCanvas）与视觉常量（graphVisuals）在 domain，两页共用。
-   悬停压暗/拖拽/搜索补景属任务 9。 */
+   搜索补景属任务 9。 */
 import {
   computed,
   defineComponent,
@@ -32,6 +33,10 @@ import {
   refreshPalette
 } from "@/domain/pages/graphVisuals";
 import {
+  attachDrag,
+  deferToHoverLayer,
+  drawLast,
+  hoveredNode,
   selectedNode,
   sigmaOptions,
   withTopLayer
@@ -103,6 +108,13 @@ export const SchemaGraphCanvas = defineComponent({
     const gridRef = ref<HTMLCanvasElement | null>(null);
     const sigmaRef = ref<Sigma | null>(null);
     const selectedRef = ref<SchemaSelection | null>(null);
+    /* 悬停态（旧仓 hoverRef / hoverEdgeRef）：指到节点/边上时高亮那一束 */
+    const hoverNodeRef = ref<string | null>(null);
+    const hoverEdgeRef = ref<string | null>(null);
+    /* 拖过的节点的新位置（旧仓 draggedPositionsRef）：布局是增量重建的——
+       每次重建 sigma 都从这张表把用户摆过的节点放回原位，拖完往哪放就在哪，
+       不会被重新布局拽回去 */
+    const draggedPositions = new Map<string, { x: number; y: number }>();
     watch(
       () => props.selected,
       s => {
@@ -151,6 +163,12 @@ export const SchemaGraphCanvas = defineComponent({
             }
           });
         }
+        /* 用户摆过的节点钉回原位（旧仓同款）：布局算的是机器的位置，
+           拖过的那几个永远听人的 */
+        for (const [id, pos] of draggedPositions) {
+          if (g.hasNode(id))
+            g.mergeNodeAttributes(id, { x: pos.x, y: pos.y });
+        }
         sigmaRef.value?.kill();
         /* sigmaOptions 的 CanvasOptions 与本文件的字面量不逐字对齐
            （edgeProgramClasses 的映射键是本文件定义的渲染派发键，运行时一致，
@@ -164,16 +182,32 @@ export const SchemaGraphCanvas = defineComponent({
             [EDGE_TYPE_CURVED_LINE]: EdgeCurveProgram
           }),
           minEdgeThickness: MIN_EDGE_THICKNESS,
-          maxCameraRatio: 8
+          // 几十上百个类，缩到 0.05 就看得见全貌（旧仓同值；实例图缩得更远）
+          minCameraRatio: 0.05,
+          maxCameraRatio: 8,
+          // 胶囊不随缩小消失（走查"城市缩着缩着变成一个圆圈"）：sigma 默认
+          // 节点半径 < 5px 就不画名字，底下的裸实心圆就露出来。叶子类 size=8，
+          // 最先掉——所以总是它先变圆圈。本体页类少、胶囊不压，阈值归零；
+          // 密度筛同步放宽（0.8 → 2），缩远时少几个名字被网格筛掉
+          labelRenderedSizeThreshold: 0,
+          labelDensity: 2
         } as never);
         const sigma = new Sigma(g, container, {
           ...settings,
           nodeReducer: (node, attrs) => {
             const res = { ...attrs };
+            const base = attrs.size as number;
             const sel = selectedRef.value;
-            if (sel && sel.kind === "class" && sel.id === node) {
-              return selectedNode(res, attrs, attrs.size as number);
+            const hov = hoverNodeRef.value;
+            const selClass =
+              sel?.kind === "class" && g.hasNode(sel.id) ? sel.id : null;
+            // 选中压过指到（与实例图同一条）：指针落到自己选中的那个类上，
+            // 读到的还是选中那一副
+            if (selClass === node) {
+              const picked = selectedNode(res, attrs, base);
+              return hov === node ? deferToHoverLayer(picked) : picked;
             }
+            if (hov === node) return hoveredNode(res);
             return res;
           },
           edgeReducer: (edge, attrs) => {
@@ -181,22 +215,43 @@ export const SchemaGraphCanvas = defineComponent({
             const [s, t] = g.extremities(edge);
             const sel = selectedRef.value;
             const kind = String(attrs.kind ?? RELATION_KIND);
-            const isSub =
-              (sel?.kind === "class" && (sel.id === s || sel.id === t)) ||
-              (sel?.kind === "relation" &&
-                ((attrs.relationIds as string[]) ?? []).includes(sel.id));
-            res.color = edgeColorFor(
-              kind,
-              !!sel && !isSub,
-              isSub && sel?.kind !== "rule"
-            );
-            if (kind === RULE_KIND) {
-              // 关掉的规则也画，只是暗一档
-              if (attrs.enabled === false) res.color = EDGE_DIM;
-              if (sel?.kind === "rule" && sel.id === attrs.ruleId) {
-                res.color = EDGE_RULE_FOCUS;
-                res.forceLabel = true;
-              }
+            const relIds = (attrs.relationIds as string[]) ?? [];
+            const base = edgeColorFor(kind, false, false);
+            res.color = base;
+            // 关掉的规则也画，只是暗一档
+            if (kind === RULE_KIND && attrs.enabled === false)
+              res.color = EDGE_DIM;
+            /* 结构性的边（继承/互斥）不挂标签；关系边挂——名字来自 schema.ts
+               建边时的 label（r.label / "N 条关系"），由 renderEdgeLabels 按缩放
+               开关（见下方 updateEdgeLabels）。规则边挂名字：那是它唯一说得出
+               自己是谁的地方 */
+            if (kind !== RELATION_KIND && kind !== RULE_KIND) res.label = "";
+
+            const hov = hoverNodeRef.value;
+            const hoverHit = hov !== null && (hov === s || hov === t);
+            const hoverEdgeHit = hoverEdgeRef.value === edge;
+            const selHit =
+              sel?.kind === "class"
+                ? sel.id === s || sel.id === t
+                : sel?.kind === "relation"
+                  ? relIds.includes(sel.id)
+                  : sel?.kind === "rule"
+                    ? attrs.ruleId === sel.id
+                    : false;
+            // 指到/选中相关的边：提亮、加粗、换到最后画的那一批
+            if (selHit || hoverHit || hoverEdgeHit) {
+              res.color = edgeColorFor(kind, false, true);
+              res.size = Math.max((attrs.size as number) ?? 1, 1) * 1.5;
+              res.zIndex = 3;
+              res.type = drawLast(String(res.type ?? EDGE_TYPE_ARROW));
+              // 提亮的边把名字亮出来（不看缩放）
+              res.forceLabel = true;
+              return res;
+            }
+            // 选中了什么但这条边跟它无关：压到背景色附近去
+            if (sel) {
+              res.color = EDGE_DIM;
+              res.label = "";
             }
             return res;
           }
@@ -209,11 +264,13 @@ export const SchemaGraphCanvas = defineComponent({
           const s = g.source(edge);
           if (attrs.kind === RELATION_KIND) {
             const relIds = (attrs.relationIds as string[]) ?? [];
+            // 单独一条：选中它；并起来的一捆：选中 domain 那个类
             if (relIds.length === 1)
               emit("select", {
                 kind: "relation",
                 id: relIds[0]
               } satisfies SchemaSelection);
+            else emit("select", { kind: "class", id: s } satisfies SchemaSelection);
           } else if (attrs.kind === RULE_KIND && attrs.ruleId) {
             emit("select", {
               kind: "rule",
@@ -225,6 +282,44 @@ export const SchemaGraphCanvas = defineComponent({
           }
         });
         sigma.on("clickStage", () => emit("select", null));
+        // 悬停：指到节点/边上，那一束提亮加粗（旧仓同款四个事件）
+        sigma.on("enterNode", ({ node }) => {
+          hoverNodeRef.value = node;
+          sigma.refresh();
+        });
+        sigma.on("leaveNode", () => {
+          hoverNodeRef.value = null;
+          sigma.refresh();
+        });
+        sigma.on("enterEdge", ({ edge }) => {
+          hoverEdgeRef.value = edge;
+          sigma.refresh();
+        });
+        sigma.on("leaveEdge", () => {
+          hoverEdgeRef.value = null;
+          sigma.refresh();
+        });
+        /* 拖节点。**没有活的力模拟要喂**——这里的布局是一次性算完就定住的，
+           拖完往哪放就在哪，不会被力模拟拽回去（「手动摆布局求清楚」）。
+           阈值/包围盒冻结/光标那一套在 attachDrag 里（迁移时整段遗漏） */
+        attachDrag(sigma, {
+          container: () => containerRef.value,
+          hovering: () => !!hoverNodeRef.value,
+          onMove: (node, pos) => {
+            draggedPositions.set(node, pos);
+          }
+        });
+        /* 关系标签只在放大后出现（旧仓同款 ratio < 1.1）——本体大起来
+           （导入包常有几十上百个类）时，全部常显就是一堵读不动的字墙。
+           迁移时漏了这一行，renderEdgeLabels 一直是默认的 false，
+           所以关系线上一个名字都没有 */
+        const updateEdgeLabels = () =>
+          sigma.setSetting(
+            "renderEdgeLabels",
+            sigma.getCamera().ratio < 1.1
+          );
+        sigma.getCamera().on("updated", updateEdgeLabels);
+        updateEdgeLabels();
         // 世界坐标网格：相机变动/容器尺寸变动时重绘
         const renderGrid = () => {
           if (gridRef.value) drawWorldGrid(gridRef.value, sigma);
