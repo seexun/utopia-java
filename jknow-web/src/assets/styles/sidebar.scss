@@ -495,11 +495,14 @@
     }
 
     /* 菜单文字对齐国内 B 端标准（用户走查"发虚不重"）：一级/组标题近实墨
-       （antd v5 菜单项 88% 墨）+ 500 字重，子项降一档 65%+400 靠字重分层，
-       选中仍主题蓝。!important 压掉别处给组标题的灰（#6b7280） */
+       + 500 字重，子项同墨 400 靠字重分层，选中仍主题蓝。!important 压掉
+       别处给组标题的灰（#6b7280）。
+       墨色走 --color-ink 令牌而不是写死 rgba(0,0,0)：暗色模式下侧栏容器
+       仍是 theme-light，写死的黑字会压在深色底上几乎看不见（README 截图
+       走查暴露——检索/问答/本体几项暗色下不可读） */
     .el-menu-item,
     .el-sub-menu__title {
-      color: rgba(0, 0, 0, 0.88) !important;
+      color: var(--color-ink) !important;
       font-weight: 500;
     }
 
@@ -527,15 +530,15 @@
     .submenu-title-noDropdown:hover,
     .el-sub-menu__title:hover {
       background-color: var(--color-neutral-soft, #fcfcfd);
-      color: rgba(0, 0, 0, 0.85) !important;
+      color: var(--color-ink) !important;
     }
 
     .nest-menu .el-sub-menu > .el-sub-menu__title,
     .el-sub-menu .el-menu-item {
       background-color: var(--el-bg-color, #fafafa);
       /* 二级与一级同墨（antd v5 菜单规范：层级只靠缩进，不做色重分档——
-         上一轮 65% 灰与一级 88% 跳变过大被走查否掉） */
-      color: rgba(0, 0, 0, 0.88) !important;
+         上一轮 65% 灰与一级 88% 跳变过大被走查否掉）。同样走令牌，暗色可读 */
+      color: var(--color-ink) !important;
       font-weight: 400;
 
       &:hover {
