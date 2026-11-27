@@ -383,3 +383,23 @@
 ### 实测（kbcreate-verify.js）
 
 头像菜单 = [个人中心, **我的库**, 布局设置, 锁定屏幕, 退出登录] ✓ / 切换器菜单 = [两库, 知识库, ＋新建知识库] ✓ / 点新建 → `/account/kbs?create=true` → 开表单 ✓（watcher 消费参数后清地址栏，属页面既有设计）。零 console error ✓。截图 `avatar-menu.png` / `switcher-menu.png` / `create-kb-form.png`。typecheck ✓ / 单测 425+425 ✓。已提交并推送。
+
+## 二十二、追补：左栏面板字色全局统一（2026-11-27，用户走查"字体颜色不一致"）
+
+用户对照图谱页与本体页左栏，指出字体颜色不一致。探针实测：图谱面板行 = `--color-ink` 近实墨 13px ✓，本体栏类行 = `#6b7280` 灰 14px ✗，底部入口 = 同灰 ✗。
+
+- **全局根因**：`rowClass`（kit.tsx，URow 基类，全站列表行共用）默认字色是 **`text-ink-2` 灰**——只有显式传 `text-ink` 的行（图谱面板手写的）才是实墨。
+- **修复**：rowClass 默认分支 `text-ink-2 hover:bg-fill hover:text-ink` → **`text-ink hover:bg-fill`**（近实墨、hover 只加底色不换字色）。本体栏类行/属性行补 `text-sub text-ink`（13px，与图谱行一致）、aside 容器 `text-[13px]`、六个底部 RailItem 走新默认（冗余 class 清理）。
+- **波及面**：URow 全站使用方（本体栏/其他零散行）行文字由灰变实墨——方向即国内标准（列表行近实墨、辅助值灰），属预期统一而非回归。暗色模式不受影响（--color-ink 令牌随主题翻转）。
+
+### 实测（panel-ink-probe.js / onto-railitem-probe.js / onto-final-shot.js）
+
+| 位置 | 颜色 | 字号/字重 |
+|---|---|---|
+| 图谱面板行 | rgb(31,41,55) ✓ | 13px / 400 |
+| 本体栏类行 | rgb(31,41,55) ✓ | 13px / 400 |
+| 本体栏底部入口 | rgb(31,41,55) ✓ | 14px / 500 |
+| 本体栏标题 | rgb(31,41,55) ✓ | 16px / 500 |
+| RailItem class | text-ink hover:bg-fill（灰已除）✓ | — |
+
+typecheck ✓ / 单测 425+425 ✓ / 零 console error ✓。截图 `onto-ink-final.png`。已提交并推送。

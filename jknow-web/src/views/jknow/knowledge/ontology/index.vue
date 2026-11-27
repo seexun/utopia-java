@@ -327,7 +327,8 @@ function afterOntologyChange(created?: {
            localStorage 持久化 + 非 onPanel 选中时回到 schema。内距由
            .onto-rail 收到 12px（标题行不再加 px/pt，分隔线为栏内既有的
            内缩式，同底部入口 border-t），行/树/分页零动 -->
-      <aside class="card onto-rail flex w-64 shrink-0 flex-col">
+      <!-- 左栏清单卡：行文字 13px 与图谱页左栏对齐（此前 14px 灰字，两栏不一致） -->
+      <aside class="card onto-rail flex w-64 shrink-0 flex-col text-[13px]">
       <!-- 卡头：标题（图谱页卡头同款）。库名 chip 已撤——左下角库切换器
            常驻显示当前库名，页头再说一遍是重复（用户走查） -->
       <div class="flex items-center gap-2 border-b border-line pb-2">
@@ -415,7 +416,7 @@ function afterOntologyChange(created?: {
                       ]"
                       :style="{ background: t.color }"
                     />
-                    <span class="truncate">{{ t.label }}</span>
+                    <span class="truncate text-sub text-ink">{{ t.label }}</span>
                   </span>
                 </URow>
               </div>
@@ -439,7 +440,7 @@ function afterOntologyChange(created?: {
                     <span class="block w-3" />
                   </template>
                   <span class="flex items-center gap-2">
-                    <span class="truncate">{{ r.label }}</span>
+                    <span class="truncate text-sub text-ink">{{ r.label }}</span>
                     <span
                       v-if="r.functional"
                       class="badge-soft badge-soft-primary"
@@ -464,56 +465,37 @@ function afterOntologyChange(created?: {
       <div
         class="mt-auto flex shrink-0 flex-col gap-0.5 border-t border-line pt-2"
       >
-        <RailItem
-          :active="sel?.kind === 'import'"
-          @click="sel = { kind: 'import' }"
-        >
+        <RailItem :active="sel?.kind === 'import'" @click="sel = { kind: 'import' }">
           <template #icon>
             <Icon icon="lucide:upload" width="14" height="14" />
           </template>
           {{ S.ontology.importShort }}
         </RailItem>
-        <RailItem
-          :active="sel?.kind === 'rules'"
-          @click="sel = { kind: 'rules' }"
-        >
+        <RailItem :active="sel?.kind === 'rules'" @click="sel = { kind: 'rules' }">
           <template #icon>
             <Icon icon="lucide:scale" width="14" height="14" />
           </template>
           {{ S.ontology.rulesShort }}
         </RailItem>
-        <RailItem
-          :active="sel?.kind === 'refine'"
-          @click="sel = { kind: 'refine' }"
-        >
+        <RailItem :active="sel?.kind === 'refine'" @click="sel = { kind: 'refine' }">
           <template #icon>
             <Icon icon="lucide:wand-2" width="14" height="14" />
           </template>
           {{ S.ontology.refineShort }}
         </RailItem>
-        <RailItem
-          :active="sel?.kind === 'uniqueness'"
-          :count="loading ? undefined : uniquenessData.length"
-          @click="sel = { kind: 'uniqueness' }"
-        >
+        <RailItem :active="sel?.kind === 'uniqueness'" @click="sel = { kind: 'uniqueness' }">
           <template #icon>
             <Icon icon="lucide:split" width="14" height="14" />
           </template>
           {{ S.ontology.uniquenessShort }}
         </RailItem>
-        <RailItem
-          :active="sel?.kind === 'regressions'"
-          @click="sel = { kind: 'regressions' }"
-        >
+        <RailItem :active="sel?.kind === 'regressions'" @click="sel = { kind: 'regressions' }">
           <template #icon>
             <Icon icon="lucide:check-check" width="14" height="14" />
           </template>
           {{ S.ontology.casesShort }}
         </RailItem>
-        <RailItem
-          :active="sel?.kind === 'misses'"
-          @click="sel = { kind: 'misses' }"
-        >
+        <RailItem :active="sel?.kind === 'misses'" @click="sel = { kind: 'misses' }">
           <template #icon>
             <Icon icon="lucide:inbox" width="14" height="14" />
           </template>

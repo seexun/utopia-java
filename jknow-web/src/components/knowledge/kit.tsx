@@ -212,7 +212,9 @@ export function rowClass(
         ? "text-danger hover:bg-fill"
         : tone === "warn"
           ? "text-warning hover:bg-fill"
-          : "text-ink-2 hover:bg-fill hover:text-ink"
+          : /* 行文字近实墨（国内 B 端标准，走查"两栏字体颜色不一致"的全局根因
+               ——原 text-ink-2 灰在白底上发虚）；hover 只加底色不换字色 */
+            "text-ink hover:bg-fill"
   );
 }
 
