@@ -651,7 +651,8 @@ const composerSendDisabled = computed(
     <div v-else class="utopia-page-scope flex h-full flex-col p-6">
       <!-- 页头（reskin-b3 六要素之一）：标题=对话、副题=库名；本页唯一主行动是
            左栏的「新对话」，页头不放 extra（检索/图谱页同口径） -->
-      <PageHeader :title="S.nav.ask" :subtitle="kb?.name ?? ''" />
+      <!-- 库名副题已撤：左下角库切换器常驻显示当前库名（用户走查） -->
+      <PageHeader :title="S.nav.ask" />
 
       <div class="flex min-h-0 flex-1 gap-4">
         <!-- 会话列表卡（reskin-b3 三卡之一）：anivia 卡容器（theme.scss .card），

@@ -1393,16 +1393,12 @@ const statsText = computed(() => {
         class="card flex h-full flex-col overflow-hidden"
         :class="panelCollapsed ? 'pointer-events-none opacity-0' : ''"
       >
-        <!-- 面板头：标题 + kb chip（prop-pane__header 同款 border-b） -->
+        <!-- 面板头：标题（prop-pane__header 同款 border-b）。库名 chip 已撤——
+             左下角库切换器常驻显示当前库名，页头再说一遍是重复（用户走查） -->
         <div
           class="flex flex-wrap items-center gap-2 border-b border-line px-3.5 pb-2.5 pt-3"
         >
           <h1 class="text-title font-semibold text-ink">{{ S.nav.graph }}</h1>
-          <span
-            class="rounded-full border border-line bg-fill px-2 py-0.5 text-aux text-ink-2"
-          >
-            {{ kb?.name }}
-          </span>
         </div>
         <!-- 搜索区（op-search 同款：灰底填充式输入，focus 白底+主色描边）。
              建议框 absolute 以本区为参照 -->

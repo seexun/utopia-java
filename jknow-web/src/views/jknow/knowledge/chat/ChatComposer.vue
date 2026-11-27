@@ -105,7 +105,10 @@ function scopeButtonClass() {
               :class="scopeButtonClass()"
             >
               <LayersIcon width="12" height="12" class="shrink-0 text-ink-2" />
-              <span class="sle">{{ kb?.name ?? "…" }}</span>
+              <!-- 按钮文字由库名改为通用的「知识库」（用户走查：主体区域不再重复
+                   显示库名，左下角库切换器已有）。当前选的是哪个库，点开下拉
+                   仍能看到并切换——功能不变 -->
+              <span class="sle">{{ S.ask.scopeLabel }}</span>
               <ChevronDownIcon
                 width="11"
                 height="11"

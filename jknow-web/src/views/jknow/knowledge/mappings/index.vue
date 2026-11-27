@@ -46,8 +46,6 @@ const queryClient = useQueryClient();
 // KbScope 对等物（每个 kb 页面 setup 调一次）
 const scope = useKbScope();
 const kbId = scope.kbId;
-// 库名副题（纯展示，final-sprint T2）：页头 PageHeader 的 subtitle 料
-const kbName = computed(() => scope.kb.value?.name ?? "");
 const { canManage } = useKbRole();
 // 注册新连接是部署级动作：管理员给直达入口（["me"] 会话内不变）
 const me = useQuery({ queryKey: ["me"], queryFn: meApi });
@@ -298,14 +296,11 @@ const hasMounted = computed(() => mountedList.value.length > 0);
       <!-- 整页收进一张卡（重排批 2026-11-27 治"难看"走查）：原裸 PageHeader +
            三行灰字 + 无卡表格，与图谱/审查"白卡 + 卡片头"的壳脱节。
            卡头=标题 + kb chip + 口径/数据源两档，与本体页图/表同位 -->
+      <!-- 整页收进一张卡：卡头=标题 + 口径/数据源两档，与本体页图/表同位。
+           库名 chip 已撤——左下角库切换器常驻显示当前库名（用户走查） -->
       <div class="card">
         <div class="flex items-center gap-2 border-b border-line pb-2.5">
           <h1 class="text-title font-semibold text-ink">{{ S.mapping.title }}</h1>
-          <span
-            class="truncate rounded-full border border-line bg-fill px-2 py-0.5 text-aux text-ink-2"
-          >
-            {{ kbName }}
-          </span>
           <USegmented
             class="ml-auto"
             :value="tab"

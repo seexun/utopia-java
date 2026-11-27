@@ -410,9 +410,10 @@ function rowSourceIcon(row: SourceDoc): Component | null {
     >
       <div>
         <!-- 页头（reskin-b1 六要素之一）：PageHeader 范式。标题语义原样
-             （headerTitle 随所选作用域：all=文库/选中来源=来源名/…），副题=库名；
+             （headerTitle 随所选作用域：all=文库/选中来源=来源名/…）；库名副题
+             已撤（左下角库切换器常驻显示，用户走查）；
              唯一主行动=上传按钮，canUpload 闸原样（canWrite 且手动语义目的地） -->
-        <PageHeader :title="headerTitle" :subtitle="kbName">
+        <PageHeader :title="headerTitle">
           <template #extra>
             <el-button
               v-if="canUpload"

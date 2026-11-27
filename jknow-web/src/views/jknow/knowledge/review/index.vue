@@ -577,13 +577,9 @@ function setPicked(on: boolean, id?: string) {
            KPI 概览条——原 8 张统计大卡浓缩为四个数，一行扫完。
            KPI 数据来自 reviewSummary；加载中先不渲染（卡片只剩标题行） -->
       <div class="card mb-[15px]">
+        <!-- 库名 chip 已撤：左下角库切换器常驻显示当前库名（用户走查） -->
         <div class="flex items-center gap-2 border-b border-line pb-2">
           <h1 class="text-title font-semibold text-ink">{{ S.review.title }}</h1>
-          <span
-            class="truncate rounded-full border border-line bg-fill px-2 py-0.5 text-aux text-ink-2"
-          >
-            {{ kb?.name }}
-          </span>
         </div>
         <div class="pt-3">
           <ReviewKpiBar v-if="summary.data.value" :summary="summary.data.value" />

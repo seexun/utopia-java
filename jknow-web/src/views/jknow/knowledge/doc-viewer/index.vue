@@ -25,9 +25,8 @@ const DOC_PAGE = 12;
 
 const route = useRoute();
 const router = useRouter();
-// KbScope 对等物（每个 kb 页面 setup 调一次）；库名给页头副题（纯展示）
+// KbScope 对等物（每个 kb 页面 setup 调一次）
 const scope = useKbScope();
-const kbName = computed(() => scope.kb.value?.name ?? "");
 const kbId = computed(
   () => (route.params as { kbId?: string } | undefined)?.kbId ?? ""
 );
@@ -137,9 +136,10 @@ const docDate = computed(() =>
           {{ String(detail.error.value) }}
         </div>
         <template v-else-if="doc">
-          <!-- 页头（重造要素一）：标题=文档名、副题=库名；extra=回文库。
+          <!-- 页头（重造要素一）：标题=文档名；extra=回文库。库名副题已撤
+               （左下角库切换器常驻显示，用户走查）。
                原 h1 行的元信息（块数/大小/文档日期/上传日）落在页头下 -->
-          <PageHeader class="mb-1" :title="doc.filename" :subtitle="kbName">
+          <PageHeader class="mb-1" :title="doc.filename">
             <template #extra>
               <RouterLink
                 :to="`/kb/${kbId}/library`"

@@ -102,9 +102,10 @@ function srcCat(documentId: string): string {
 <template>
   <div class="knowledge-page h-full overflow-y-auto p-6">
     <div class="mx-auto max-w-3xl">
-      <!-- 页头（PageHeader 自 gvdata 零改写迁入）：22/800 标题 + 库名副题；
-           检索页的唯一主行动是查询卡里的提交按钮，页头不放 extra -->
-      <PageHeader :title="S.nav.search" :subtitle="kb?.name ?? ''" />
+      <!-- 页头（PageHeader 自 gvdata 零改写迁入）：22/800 标题；库名副题已撤
+           （左下角库切换器常驻显示，用户走查）。检索页的唯一主行动是查询卡里
+           的提交按钮，页头不放 extra -->
+      <PageHeader :title="S.nav.search" />
 
       <div class="flex flex-col gap-4">
         <!-- 查询卡：大号输入 + 主行动（每页唯一）。focus 光晕由全局主题层提供

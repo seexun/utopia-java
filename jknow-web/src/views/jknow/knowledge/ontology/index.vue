@@ -102,8 +102,6 @@ const { canManage: canEdit } = useKbRole();
 const kbId = computed(
   () => (route.params as { kbId?: string } | undefined)?.kbId ?? ""
 );
-/** 页头副题：库名（reskin-b3 纯展示；详情由 useKbScope 载入 store） */
-const kbName = computed(() => kbStore.kbDetail?.name ?? "");
 
 const sel = ref<Sel>(null);
 const edit = ref<Edit>(null);
@@ -330,14 +328,10 @@ function afterOntologyChange(created?: {
            .onto-rail 收到 12px（标题行不再加 px/pt，分隔线为栏内既有的
            内缩式，同底部入口 border-t），行/树/分页零动 -->
       <aside class="card onto-rail flex w-64 shrink-0 flex-col">
-      <!-- 卡头：标题 + kb chip（图谱页卡头行1 同款家族形态） -->
+      <!-- 卡头：标题（图谱页卡头同款）。库名 chip 已撤——左下角库切换器
+           常驻显示当前库名，页头再说一遍是重复（用户走查） -->
       <div class="flex items-center gap-2 border-b border-line pb-2">
         <h1 class="text-title font-semibold text-ink">{{ S.ontology.title }}</h1>
-        <span
-          class="truncate rounded-full border border-line bg-fill px-2 py-0.5 text-aux text-ink-2"
-        >
-          {{ kbName }}
-        </span>
       </div>
       <!-- 筛选框、两档、清单只属于图那一档——换档时折起来而不是瞬间消失 -->
       <div class="rail-fold" :class="view === 'table' && 'is-folded'">
