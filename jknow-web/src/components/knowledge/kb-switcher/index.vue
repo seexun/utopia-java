@@ -10,10 +10,12 @@
         计算，折叠态（54px）收敛为首字徽标图标按钮 + el-tooltip 显全名。 -->
 <script setup lang="ts">
 import { computed } from "vue";
+import { useRouter } from "vue-router";
 import { useKbContext } from "@/composables/useKbContext";
 import useAppStore from "@/store/modules/app";
 import useSettingsStore from "@/store/modules/settings";
 import variables from "@/assets/styles/variables.module.scss";
+import { S } from "@/i18n";
 import LayersIcon from "~icons/lucide/layers";
 import ChevronDownIcon from "~icons/lucide/chevron-down";
 import CheckIcon from "~icons/lucide/check";
@@ -22,6 +24,10 @@ const { kb, kbs, switchKb } = useKbContext();
 
 const appStore = useAppStore();
 const settingsStore = useSettingsStore();
+const router = useRouter();
+/* 建库入口：落「我的库」页并直接开新建表单（?create=true 深链，
+   my-kbs.vue 对 ?create=true 有专门处理） */
+const goCreate = () => router.push("/account/kbs?create=true");
 
 const collapse = computed(() => !appStore.sidebar.opened);
 const sideTheme = computed(() => settingsStore.sideTheme);
@@ -92,6 +98,14 @@ const switcherBorder = computed(() =>
           <CheckIcon v-if="kb && k.id === kb.id" width="13" height="13" />
         </el-dropdown-item>
         <el-dropdown-item v-if="kbs.length === 0" disabled>暂无知识库</el-dropdown-item>
+        <!-- 库管理入口（重排批 2026-11-27 用户走查：切换器里没有建库入口）——
+             我的库=库列表与管理；新建知识库=落我的库页并直接开建库表单 -->
+        <el-dropdown-item divided @click="router.push('/account/kbs')">
+          <span class="kb-switcher-manage">{{ S.account.kbsNav }}</span>
+        </el-dropdown-item>
+        <el-dropdown-item @click="goCreate">
+          <span class="kb-switcher-manage kb-switcher-manage--create">＋ {{ S.settings.kbs.newKb }}</span>
+        </el-dropdown-item>
       </el-dropdown-menu>
     </template>
   </el-dropdown>
@@ -156,6 +170,20 @@ const switcherBorder = computed(() =>
       background: var(--current-color, var(--color-primary));
     }
   }
+}
+
+/* 库管理入口（我的库 / 新建知识库）：列表项下方两行，次要色、悬停提亮 */
+.kb-switcher-manage {
+  color: var(--color-ink-2);
+
+  &:hover {
+    color: var(--color-primary);
+  }
+}
+
+.kb-switcher-manage--create {
+  color: var(--color-primary);
+  font-weight: 500;
 }
 </style>
 

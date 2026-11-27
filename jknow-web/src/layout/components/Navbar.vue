@@ -47,6 +47,11 @@
             <router-link to="/user/profile">
               <el-dropdown-item>个人中心</el-dropdown-item>
             </router-link>
+            <!-- 我的库（2026-11-27 用户走查：头像菜单里找不到建库入口）——
+                 /account/kbs = 我的库列表 + 新建知识库 -->
+            <router-link to="/account/kbs">
+              <el-dropdown-item>我的库</el-dropdown-item>
+            </router-link>
             <el-dropdown-item command="setLayout" v-if="settingsStore.showSettings">
                 <span>布局设置</span>
             </el-dropdown-item>

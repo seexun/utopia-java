@@ -371,3 +371,15 @@
 ### 实测（kbname-verify.js）
 
 7 个页面（图谱/本体/审查/映射/检索/文库/问答）逐页断言：主区域库名出现 0 次 ✓ / 左下角有库名 ✓ / 页面正常渲染（防空白页回归）✓ → **ALL PASS**。typecheck ✓ / 单测 425+425 ✓。截图 `kbname-removed-ontology.png`。已提交并推送。
+
+## 二十一、追补：建库入口补全（2026-11-27，用户走查"找不到新建入口"）
+
+用户按指引找建库入口，两处都落空。排查：带「我的库/知识库/新建」入口的 `UserMenu` 组件只挂在文档公开页；主界面（Layout 侧栏 + 头像菜单）用若依原生下拉，没有这些项；kb-switcher 文件头注释宣称的"查找/库列表/新建三段式弹层"实际实现只有库列表——新建段在迁移中丢失。
+
+- **头像菜单**加「我的库」（`/account/kbs`）——个人中心之下、布局设置之上
+- **kb-switcher 下拉**加两项：我的库（`/account/kbs`）/ ＋ 新建知识库（`/account/kbs?create=true`，my-kbs 页对 ?create=true 的 watch 会开建库表单并清地址栏参数——深链机制原样复用）
+- 新建表单弹窗（名称/描述/仅受邀请/预置本体）端到端实测弹出 ✓
+
+### 实测（kbcreate-verify.js）
+
+头像菜单 = [个人中心, **我的库**, 布局设置, 锁定屏幕, 退出登录] ✓ / 切换器菜单 = [两库, 知识库, ＋新建知识库] ✓ / 点新建 → `/account/kbs?create=true` → 开表单 ✓（watcher 消费参数后清地址栏，属页面既有设计）。零 console error ✓。截图 `avatar-menu.png` / `switcher-menu.png` / `create-kb-form.png`。typecheck ✓ / 单测 425+425 ✓。已提交并推送。
